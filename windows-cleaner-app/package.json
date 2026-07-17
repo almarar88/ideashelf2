@@ -1,0 +1,35 @@
+{
+  "name": "cleanshelf",
+  "productName": "CleanShelf",
+  "version": "1.0.0",
+  "description": "أداة ويندوز لتنظيف الكمبيوتر، إزالة البرامج، إدارة الملفات، وتحرير وسوم ملفات الأغاني",
+  "author": "ideashelf2",
+  "private": true,
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "build:win": "electron-vite build && electron-builder --win --x64",
+    "build:win:portable": "electron-vite build && electron-builder --win portable --x64",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "music-metadata": "^7.14.0",
+    "node-id3": "^0.2.6",
+    "systeminformation": "^5.23.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

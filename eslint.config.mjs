@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // مشروع فرعي مستقل بأدواته وتهيئته الخاصة (Electron/Vite)
+    "windows-cleaner-app/**",
   ]),
 ]);
 
