@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import type { LargeFileEntry } from '../../shared/types'
+import { useEffect, useState } from 'react'
+import type { LargeFileEntry, ScanProgress } from '../../shared/types'
+import { ScanProgressPanel } from '../components/ScanProgressPanel'
 import { formatBytes } from '../lib/format'
 import { basename } from '../lib/pathUtils'
 import { useToast } from '../lib/toastContext'
@@ -18,6 +19,9 @@ export function LargeFiles(): JSX.Element {
   const [threshold, setThreshold] = useState(THRESHOLDS[0].bytes)
   const [files, setFiles] = useState<LargeFileEntry[]>([])
   const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [progress, setProgress] = useState<ScanProgress | null>(null)
+
+  useEffect(() => window.api.fm.onScanProgress(setProgress), [])
 
   async function pickAndScan(): Promise<void> {
     const picked = await window.api.dialogs.pickFolder()
@@ -29,12 +33,15 @@ export function LargeFiles(): JSX.Element {
     setFolder(root)
     setScanning(true)
     setChecked(new Set())
+    setProgress(null)
     try {
       setFiles(await window.api.fm.findLargeFiles(root, minSize))
     } catch (err) {
-      showToast('فشل البحث: ' + (err as Error).message)
+      const message = (err as Error).message
+      showToast(message.includes('أُلغي') ? 'أُوقف الفحص' : 'فشل البحث: ' + message)
     } finally {
       setScanning(false)
+      setProgress(null)
     }
   }
 
@@ -85,10 +92,11 @@ export function LargeFiles(): JSX.Element {
         )}
       </div>
 
+      {scanning ? (
+        <ScanProgressPanel progress={progress} onCancel={() => window.api.fm.cancelScan()} />
+      ) : (
       <div className="card">
-        {scanning ? (
-          <div className="empty-state">جارٍ البحث…</div>
-        ) : files.length === 0 ? (
+        {files.length === 0 ? (
           <div className="empty-state">
             <div style={{ fontSize: 32 }}>📦</div>
             <div>اختر مجلدًا لعرض أكبر الملفات فيه</div>
@@ -127,6 +135,7 @@ export function LargeFiles(): JSX.Element {
           </table>
         )}
       </div>
+      )}
     </div>
   )
 }

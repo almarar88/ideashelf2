@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import type { DuplicateGroup } from '../../shared/types'
+import { useEffect, useState } from 'react'
+import type { DuplicateGroup, ScanProgress } from '../../shared/types'
+import { ScanProgressPanel } from '../components/ScanProgressPanel'
 import { formatBytes } from '../lib/format'
 import { basename } from '../lib/pathUtils'
 import { useToast } from '../lib/toastContext'
@@ -10,22 +11,37 @@ export function Duplicates(): JSX.Element {
   const [scanning, setScanning] = useState(false)
   const [groups, setGroups] = useState<DuplicateGroup[]>([])
   const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [progress, setProgress] = useState<ScanProgress | null>(null)
+
+  useEffect(() => window.api.fm.onScanProgress(setProgress), [])
+
+  async function runScan(root: string, announceEmpty = true): Promise<void> {
+    setScanning(true)
+    setGroups([])
+    setChecked(new Set())
+    setProgress(null)
+    try {
+      const result = await window.api.fm.findDuplicates(root, 4096)
+      setGroups(result)
+      if (announceEmpty && result.length === 0) showToast('لم يُعثر على ملفات مكرّرة')
+    } catch (err) {
+      const message = (err as Error).message
+      showToast(message.includes('أُلغي') ? 'أُوقف الفحص' : 'فشل البحث: ' + message)
+    } finally {
+      setScanning(false)
+      setProgress(null)
+    }
+  }
 
   async function pickAndScan(): Promise<void> {
     const picked = await window.api.dialogs.pickFolder()
     if (!picked) return
     setFolder(picked)
-    setScanning(true)
-    setGroups([])
-    setChecked(new Set())
-    try {
-      const result = await window.api.fm.findDuplicates(picked, 4096)
-      setGroups(result)
-    } catch (err) {
-      showToast('فشل البحث: ' + (err as Error).message)
-    } finally {
-      setScanning(false)
-    }
+    await runScan(picked)
+  }
+
+  async function cancelScan(): Promise<void> {
+    await window.api.fm.cancelScan()
   }
 
   function toggle(p: string): void {
@@ -56,13 +72,7 @@ export function Duplicates(): JSX.Element {
     if (!confirmed) return
     const results = await window.api.fm.delete([...checked])
     showToast(`تم حذف ${results.filter((r) => r.success).length} ملف`)
-    if (folder) {
-      setScanning(true)
-      const result = await window.api.fm.findDuplicates(folder, 4096)
-      setGroups(result)
-      setChecked(new Set())
-      setScanning(false)
-    }
+    if (folder) await runScan(folder, false)
   }
 
   return (
@@ -87,7 +97,7 @@ export function Duplicates(): JSX.Element {
       </div>
 
       {scanning ? (
-        <div className="empty-state">جارٍ البحث عن الملفات المكرّرة… قد يستغرق دقائق للمجلدات الكبيرة</div>
+        <ScanProgressPanel progress={progress} onCancel={cancelScan} />
       ) : groups.length === 0 ? (
         <div className="empty-state">
           <div style={{ fontSize: 32 }}>🧬</div>

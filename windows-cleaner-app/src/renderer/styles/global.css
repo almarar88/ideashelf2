@@ -357,6 +357,33 @@ select:focus {
   transition: width 0.2s ease;
 }
 
+/* شريط غير محدّد المدة: لا نعرف الإجمالي أثناء المسح، فنُظهر حركة مستمرة */
+.progress-bar.indeterminate {
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar.indeterminate > div {
+  background: linear-gradient(
+    90deg,
+    var(--border) 0%,
+    var(--accent) 45%,
+    var(--accent) 55%,
+    var(--border) 100%
+  );
+  background-size: 240% 100%;
+  animation: indeterminate-slide 1.3s linear infinite;
+}
+
+@keyframes indeterminate-slide {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;

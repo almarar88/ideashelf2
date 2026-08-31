@@ -58,17 +58,36 @@ export interface FlatFile {
   sizeBytes: number
 }
 
+export class ScanCancelledError extends Error {
+  constructor() {
+    super('أُلغي الفحص')
+    this.name = 'ScanCancelledError'
+  }
+}
+
+export interface WalkOptions {
+  maxEntries?: number
+  /** يُستدعى دوريًا (وليس لكل ملف) لتفادي إغراق قناة IPC */
+  onProgress?: (filesSeen: number, currentDir: string) => void
+  shouldCancel?: () => boolean
+}
+
+const PROGRESS_EVERY = 400
+
 /** يجمع كل الملفات تحت مجلد كقائمة مسطّحة (للحذف أو البحث عن التكرارات). */
 export async function listFilesRecursive(
   rootPath: string,
-  maxEntries = 200_000
+  options: WalkOptions = {}
 ): Promise<FlatFile[]> {
+  const { maxEntries = 200_000, onProgress, shouldCancel } = options
   const result: FlatFile[] = []
   let visited = 0
   const stack: string[] = [rootPath]
 
   while (stack.length > 0) {
     const current = stack.pop()!
+    if (shouldCancel?.()) throw new ScanCancelledError()
+
     let entries: import('node:fs').Dirent[]
     try {
       entries = await fs.readdir(current, { withFileTypes: true })
@@ -77,6 +96,8 @@ export async function listFilesRecursive(
     }
     for (const entry of entries) {
       if (visited++ > maxEntries) return result
+      if (onProgress && visited % PROGRESS_EVERY === 0) onProgress(result.length, current)
+
       const full = path.join(current, entry.name)
       if (entry.isSymbolicLink()) continue
       if (entry.isDirectory()) {

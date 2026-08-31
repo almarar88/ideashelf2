@@ -11,7 +11,8 @@ import type {
   AudioTag,
   AudioTagWrite,
   StartupItem,
-  SystemSummary
+  SystemSummary,
+  ScanProgress
 } from '../shared/types'
 import type { BatchRenamePlan, BatchRenameResult } from '../main/lib/fileManagerLib'
 
@@ -57,6 +58,14 @@ const api = {
       ipcRenderer.invoke('fm:findDuplicates', rootPath, minSizeBytes),
     findLargeFiles: (rootPath: string, minSizeBytes: number): Promise<LargeFileEntry[]> =>
       ipcRenderer.invoke('fm:findLargeFiles', rootPath, minSizeBytes),
+    cancelScan: (): Promise<void> => ipcRenderer.invoke('fm:cancelScan'),
+    onScanProgress: (listener: (p: ScanProgress) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, p: ScanProgress): void => listener(p)
+      ipcRenderer.on('fm:scanProgress', handler)
+      return (): void => {
+        ipcRenderer.removeListener('fm:scanProgress', handler)
+      }
+    },
     homeDir: (): Promise<string> => ipcRenderer.invoke('fm:homeDir')
   },
   tags: {

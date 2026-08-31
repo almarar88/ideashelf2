@@ -13,6 +13,17 @@ export interface CleanerCategory {
   requiresAdmin: boolean
 }
 
+export interface ScanProgress {
+  phase: 'walking' | 'hashing'
+  /** عدد الملفات التي عُثر عليها حتى الآن */
+  filesSeen: number
+  /** عدد الملفات التي جرت معالجتها في المرحلة الحالية */
+  processed: number
+  /** إجمالي المطلوب معالجته في المرحلة الحالية (0 إذا كان غير معروف بعد) */
+  total: number
+  currentPath: string
+}
+
 export interface CleanerScanResult {
   categories: CleanerCategory[]
   totalBytes: number

@@ -1,6 +1,6 @@
-import { ipcMain, shell } from 'electron'
+import { ipcMain, shell, BrowserWindow } from 'electron'
 import path from 'node:path'
-import type { DirListing, DuplicateGroup, LargeFileEntry } from '../../shared/types'
+import type { DirListing, DuplicateGroup, LargeFileEntry, ScanProgress } from '../../shared/types'
 import {
   listDirectory,
   renameEntry,
@@ -62,17 +62,37 @@ export function registerFileManagerIpc(): void {
     return applyBatchRename(plan)
   })
 
+  // فحص واحد نشط في كل لحظة — يكفي لواجهة لا تسمح ببدء فحصين معًا
+  let cancelRequested = false
+
+  function scanHooks(event: Electron.IpcMainInvokeEvent): {
+    onProgress: (progress: ScanProgress) => void
+    shouldCancel: () => boolean
+  } {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    return {
+      onProgress: (progress) => win?.webContents.send('fm:scanProgress', progress),
+      shouldCancel: () => cancelRequested
+    }
+  }
+
+  ipcMain.handle('fm:cancelScan', async () => {
+    cancelRequested = true
+  })
+
   ipcMain.handle(
     'fm:findDuplicates',
-    async (_event, rootPath: string, minSizeBytes: number): Promise<DuplicateGroup[]> => {
-      return findDuplicates(rootPath, minSizeBytes)
+    async (event, rootPath: string, minSizeBytes: number): Promise<DuplicateGroup[]> => {
+      cancelRequested = false
+      return findDuplicates(rootPath, minSizeBytes, scanHooks(event))
     }
   )
 
   ipcMain.handle(
     'fm:findLargeFiles',
-    async (_event, rootPath: string, minSizeBytes: number): Promise<LargeFileEntry[]> => {
-      return findLargeFiles(rootPath, minSizeBytes)
+    async (event, rootPath: string, minSizeBytes: number): Promise<LargeFileEntry[]> => {
+      cancelRequested = false
+      return findLargeFiles(rootPath, minSizeBytes, 200, scanHooks(event))
     }
   )
 
