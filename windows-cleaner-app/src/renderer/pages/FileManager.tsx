@@ -3,6 +3,7 @@ import type { DirListing, FileEntry } from '../../shared/types'
 import { formatBytes, formatDate } from '../lib/format'
 import { useToast } from '../lib/toastContext'
 import { BatchRenameModal } from '../components/BatchRenameModal'
+import { InputModal } from '../components/InputModal'
 
 function extIcon(entry: FileEntry): string {
   if (entry.isDirectory) return '📁'
@@ -23,6 +24,8 @@ export function FileManager(): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [showBatchRename, setShowBatchRename] = useState(false)
+  const [renameTarget, setRenameTarget] = useState<FileEntry | null>(null)
+  const [showNewFolder, setShowNewFolder] = useState(false)
 
   async function open(targetPath: string | null): Promise<void> {
     setLoading(true)
@@ -63,9 +66,9 @@ export function FileManager(): JSX.Element {
     if (listing) open(listing.path)
   }
 
-  async function handleRename(entry: FileEntry): Promise<void> {
-    const newName = window.prompt('الاسم الجديد', entry.name)
-    if (!newName || newName === entry.name) return
+  async function handleRename(entry: FileEntry, newName: string): Promise<void> {
+    setRenameTarget(null)
+    if (newName === entry.name) return
     try {
       await window.api.fm.rename(entry.path, newName)
       if (listing) open(listing.path)
@@ -74,10 +77,9 @@ export function FileManager(): JSX.Element {
     }
   }
 
-  async function handleNewFolder(): Promise<void> {
+  async function handleNewFolder(name: string): Promise<void> {
+    setShowNewFolder(false)
     if (!listing?.path) return
-    const name = window.prompt('اسم المجلد الجديد', 'مجلد جديد')
-    if (!name) return
     try {
       await window.api.fm.createFolder(listing.path, name)
       open(listing.path)
@@ -100,7 +102,7 @@ export function FileManager(): JSX.Element {
         <button className="btn" disabled={!listing?.parent} onClick={() => open(listing!.parent)}>
           ⬆️ للأعلى
         </button>
-        <button className="btn" disabled={!listing?.path} onClick={handleNewFolder}>
+        <button className="btn" disabled={!listing?.path} onClick={() => setShowNewFolder(true)}>
           ➕ مجلد جديد
         </button>
         <button className="btn" disabled={selected.size === 0} onClick={handleDelete}>
@@ -124,7 +126,9 @@ export function FileManager(): JSX.Element {
           </span>
           {crumbs.map((c, i) => {
             const partial = crumbs.slice(0, i + 1).join('\\')
-            const full = listing.path.startsWith('\\\\') ? '\\\\' + partial : partial
+            // "C:" وحده يعني "المجلد الحالي للقرص" في ويندوز وليس جذره — لذا نضيف الفاصل
+            const withRoot = i === 0 ? partial + '\\' : partial
+            const full = listing.path.startsWith('\\\\') ? '\\\\' + withRoot : withRoot
             return (
               <span key={i}>
                 {' / '}
@@ -182,7 +186,7 @@ export function FileManager(): JSX.Element {
                   <td>{entry.isDirectory ? '—' : formatBytes(entry.sizeBytes)}</td>
                   <td className="muted">{formatDate(entry.modifiedAt)}</td>
                   <td>
-                    <button className="btn btn-sm" onClick={() => handleRename(entry)}>
+                    <button className="btn btn-sm" onClick={() => setRenameTarget(entry)}>
                       إعادة تسمية
                     </button>
                     <button
@@ -199,6 +203,26 @@ export function FileManager(): JSX.Element {
           </table>
         )}
       </div>
+
+      {renameTarget && (
+        <InputModal
+          title="إعادة تسمية"
+          initialValue={renameTarget.name}
+          confirmLabel="إعادة تسمية"
+          onConfirm={(name) => handleRename(renameTarget, name)}
+          onCancel={() => setRenameTarget(null)}
+        />
+      )}
+
+      {showNewFolder && (
+        <InputModal
+          title="اسم المجلد الجديد"
+          initialValue="مجلد جديد"
+          confirmLabel="إنشاء"
+          onConfirm={handleNewFolder}
+          onCancel={() => setShowNewFolder(false)}
+        />
+      )}
 
       {showBatchRename && (
         <BatchRenameModal

@@ -8,6 +8,8 @@ export interface CategoryDef {
   id: string
   labelKey: string
   risk: 'safe' | 'caution'
+  /** يحتاج صلاحيات مدير للحذف الفعلي (مسارات داخل ويندوز نفسه) */
+  requiresAdmin: boolean
   /** يعيد المجلدات المرشّحة لهذه الفئة (بعضها قد لا يكون موجودًا فعليًا). */
   resolvePaths: () => Promise<string[]>
   /** حساب الحجم بطريقة خاصة (سلة المحذوفات مثلاً)، اختياري. */
@@ -34,24 +36,28 @@ export const CATEGORY_DEFS: CategoryDef[] = [
     id: 'user_temp',
     labelKey: 'cleaner.userTemp',
     risk: 'safe',
+    requiresAdmin: false,
     resolvePaths: async () => [env('TEMP') || env('TMP')].filter(Boolean)
   },
   {
     id: 'windows_temp',
     labelKey: 'cleaner.windowsTemp',
     risk: 'safe',
+    requiresAdmin: true,
     resolvePaths: async () => [path.join(env('WINDIR') || 'C:\\Windows', 'Temp')]
   },
   {
     id: 'prefetch',
     labelKey: 'cleaner.prefetch',
     risk: 'caution',
+    requiresAdmin: true,
     resolvePaths: async () => [path.join(env('WINDIR') || 'C:\\Windows', 'Prefetch')]
   },
   {
     id: 'windows_update_cache',
     labelKey: 'cleaner.windowsUpdate',
     risk: 'safe',
+    requiresAdmin: true,
     resolvePaths: async () => [
       path.join(env('WINDIR') || 'C:\\Windows', 'SoftwareDistribution', 'Download')
     ]
@@ -60,6 +66,7 @@ export const CATEGORY_DEFS: CategoryDef[] = [
     id: 'thumbnail_cache',
     labelKey: 'cleaner.thumbnails',
     risk: 'safe',
+    requiresAdmin: false,
     resolvePaths: async () => [
       path.join(env('LOCALAPPDATA'), 'Microsoft', 'Windows', 'Explorer')
     ]
@@ -68,18 +75,21 @@ export const CATEGORY_DEFS: CategoryDef[] = [
     id: 'windows_error_reports',
     labelKey: 'cleaner.errorReports',
     risk: 'safe',
+    requiresAdmin: false,
     resolvePaths: async () => [path.join(env('LOCALAPPDATA'), 'Microsoft', 'Windows', 'WER')]
   },
   {
     id: 'recent_list',
     labelKey: 'cleaner.recentList',
     risk: 'safe',
+    requiresAdmin: false,
     resolvePaths: async () => [path.join(env('APPDATA'), 'Microsoft', 'Windows', 'Recent')]
   },
   {
     id: 'chrome_cache',
     labelKey: 'cleaner.chromeCache',
     risk: 'safe',
+    requiresAdmin: false,
     resolvePaths: async () => [
       path.join(env('LOCALAPPDATA'), 'Google', 'Chrome', 'User Data', 'Default', 'Cache'),
       path.join(env('LOCALAPPDATA'), 'Google', 'Chrome', 'User Data', 'Default', 'Code Cache')
@@ -89,6 +99,7 @@ export const CATEGORY_DEFS: CategoryDef[] = [
     id: 'edge_cache',
     labelKey: 'cleaner.edgeCache',
     risk: 'safe',
+    requiresAdmin: false,
     resolvePaths: async () => [
       path.join(env('LOCALAPPDATA'), 'Microsoft', 'Edge', 'User Data', 'Default', 'Cache'),
       path.join(env('LOCALAPPDATA'), 'Microsoft', 'Edge', 'User Data', 'Default', 'Code Cache')
@@ -98,12 +109,14 @@ export const CATEGORY_DEFS: CategoryDef[] = [
     id: 'firefox_cache',
     labelKey: 'cleaner.firefoxCache',
     risk: 'safe',
+    requiresAdmin: false,
     resolvePaths: firefoxCacheDirs
   },
   {
     id: 'delivery_optimization',
     labelKey: 'cleaner.deliveryOptimization',
     risk: 'caution',
+    requiresAdmin: true,
     resolvePaths: async () => [
       path.join(env('WINDIR') || 'C:\\Windows', 'SoftwareDistribution', 'DeliveryOptimization')
     ]
@@ -112,12 +125,14 @@ export const CATEGORY_DEFS: CategoryDef[] = [
     id: 'minidumps',
     labelKey: 'cleaner.minidumps',
     risk: 'caution',
+    requiresAdmin: true,
     resolvePaths: async () => [path.join(env('WINDIR') || 'C:\\Windows', 'Minidump')]
   },
   {
     id: 'recycle_bin',
     labelKey: 'cleaner.recycleBin',
     risk: 'caution',
+    requiresAdmin: false,
     resolvePaths: async () => [],
     customScan: async () => {
       const script = `

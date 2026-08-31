@@ -12,6 +12,7 @@ export function Cleaner(): JSX.Element {
   const [cleaning, setCleaning] = useState(false)
   const [progress, setProgress] = useState<Record<string, CleanProgress>>({})
   const [showConfirm, setShowConfirm] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(true)
 
   const scan = async (): Promise<void> => {
     setLoading(true)
@@ -29,6 +30,7 @@ export function Cleaner(): JSX.Element {
 
   useEffect(() => {
     scan()
+    window.api.system.isAdmin().then(setIsAdmin).catch(() => setIsAdmin(true))
     const off = window.api.cleaner.onProgress((p) => {
       setProgress((prev) => ({ ...prev, [p.categoryId]: p }))
     })
@@ -67,6 +69,14 @@ export function Cleaner(): JSX.Element {
 
   const hasCautionSelected = categories.some((c) => selected.has(c.id) && c.risk === 'caution')
 
+  // فئات محمية فيها بيانات فعلًا — لا فائدة من تنبيه المستخدم لفئات فارغة أصلًا
+  const adminCategoriesWithData = categories.filter((c) => c.requiresAdmin && c.sizeBytes > 0)
+
+  async function relaunchAsAdmin(): Promise<void> {
+    const result = await window.api.system.relaunchAsAdmin()
+    if (!result.started) showToast(result.message)
+  }
+
   return (
     <div className="page">
       <div className="toolbar">
@@ -90,6 +100,22 @@ export function Cleaner(): JSX.Element {
           {cleaning ? 'جارٍ التنظيف…' : '🧹 تنظيف المحدَّد'}
         </button>
       </div>
+
+      {!isAdmin && adminCategoriesWithData.length > 0 && (
+        <div
+          className="card card-pad"
+          style={{ marginBottom: 16, borderRight: '3px solid var(--warning)' }}
+        >
+          <strong>🛡️ بعض الفئات تحتاج صلاحيات المدير</strong>
+          <div className="muted" style={{ fontSize: 13, margin: '6px 0 10px' }}>
+            الفئات التالية موجودة داخل مجلدات ويندوز المحمية، ولن يُحذف منها شيء دون رفع الصلاحيات:{' '}
+            {adminCategoriesWithData.map((c) => categoryLabel(c.labelKey).title).join('، ')}.
+          </div>
+          <button className="btn btn-sm" onClick={relaunchAsAdmin}>
+            إعادة تشغيل التطبيق كمسؤول
+          </button>
+        </div>
+      )}
 
       <div className="card">
         <table>
@@ -119,7 +145,12 @@ export function Cleaner(): JSX.Element {
                   <td>
                     <div style={{ fontWeight: 600 }}>
                       {label.title}{' '}
-                      {cat.risk === 'caution' && <span className="badge badge-caution">انتبه</span>}
+                      {cat.risk === 'caution' && <span className="badge badge-caution">انتبه</span>}{' '}
+                      {cat.requiresAdmin && !isAdmin && (
+                        <span className="badge badge-caution" title="يحتاج تشغيل التطبيق كمسؤول">
+                          🛡️ مدير
+                        </span>
+                      )}
                     </div>
                     <div className="muted" style={{ fontSize: 12 }}>
                       {label.desc}

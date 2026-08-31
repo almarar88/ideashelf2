@@ -15,7 +15,8 @@ export function registerCleanerIpc(): void {
             sizeBytes,
             fileCount,
             scanned: true,
-            risk: def.risk
+            risk: def.risk,
+            requiresAdmin: def.requiresAdmin
           }
         } catch (err) {
           return {
@@ -26,7 +27,8 @@ export function registerCleanerIpc(): void {
             fileCount: 0,
             scanned: false,
             error: (err as Error).message,
-            risk: def.risk
+            risk: def.risk,
+            requiresAdmin: def.requiresAdmin
           }
         }
       })

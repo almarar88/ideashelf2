@@ -30,8 +30,12 @@ export function BatchRenameModal({
   async function apply(): Promise<void> {
     setApplying(true)
     try {
-      const applied = await window.api.fm.batchRenameApply(plan)
-      showToast(`تمت إعادة تسمية ${applied.length} ملف`)
+      const { applied, failed } = await window.api.fm.batchRenameApply(plan)
+      showToast(
+        failed.length
+          ? `تمت إعادة تسمية ${applied.length} ملف، وتعذّر ${failed.length} (${failed[0].error})`
+          : `تمت إعادة تسمية ${applied.length} ملف`
+      )
       onDone()
     } catch (err) {
       showToast('فشل بعض العمليات: ' + (err as Error).message)

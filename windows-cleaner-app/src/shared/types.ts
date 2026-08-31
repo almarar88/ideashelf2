@@ -9,6 +9,8 @@ export interface CleanerCategory {
   scanned: boolean
   error?: string
   risk: 'safe' | 'caution'
+  /** يحتاج تشغيل التطبيق بصلاحيات المدير لتنظيفه فعليًا */
+  requiresAdmin: boolean
 }
 
 export interface CleanerScanResult {

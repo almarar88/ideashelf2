@@ -6,7 +6,8 @@ import {
   readFolderTags,
   writeAudioTag,
   buildNameFromPattern,
-  parseTagsFromFileName
+  parseTagsFromFileName,
+  isAudioFile
 } from '../lib/tagEditorLib'
 import { renameEntry } from '../lib/fileManagerLib'
 
@@ -57,7 +58,7 @@ export function registerTagEditorIpc(): void {
       const entries = await fs.readdir(folderPath, { withFileTypes: true })
       const results: { path: string; fields: Record<string, string> }[] = []
       for (const entry of entries) {
-        if (!entry.isFile()) continue
+        if (!entry.isFile() || !isAudioFile(entry.name)) continue
         const fields = parseTagsFromFileName(entry.name, pattern)
         if (Object.keys(fields).length > 0) {
           results.push({ path: path.join(folderPath, entry.name), fields })

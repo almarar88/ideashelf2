@@ -4,6 +4,7 @@ import os from 'node:os'
 import type { DirListing, FileEntry } from '../../shared/types'
 import { isWindows } from './platform'
 import { runPowerShellJson } from './powershell'
+import { pathExists } from './fsWalk'
 
 interface RawDrive {
   DeviceID: string
@@ -107,12 +108,31 @@ export function buildBatchRenamePlan(
   })
 }
 
-export async function applyBatchRename(plan: BatchRenamePlan[]): Promise<BatchRenamePlan[]> {
+export interface BatchRenameResult {
+  applied: BatchRenamePlan[]
+  failed: { path: string; error: string }[]
+}
+
+/**
+ * ينفّذ خطة إعادة التسمية ملفًا ملفًا. لا يتوقف عند أول خطأ، ولا يستبدل
+ * ملفًا موجودًا أبدًا (fs.rename يستبدل الهدف بصمت على بعض الأنظمة).
+ */
+export async function applyBatchRename(plan: BatchRenamePlan[]): Promise<BatchRenameResult> {
   const applied: BatchRenamePlan[] = []
+  const failed: { path: string; error: string }[] = []
+
   for (const step of plan) {
     if (step.from === step.to) continue
-    await fs.rename(step.from, step.to)
-    applied.push(step)
+    try {
+      if (await pathExists(step.to)) {
+        failed.push({ path: step.from, error: 'يوجد ملف بنفس الاسم مسبقًا' })
+        continue
+      }
+      await fs.rename(step.from, step.to)
+      applied.push(step)
+    } catch (err) {
+      failed.push({ path: step.from, error: (err as Error).message })
+    }
   }
-  return applied
+  return { applied, failed }
 }

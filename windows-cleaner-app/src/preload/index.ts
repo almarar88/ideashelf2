@@ -13,7 +13,7 @@ import type {
   StartupItem,
   SystemSummary
 } from '../shared/types'
-import type { BatchRenamePlan } from '../main/lib/fileManagerLib'
+import type { BatchRenamePlan, BatchRenameResult } from '../main/lib/fileManagerLib'
 
 const api = {
   cleaner: {
@@ -51,7 +51,7 @@ const api = {
     openPath: (targetPath: string): Promise<void> => ipcRenderer.invoke('fm:openPath', targetPath),
     batchRenamePreview: (paths: string[], pattern: string, startNumber: number): Promise<BatchRenamePlan[]> =>
       ipcRenderer.invoke('fm:batchRenamePreview', paths, pattern, startNumber),
-    batchRenameApply: (plan: BatchRenamePlan[]): Promise<BatchRenamePlan[]> =>
+    batchRenameApply: (plan: BatchRenamePlan[]): Promise<BatchRenameResult> =>
       ipcRenderer.invoke('fm:batchRenameApply', plan),
     findDuplicates: (rootPath: string, minSizeBytes: number): Promise<DuplicateGroup[]> =>
       ipcRenderer.invoke('fm:findDuplicates', rootPath, minSizeBytes),
@@ -85,7 +85,10 @@ const api = {
     remove: (item: StartupItem): Promise<void> => ipcRenderer.invoke('startup:remove', item)
   },
   system: {
-    summary: (): Promise<SystemSummary> => ipcRenderer.invoke('system:summary')
+    summary: (): Promise<SystemSummary> => ipcRenderer.invoke('system:summary'),
+    isAdmin: (): Promise<boolean> => ipcRenderer.invoke('system:isAdmin'),
+    relaunchAsAdmin: (): Promise<{ started: boolean; message: string }> =>
+      ipcRenderer.invoke('system:relaunchAsAdmin')
   },
   dialogs: {
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:pickFolder'),
