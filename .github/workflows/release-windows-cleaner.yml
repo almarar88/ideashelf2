@@ -5,6 +5,8 @@ name: Release CleanShelf
 on:
   push:
     tags: ['v*']
+    # فرع release/v1.0.0 بديل عن الوسم حين تمنع البيئة دفع الوسوم
+    branches: ['release/**']
   workflow_dispatch:
     inputs:
       tag:
@@ -64,12 +66,16 @@ jobs:
           # يُمرَّر عبر متغيّر بيئة لا داخل السكربت مباشرةً، تفاديًا لحقن الأوامر
           INPUT_TAG: ${{ inputs.tag }}
         run: |
-          $tag = if ($env:INPUT_TAG) { $env:INPUT_TAG } else { $env:GITHUB_REF_NAME }
+          # release/v1.0.0 → v1.0.0، والوسم v1.0.0 يبقى كما هو
+          $tag = if ($env:INPUT_TAG) { $env:INPUT_TAG } else { $env:GITHUB_REF_NAME -replace '^release/', '' }
           $files = Get-ChildItem dist/*.exe | ForEach-Object { $_.FullName }
           if ($files.Count -lt 1) { throw "لا توجد ملفات exe للنشر" }
           Write-Host "سيُنشر الوسم $tag بالملفات: $($files -join ', ')"
 
+          # --target ضروري: بدونه ينشئ gh الوسم على الفرع الافتراضي للمستودع
+          # (فرع تطبيق المزرعة هنا) بدل الشيفرة التي بُني منها هذا الإصدار فعلًا
           gh release create $tag $files `
+            --target $env:GITHUB_SHA `
             --title "CleanShelf $tag" `
             --notes-file ../.github/release-notes-cleanshelf.md
           Write-Host "تم نشر الإصدار $tag"
