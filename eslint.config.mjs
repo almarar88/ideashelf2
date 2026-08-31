@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // تطبيق الدينامو (Electron) له إعداداته الخاصة داخل مجلده.
+    "mbzuh/**",
   ]),
 ]);
 
