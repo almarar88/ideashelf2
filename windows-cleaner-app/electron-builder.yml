@@ -8,6 +8,7 @@ files:
   - package.json
 asar: true
 win:
+  icon: build/icon.ico
   target:
     - target: nsis
       arch: [x64]
@@ -19,6 +20,9 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
   artifactName: '${productName}-Setup-${version}.${ext}'
 portable:
   artifactName: '${productName}-Portable-${version}.${ext}'

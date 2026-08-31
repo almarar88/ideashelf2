@@ -19,6 +19,8 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     title: 'CleanShelf',
+    // النسخة المحزومة تأخذ أيقونتها من الملف التنفيذي نفسه؛ هذه لوضع التطوير فقط
+    ...(isDev ? { icon: path.join(__dirname, '../../build/icon.png') } : {}),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

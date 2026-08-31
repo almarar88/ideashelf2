@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { Dashboard } from './pages/Dashboard'
 import { Cleaner } from './pages/Cleaner'
@@ -10,6 +10,7 @@ import { LargeFiles } from './pages/LargeFiles'
 import { Startup } from './pages/Startup'
 import { SystemInfo } from './pages/SystemInfo'
 import { ToastProvider } from './lib/toastContext'
+import { applyTheme, loadTheme, nextTheme, THEME_LABEL, type ThemeMode } from './lib/theme'
 
 export type PageId =
   | 'dashboard'
@@ -59,7 +60,12 @@ function renderPage(page: PageId, onNavigate: (id: PageId) => void): JSX.Element
 
 export function App(): JSX.Element {
   const [page, setPage] = useState<PageId>('dashboard')
+  const [theme, setTheme] = useState<ThemeMode>(loadTheme)
   const meta = PAGE_TITLES[page]
+
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme])
 
   return (
     <ToastProvider>
@@ -71,6 +77,13 @@ export function App(): JSX.Element {
               <h1>{meta.title}</h1>
               <div className="sub">{meta.sub}</div>
             </div>
+            <button
+              className="btn btn-sm"
+              onClick={() => setTheme(nextTheme(theme))}
+              title="تبديل مظهر التطبيق"
+            >
+              {THEME_LABEL[theme]}
+            </button>
           </div>
           {renderPage(page, setPage)}
         </div>
