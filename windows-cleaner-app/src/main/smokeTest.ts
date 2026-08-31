@@ -6,6 +6,11 @@ import { listInstalledApps } from './lib/uninstallerLib'
 import { listStartupItems } from './lib/startupLib'
 import { listDrives } from './lib/fileManagerLib'
 import { isElevated } from './lib/elevation'
+import { listProcesses } from './lib/processesLib'
+import { listServices } from './lib/servicesLib'
+import { listAdapters } from './lib/networkLib'
+import { analyzeFolder } from './lib/diskAnalyzerLib'
+import { readHistory } from './lib/historyLib'
 
 /**
  * فحص تشغيل سريع للنسخة المبنية: يتأكد أن النافذة تُحمَّل فعلًا، وأن جسر
@@ -117,6 +122,27 @@ export async function runSmokeTest(win: BrowserWindow): Promise<void> {
   await check('برامج بدء التشغيل', async () => `${(await listStartupItems()).length} عنصر`)
 
   await check('كشف صلاحيات المدير', async () => String(await isElevated()))
+
+  await check('قائمة العمليات', async () => {
+    const list = await listProcesses()
+    if (list.length === 0) throw new Error('لم تُقرأ أي عملية')
+    return `${list.length} عملية`
+  })
+
+  await check('خدمات ويندوز', async () => {
+    const list = await listServices()
+    if (list.length === 0) throw new Error('لم تُقرأ أي خدمة')
+    return `${list.length} خدمة`
+  })
+
+  await check('محوّلات الشبكة', async () => `${(await listAdapters()).length} محوّل`)
+
+  await check('تحليل المساحة', async () => {
+    const result = await analyzeFolder(process.env['TEMP'] || 'C:\\Windows\\Temp')
+    return `${result.children.length} عنصر / ${result.totalBytes} بايت`
+  })
+
+  await check('سجل التنظيف', async () => `${(await readHistory()).length} قيد`)
 
   finish()
 }

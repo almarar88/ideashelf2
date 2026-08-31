@@ -13,6 +13,77 @@ export interface CleanerCategory {
   requiresAdmin: boolean
 }
 
+export interface ProcessEntry {
+  pid: number
+  name: string
+  cpuPercent: number
+  memoryBytes: number
+  user: string
+  path: string
+  started: string
+}
+
+export interface ServiceEntry {
+  name: string
+  displayName: string
+  status: 'running' | 'stopped' | 'paused' | 'unknown'
+  startType: 'boot' | 'system' | 'automatic' | 'manual' | 'disabled' | 'unknown'
+}
+
+export interface NetworkAdapter {
+  name: string
+  type: string
+  ip4: string
+  ip6: string
+  mac: string
+  speedMbps: number
+  isUp: boolean
+  rxBytes: number
+  txBytes: number
+}
+
+export interface NetworkConnection {
+  protocol: string
+  localAddress: string
+  remoteAddress: string
+  state: string
+  pid: number
+  processName: string
+}
+
+export interface PingResult {
+  host: string
+  success: boolean
+  averageMs: number
+  message: string
+}
+
+export interface FolderUsage {
+  path: string
+  name: string
+  sizeBytes: number
+  fileCount: number
+  isDirectory: boolean
+}
+
+export interface DiskUsageResult {
+  root: string
+  parent: string | null
+  totalBytes: number
+  children: FolderUsage[]
+}
+
+export interface BrokenShortcut {
+  shortcutPath: string
+  targetPath: string
+}
+
+export interface CleanHistoryEntry {
+  timestamp: string
+  freedBytes: number
+  categories: string[]
+}
+
 export interface ScanProgress {
   phase: 'walking' | 'hashing'
   /** عدد الملفات التي عُثر عليها حتى الآن */

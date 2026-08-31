@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { DirListing, FileEntry } from '../../shared/types'
+import type { DirListing, FileEntry, LargeFileEntry, ScanProgress } from '../../shared/types'
+import { ScanProgressPanel } from '../components/ScanProgressPanel'
 import { formatBytes, formatDate } from '../lib/format'
 import { useToast } from '../lib/toastContext'
 import { BatchRenameModal } from '../components/BatchRenameModal'
@@ -26,6 +27,28 @@ export function FileManager(): JSX.Element {
   const [showBatchRename, setShowBatchRename] = useState(false)
   const [renameTarget, setRenameTarget] = useState<FileEntry | null>(null)
   const [showNewFolder, setShowNewFolder] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [searchResults, setSearchResults] = useState<LargeFileEntry[] | null>(null)
+  const [searchProgress, setSearchProgress] = useState<ScanProgress | null>(null)
+
+  useEffect(() => window.api.fm.onScanProgress(setSearchProgress), [])
+
+  async function runSearch(): Promise<void> {
+    const query = searchQuery.trim()
+    if (!query || !listing?.path) return
+    setSearching(true)
+    setSearchProgress(null)
+    try {
+      setSearchResults(await window.api.fm.search(listing.path, query))
+    } catch (err) {
+      const message = (err as Error).message
+      showToast(message.includes('أُلغي') ? 'أُوقف البحث' : 'فشل البحث: ' + message)
+    } finally {
+      setSearching(false)
+      setSearchProgress(null)
+    }
+  }
 
   async function open(targetPath: string | null): Promise<void> {
     setLoading(true)
@@ -116,6 +139,27 @@ export function FileManager(): JSX.Element {
           🔤 إعادة تسمية دفعية
         </button>
         <div className="spacer" />
+        <input
+          type="search"
+          placeholder="ابحث داخل هذا المجلد وما تحته…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && runSearch()}
+          disabled={!listing?.path}
+          style={{ width: 240 }}
+        />
+        <button
+          className="btn"
+          onClick={runSearch}
+          disabled={!listing?.path || !searchQuery.trim() || searching}
+        >
+          🔍 بحث
+        </button>
+        {searchResults && (
+          <button className="btn btn-sm btn-ghost" onClick={() => setSearchResults(null)}>
+            ✕ إلغاء نتائج البحث
+          </button>
+        )}
         <span className="muted">{selected.size > 0 ? `محدَّد: ${selected.size}` : ''}</span>
       </div>
 
@@ -141,6 +185,38 @@ export function FileManager(): JSX.Element {
         </div>
       )}
 
+      {searching ? (
+        <ScanProgressPanel progress={searchProgress} onCancel={() => window.api.fm.cancelScan()} />
+      ) : searchResults ? (
+        <div className="card">
+          {searchResults.length === 0 ? (
+            <div className="empty-state">لا نتائج مطابقة</div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>نتائج البحث ({searchResults.length})</th>
+                  <th>الحجم</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {searchResults.map((r) => (
+                  <tr key={r.path}>
+                    <td style={{ direction: 'ltr', textAlign: 'right', fontSize: 12.5 }}>{r.path}</td>
+                    <td>{formatBytes(r.sizeBytes)}</td>
+                    <td>
+                      <button className="btn btn-sm" onClick={() => window.api.fm.reveal(r.path)}>
+                        إظهار
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : (
       <div className="card">
         {loading ? (
           <div className="empty-state">جارٍ التحميل…</div>
@@ -203,6 +279,7 @@ export function FileManager(): JSX.Element {
           </table>
         )}
       </div>
+      )}
 
       {renameTarget && (
         <InputModal

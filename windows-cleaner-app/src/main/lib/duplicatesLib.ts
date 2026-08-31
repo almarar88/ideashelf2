@@ -107,6 +107,29 @@ export async function findDuplicates(
   return groups.sort((a, b) => b.sizeBytes * b.files.length - a.sizeBytes * a.files.length)
 }
 
+/** بحث عن الملفات بالاسم تحت مجلد، مع تقدّم وإمكانية إيقاف. */
+export async function searchFiles(
+  rootPath: string,
+  query: string,
+  hooks: ScanHooks = {},
+  limit = 500
+): Promise<LargeFileEntry[]> {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return []
+
+  const { onProgress, shouldCancel } = hooks
+  const files = await listFilesRecursive(rootPath, {
+    shouldCancel,
+    onProgress: (filesSeen, currentDir) =>
+      onProgress?.({ phase: 'walking', filesSeen, processed: 0, total: 0, currentPath: currentDir })
+  })
+
+  return files
+    .filter((f) => f.path.toLowerCase().includes(needle))
+    .slice(0, limit)
+    .map((f) => ({ path: f.path, sizeBytes: f.sizeBytes }))
+}
+
 export async function findLargeFiles(
   rootPath: string,
   minSizeBytes = 100 * 1024 * 1024,

@@ -13,6 +13,7 @@ export function Cleaner(): JSX.Element {
   const [progress, setProgress] = useState<Record<string, CleanProgress>>({})
   const [showConfirm, setShowConfirm] = useState(false)
   const [isAdmin, setIsAdmin] = useState(true)
+  const [makeRestorePoint, setMakeRestorePoint] = useState(false)
 
   const scan = async (): Promise<void> => {
     setLoading(true)
@@ -56,6 +57,13 @@ export function Cleaner(): JSX.Element {
     setShowConfirm(false)
     setCleaning(true)
     try {
+      if (makeRestorePoint) {
+        showToast('جارٍ إنشاء نقطة استعادة… قد يستغرق دقيقة')
+        const rp = await window.api.history.restorePoint()
+        if (!rp.success) {
+          showToast('تعذّر إنشاء نقطة الاستعادة: ' + rp.message)
+        }
+      }
       const ids = [...selected]
       const { totalFreedBytes } = await window.api.cleaner.clean(ids)
       showToast(`تم تحرير ${formatBytes(totalFreedBytes)} من المساحة`)
@@ -195,6 +203,14 @@ export function Cleaner(): JSX.Element {
                 ⚠️ اخترت فئات مُعلَّمة "انتبه" — تأكد من فهم تأثيرها قبل المتابعة.
               </p>
             )}
+            <label className="checkbox-row" style={{ fontSize: 13, marginTop: 10 }}>
+              <input
+                type="checkbox"
+                checked={makeRestorePoint}
+                onChange={(e) => setMakeRestorePoint(e.target.checked)}
+              />
+              أنشئ نقطة استعادة نظام أولًا (تحتاج صلاحيات مدير، وقد تستغرق دقيقة)
+            </label>
             <div className="toolbar" style={{ marginTop: 16, marginBottom: 0 }}>
               <div className="spacer" />
               <button className="btn" onClick={() => setShowConfirm(false)}>

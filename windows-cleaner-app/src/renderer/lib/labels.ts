@@ -17,3 +17,29 @@ export const CLEANER_CATEGORY_LABELS: Record<string, { title: string; desc: stri
 export function categoryLabel(key: string): { title: string; desc: string } {
   return CLEANER_CATEGORY_LABELS[key] ?? { title: key, desc: '' }
 }
+
+/**
+ * معرّف الفئة كما يُخزَّن في سجل التنظيف → مفتاح الاسم المعروض.
+ * صريح لا مشتق بتحويل الأحرف، لأن بعض المعرّفات لا تطابق مفاتيحها
+ * (windows_update_cache مقابل windowsUpdate مثلاً).
+ */
+const CATEGORY_ID_TO_LABEL_KEY: Record<string, string> = {
+  user_temp: 'cleaner.userTemp',
+  windows_temp: 'cleaner.windowsTemp',
+  prefetch: 'cleaner.prefetch',
+  windows_update_cache: 'cleaner.windowsUpdate',
+  thumbnail_cache: 'cleaner.thumbnails',
+  windows_error_reports: 'cleaner.errorReports',
+  recent_list: 'cleaner.recentList',
+  chrome_cache: 'cleaner.chromeCache',
+  edge_cache: 'cleaner.edgeCache',
+  firefox_cache: 'cleaner.firefoxCache',
+  delivery_optimization: 'cleaner.deliveryOptimization',
+  minidumps: 'cleaner.minidumps',
+  recycle_bin: 'cleaner.recycleBin'
+}
+
+export function categoryTitleById(categoryId: string): string {
+  const key = CATEGORY_ID_TO_LABEL_KEY[categoryId]
+  return key ? categoryLabel(key).title : categoryId
+}

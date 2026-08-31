@@ -7,6 +7,7 @@ import { registerTagEditorIpc } from './ipc/tagEditor'
 import { registerStartupIpc } from './ipc/startup'
 import { registerSystemInfoIpc } from './ipc/systemInfo'
 import { registerDialogIpc } from './ipc/dialogs'
+import { registerSystemToolsIpc } from './ipc/systemTools'
 
 const isDev = !app.isPackaged
 
@@ -57,6 +58,7 @@ app.whenReady().then(() => {
   registerStartupIpc()
   registerSystemInfoIpc()
   registerDialogIpc()
+  registerSystemToolsIpc()
 
   createWindow()
 

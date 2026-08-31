@@ -1,6 +1,7 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import type { CleanerScanResult, CleanProgress } from '../../shared/types'
 import { CATEGORY_DEFS, scanCategory, clearDirectoryContents } from '../lib/cleanerCategories'
+import { appendHistory } from '../lib/historyLib'
 
 export function registerCleanerIpc(): void {
   ipcMain.handle('cleaner:scan', async (): Promise<CleanerScanResult> => {
@@ -72,6 +73,12 @@ export function registerCleanerIpc(): void {
           } satisfies CleanProgress)
         }
       }
+      await appendHistory({
+        timestamp: new Date().toISOString(),
+        freedBytes: totalFreedBytes,
+        categories: categoryIds
+      })
+
       return { totalFreedBytes }
     }
   )

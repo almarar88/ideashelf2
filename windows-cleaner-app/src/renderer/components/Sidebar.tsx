@@ -15,10 +15,19 @@ const MAIN_ITEMS: NavItem[] = [
 ]
 
 const ADVANCED_ITEMS: NavItem[] = [
+  { id: 'diskanalyzer', label: 'محلّل المساحة', icon: '📊' },
   { id: 'duplicates', label: 'الملفات المكرّرة', icon: '🧬' },
   { id: 'largefiles', label: 'أكبر الملفات', icon: '📦' },
-  { id: 'startup', label: 'برامج بدء التشغيل', icon: '🚀' },
-  { id: 'system', label: 'معلومات النظام', icon: '📊' }
+  { id: 'extras', label: 'مجلدات واختصارات', icon: '🗂️' },
+  { id: 'startup', label: 'برامج بدء التشغيل', icon: '🚀' }
+]
+
+const SYSTEM_ITEMS: NavItem[] = [
+  { id: 'processes', label: 'العمليات', icon: '⚡' },
+  { id: 'services', label: 'خدمات ويندوز', icon: '⚙️' },
+  { id: 'network', label: 'الشبكة', icon: '🌐' },
+  { id: 'system', label: 'معلومات النظام', icon: '💻' },
+  { id: 'history', label: 'سجل التنظيف', icon: '🧾' }
 ]
 
 export function Sidebar({
@@ -46,8 +55,20 @@ export function Sidebar({
         </div>
       ))}
 
-      <div className="nav-section-label">أدوات متقدّمة</div>
+      <div className="nav-section-label">أدوات القرص</div>
       {ADVANCED_ITEMS.map((item) => (
+        <div
+          key={item.id}
+          className={`nav-item ${active === item.id ? 'active' : ''}`}
+          onClick={() => onNavigate(item.id)}
+        >
+          <span>{item.icon}</span>
+          <span>{item.label}</span>
+        </div>
+      ))}
+
+      <div className="nav-section-label">النظام</div>
+      {SYSTEM_ITEMS.map((item) => (
         <div
           key={item.id}
           className={`nav-item ${active === item.id ? 'active' : ''}`}

@@ -12,7 +12,15 @@ import type {
   AudioTagWrite,
   StartupItem,
   SystemSummary,
-  ScanProgress
+  ScanProgress,
+  ProcessEntry,
+  ServiceEntry,
+  NetworkAdapter,
+  NetworkConnection,
+  PingResult,
+  DiskUsageResult,
+  BrokenShortcut,
+  CleanHistoryEntry
 } from '../shared/types'
 import type { BatchRenamePlan, BatchRenameResult } from '../main/lib/fileManagerLib'
 
@@ -66,7 +74,17 @@ const api = {
         ipcRenderer.removeListener('fm:scanProgress', handler)
       }
     },
-    homeDir: (): Promise<string> => ipcRenderer.invoke('fm:homeDir')
+    homeDir: (): Promise<string> => ipcRenderer.invoke('fm:homeDir'),
+    analyzeFolder: (rootPath: string): Promise<DiskUsageResult> =>
+      ipcRenderer.invoke('fm:analyzeFolder', rootPath),
+    findEmptyFolders: (rootPath: string): Promise<string[]> =>
+      ipcRenderer.invoke('fm:findEmptyFolders', rootPath),
+    findBrokenShortcuts: (rootPath: string): Promise<BrokenShortcut[]> =>
+      ipcRenderer.invoke('fm:findBrokenShortcuts', rootPath),
+    search: (rootPath: string, query: string): Promise<LargeFileEntry[]> =>
+      ipcRenderer.invoke('fm:search', rootPath, query),
+    trashPaths: (paths: string[]): Promise<{ path: string; success: boolean; error?: string }[]> =>
+      ipcRenderer.invoke('fm:trashPaths', paths)
   },
   tags: {
     readFolder: (folderPath: string): Promise<AudioTag[]> => ipcRenderer.invoke('tags:readFolder', folderPath),
@@ -92,6 +110,32 @@ const api = {
     setEnabled: (item: StartupItem, enabled: boolean): Promise<void> =>
       ipcRenderer.invoke('startup:setEnabled', item, enabled),
     remove: (item: StartupItem): Promise<void> => ipcRenderer.invoke('startup:remove', item)
+  },
+  proc: {
+    list: (): Promise<ProcessEntry[]> => ipcRenderer.invoke('proc:list'),
+    kill: (pid: number): Promise<{ success: boolean; message: string }> =>
+      ipcRenderer.invoke('proc:kill', pid)
+  },
+  svc: {
+    list: (): Promise<ServiceEntry[]> => ipcRenderer.invoke('svc:list'),
+    control: (
+      name: string,
+      action: 'start' | 'stop' | 'restart'
+    ): Promise<{ success: boolean; message: string }> =>
+      ipcRenderer.invoke('svc:control', name, action)
+  },
+  net: {
+    adapters: (): Promise<NetworkAdapter[]> => ipcRenderer.invoke('net:adapters'),
+    connections: (): Promise<NetworkConnection[]> => ipcRenderer.invoke('net:connections'),
+    ping: (host: string): Promise<PingResult> => ipcRenderer.invoke('net:ping', host),
+    flushDns: (): Promise<{ success: boolean; message: string }> =>
+      ipcRenderer.invoke('net:flushDns')
+  },
+  history: {
+    list: (): Promise<CleanHistoryEntry[]> => ipcRenderer.invoke('history:list'),
+    clear: (): Promise<void> => ipcRenderer.invoke('history:clear'),
+    restorePoint: (): Promise<{ success: boolean; message: string }> =>
+      ipcRenderer.invoke('history:restorePoint')
   },
   system: {
     summary: (): Promise<SystemSummary> => ipcRenderer.invoke('system:summary'),

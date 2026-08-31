@@ -1,6 +1,13 @@
 import { ipcMain, shell, BrowserWindow } from 'electron'
 import path from 'node:path'
-import type { DirListing, DuplicateGroup, LargeFileEntry, ScanProgress } from '../../shared/types'
+import type {
+  DirListing,
+  DuplicateGroup,
+  LargeFileEntry,
+  ScanProgress,
+  DiskUsageResult,
+  BrokenShortcut
+} from '../../shared/types'
 import {
   listDirectory,
   renameEntry,
@@ -10,7 +17,8 @@ import {
   applyBatchRename,
   type BatchRenamePlan
 } from '../lib/fileManagerLib'
-import { findDuplicates, findLargeFiles } from '../lib/duplicatesLib'
+import { findDuplicates, findLargeFiles, searchFiles } from '../lib/duplicatesLib'
+import { analyzeFolder, findEmptyFolders, findBrokenShortcuts } from '../lib/diskAnalyzerLib'
 
 export function registerFileManagerIpc(): void {
   ipcMain.handle('fm:list', async (_event, targetPath: string | null): Promise<DirListing> => {
@@ -95,6 +103,49 @@ export function registerFileManagerIpc(): void {
       return findLargeFiles(rootPath, minSizeBytes, 200, scanHooks(event))
     }
   )
+
+  ipcMain.handle(
+    'fm:analyzeFolder',
+    async (event, rootPath: string): Promise<DiskUsageResult> => {
+      cancelRequested = false
+      return analyzeFolder(rootPath, scanHooks(event))
+    }
+  )
+
+  ipcMain.handle('fm:findEmptyFolders', async (event, rootPath: string): Promise<string[]> => {
+    cancelRequested = false
+    return findEmptyFolders(rootPath, scanHooks(event))
+  })
+
+  ipcMain.handle(
+    'fm:findBrokenShortcuts',
+    async (event, rootPath: string): Promise<BrokenShortcut[]> => {
+      cancelRequested = false
+      return findBrokenShortcuts(rootPath, scanHooks(event))
+    }
+  )
+
+  ipcMain.handle(
+    'fm:search',
+    async (event, rootPath: string, query: string): Promise<LargeFileEntry[]> => {
+      cancelRequested = false
+      return searchFiles(rootPath, query, scanHooks(event))
+    }
+  )
+
+  // حذف مجلدات فارغة: آمن نسبيًا لكنه يمر عبر سلة المحذوفات احتياطًا
+  ipcMain.handle('fm:trashPaths', async (_event, paths: string[]) => {
+    const results: { path: string; success: boolean; error?: string }[] = []
+    for (const p of paths) {
+      try {
+        await shell.trashItem(p)
+        results.push({ path: p, success: true })
+      } catch (err) {
+        results.push({ path: p, success: false, error: (err as Error).message })
+      }
+    }
+    return results
+  })
 
   ipcMain.handle('fm:homeDir', async () => {
     return process.platform === 'win32' ? process.env.USERPROFILE || '' : path.resolve('.')
