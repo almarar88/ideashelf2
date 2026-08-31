@@ -8,6 +8,24 @@
   <img src="build/icon.png" width="120" alt="شعار الدينامو" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/almarar88/ideashelf2/releases/latest">
+    <img src="https://img.shields.io/github/v/release/almarar88/ideashelf2?label=%D8%A2%D8%AE%D8%B1%20%D8%A5%D8%B5%D8%AF%D8%A7%D8%B1&color=0d9488" alt="آخر إصدار" />
+  </a>
+</p>
+
+## ⬇️ التحميل
+
+**[تحميل ملف التثبيت لويندوز (64-بت)](https://github.com/almarar88/ideashelf2/releases/latest/download/Dynamo-Setup-1.0.0.exe)**
+
+أو من [صفحة الإصدارات](https://github.com/almarar88/ideashelf2/releases/latest) لاختيار إصدار محدد.
+
+بعد التنزيل: شغّل `Dynamo-Setup-1.0.0.exe` واتبع خطوات التثبيت (يُثبَّت للمستخدم
+الحالي بلا صلاحيات مدير)، ثم افتح **الدينامو** من قائمة ابدأ أو من أيقونة سطح المكتب.
+
+> ملاحظة: ويندوز قد يُظهر تنبيه «SmartScreen» لأن ملف التثبيت غير موقّع رقميًا —
+> اختر «مزيد من المعلومات» ثم «تشغيل على أي حال».
+
 ---
 
 ## الوحدات

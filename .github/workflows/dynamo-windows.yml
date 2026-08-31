@@ -6,6 +6,9 @@ on:
     tags:
       - "dynamo-v*"
 
+permissions:
+  contents: write
+
 jobs:
   windows-installer:
     runs-on: windows-latest
@@ -38,8 +41,14 @@ jobs:
           path: mbzuh/release/Dynamo-Setup-*.exe
           if-no-files-found: error
 
-      - name: Attach installer to release
+      - name: Publish release with installer
         if: startsWith(github.ref, 'refs/tags/dynamo-v')
         uses: softprops/action-gh-release@v2
         with:
+          name: الدينامو ${{ github.ref_name }}
           files: mbzuh/release/Dynamo-Setup-*.exe
+          body: |
+            ملف تثبيت تطبيق «الدينامو» لويندوز (64-بت).
+
+            نزّل `Dynamo-Setup-1.0.0.exe` ثم شغّله واتبع خطوات التثبيت.
+            التطبيق يعمل بقاعدة بيانات محلية على جهازك بلا إنترنت.
