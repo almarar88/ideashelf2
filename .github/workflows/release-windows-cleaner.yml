@@ -1,0 +1,81 @@
+name: Release CleanShelf
+
+# ينشر إصدارًا دائمًا بملفات exe مرفقة. يُشغَّل بدفع وسم مثل v1.0.0،
+# أو يدويًا من تبويب Actions مع تحديد اسم الوسم.
+on:
+  push:
+    tags: ['v*']
+    # فرع release/v1.0.0 بديل عن الوسم حين تمنع البيئة دفع الوسوم
+    branches: ['release/**']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'اسم الوسم للإصدار (مثال: v1.0.0)'
+        required: true
+        default: v1.0.0
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: windows-cleaner-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows-cleaner-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Build installer + portable exe
+        run: npm run build:win
+
+      # لا نَنشر تطبيقًا لم نتأكد أنه يُقلع فعلًا
+      - name: Smoke-test the built app
+        shell: pwsh
+        env:
+          CLEANSHELF_SMOKE_TEST: '1'
+        run: |
+          $exe = "dist/win-unpacked/CleanShelf.exe"
+          if (-not (Test-Path $exe)) { throw "لم يُعثر على الملف المبني: $exe" }
+          $env:CLEANSHELF_SMOKE_LOG = Join-Path $PWD "smoke-log.txt"
+          $proc = Start-Process -FilePath $exe -PassThru -NoNewWindow
+          $null = $proc.Handle
+          if (-not $proc.WaitForExit(180000)) {
+            $proc.Kill()
+            throw "التطبيق لم ينتهِ خلال 180 ثانية"
+          }
+          if (Test-Path $env:CLEANSHELF_SMOKE_LOG) { Get-Content $env:CLEANSHELF_SMOKE_LOG }
+          if ($proc.ExitCode -ne 0) { throw "فشل فحص التشغيل برمز $($proc.ExitCode)" }
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # يُمرَّر عبر متغيّر بيئة لا داخل السكربت مباشرةً، تفاديًا لحقن الأوامر
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          # release/v1.0.0 → v1.0.0، والوسم v1.0.0 يبقى كما هو
+          $tag = if ($env:INPUT_TAG) { $env:INPUT_TAG } else { $env:GITHUB_REF_NAME -replace '^release/', '' }
+          $files = Get-ChildItem dist/*.exe | ForEach-Object { $_.FullName }
+          if ($files.Count -lt 1) { throw "لا توجد ملفات exe للنشر" }
+          Write-Host "سيُنشر الوسم $tag بالملفات: $($files -join ', ')"
+
+          # --target ضروري: بدونه ينشئ gh الوسم على الفرع الافتراضي للمستودع
+          # (فرع تطبيق المزرعة هنا) بدل الشيفرة التي بُني منها هذا الإصدار فعلًا
+          gh release create $tag $files `
+            --target $env:GITHUB_SHA `
+            --title "CleanShelf $tag" `
+            --notes-file ../.github/release-notes-cleanshelf.md
+          Write-Host "تم نشر الإصدار $tag"

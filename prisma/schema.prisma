@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// NOTE: SQLite has no native enum support in Prisma, so "enum-like" fields
+// below are plain Strings. Allowed values are defined in src/lib/constants.ts.
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("VIEWER") // OWNER | MANAGER | WORKER | VIEWER
+  createdAt    DateTime @default(now())
+}
+
+model Farm {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  address       String?
+  lat           Float?
+  lng           Float?
+  areaHectares  Float?
+  boundary      String? // JSON array of [lat,lng] polygon points
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  palms         Palm[]
+  workers       Worker[]
+  expenses      Expense[]
+  events        CalendarEvent[]
+}
+
+model Palm {
+  id            String   @id @default(cuid())
+  code          String
+  farmId        String
+  farm          Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  variety       String
+  plantingDate  DateTime?
+  lat           Float?
+  lng           Float?
+  heightMeters  Float?
+  status        String   @default("HEALTHY") // HEALTHY | SICK | UNDER_TREATMENT | YOUNG_SEEDLING | DEAD
+  notes         String?
+  lastYieldKg   Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  photos        PalmPhoto[]
+  diagnoses     DiagnosisReport[]
+
+  @@unique([farmId, code])
+}
+
+model PalmPhoto {
+  id         String   @id @default(cuid())
+  palmId     String
+  palm       Palm     @relation(fields: [palmId], references: [id], onDelete: Cascade)
+  url        String
+  caption    String?
+  takenAt    DateTime @default(now())
+  diagnoses  DiagnosisReport[]
+  createdAt  DateTime @default(now())
+}
+
+model DiagnosisReport {
+  id            String   @id @default(cuid())
+  palmId        String
+  palm          Palm     @relation(fields: [palmId], references: [id], onDelete: Cascade)
+  photoId       String?
+  photo         PalmPhoto? @relation(fields: [photoId], references: [id], onDelete: SetNull)
+  diseaseName   String
+  confidence    Float?
+  severity      String?
+  symptoms      String?
+  treatment     String?
+  prevention    String?
+  aiRaw         String?
+  status        String   @default("OPEN") // OPEN | MONITORING | TREATED | DISMISSED
+  createdAt     DateTime @default(now())
+}
+
+model Worker {
+  id             String   @id @default(cuid())
+  farmId         String
+  farm           Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  name           String
+  phone          String?
+  position       String?
+  monthlySalary  Float
+  hireDate       DateTime?
+  status         String   @default("ACTIVE") // ACTIVE | INACTIVE
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  salaryPayments SalaryPayment[]
+}
+
+model SalaryPayment {
+  id           String   @id @default(cuid())
+  workerId     String
+  worker       Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  amount       Float
+  periodMonth  String   // e.g. "2026-07"
+  dueDate      DateTime
+  paidDate     DateTime?
+  status       String   @default("PENDING") // PENDING | PAID | LATE
+  notes        String?
+  createdAt    DateTime @default(now())
+}
+
+model Expense {
+  id           String   @id @default(cuid())
+  farmId       String
+  farm         Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  category     String   // WATER | FERTILIZER | PESTICIDE | EQUIPMENT | MAINTENANCE | FUEL | LABOR | UTILITIES | OTHER
+  amount       Float
+  date         DateTime
+  description  String?
+  createdAt    DateTime @default(now())
+}
+
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  farmId      String
+  farm        Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  title       String
+  date        DateTime
+  type        String   @default("OTHER") // EXPENSE | SALARY | IRRIGATION | FERTILIZATION | PESTICIDE_TREATMENT | HARVEST | MAINTENANCE | OTHER
+  notes       String?
+  completed   Boolean  @default(false)
+  recurrence  String   @default("NONE") // NONE | WEEKLY | MONTHLY | YEARLY
+  relatedType String?
+  relatedId   String?
+  createdAt   DateTime @default(now())
+}
+
+model MarketListing {
+  id           String   @id @default(cuid())
+  type         String   // SELL | BUY
+  title        String
+  variety      String?
+  description  String?
+  price        Float?
+  quantity     Int      @default(1)
+  unit         String   @default("فسيلة")
+  images       String?  // JSON array of urls
+  sellerName   String
+  contact      String?
+  location     String?
+  status       String   @default("ACTIVE") // ACTIVE | SOLD | CLOSED
+  createdAt    DateTime @default(now())
+}
+
+model Auction {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  variety       String?
+  images        String?  // JSON array of urls
+  startPrice    Float
+  currentPrice  Float
+  bidStep       Float    @default(10)
+  startAt       DateTime
+  endAt         DateTime
+  status        String   @default("SCHEDULED") // SCHEDULED | ACTIVE | ENDED | CANCELLED
+  winnerName    String?
+  createdAt     DateTime @default(now())
+
+  bids          Bid[]
+}
+
+model Bid {
+  id           String   @id @default(cuid())
+  auctionId    String
+  auction      Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  bidderName   String
+  bidderContact String?
+  amount       Float
+  createdAt    DateTime @default(now())
+}

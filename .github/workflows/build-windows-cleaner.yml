@@ -1,0 +1,67 @@
+name: Build CleanShelf Windows exe
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'windows-cleaner-app/**'
+      - '.github/workflows/build-windows-cleaner.yml'
+  pull_request:
+    paths:
+      - 'windows-cleaner-app/**'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: windows-cleaner-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows-cleaner-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Build installer + portable exe
+        run: npm run build:win
+
+      # يشغّل التطبيق المبني فعليًا على ويندوز: يتأكد أن النافذة تُحمَّل، وأن جسر
+      # preload يصل للواجهة، وأن قراءة السجل والأقراص تعمل — أشياء لا يكشفها
+      # فحص الأنواع ولا البناء وحدهما.
+      - name: Smoke-test the built app
+        shell: pwsh
+        env:
+          CLEANSHELF_SMOKE_TEST: '1'
+          CLEANSHELF_SMOKE_LOG: smoke-log.txt
+        run: |
+          $exe = "dist/win-unpacked/CleanShelf.exe"
+          if (-not (Test-Path $exe)) { throw "لم يُعثر على الملف المبني: $exe" }
+          $env:CLEANSHELF_SMOKE_LOG = Join-Path $PWD "smoke-log.txt"
+          $proc = Start-Process -FilePath $exe -PassThru -NoNewWindow
+          # لمس Handle يجبر PowerShell على الاحتفاظ به، وإلا يعود ExitCode فارغًا
+          $null = $proc.Handle
+          if (-not $proc.WaitForExit(180000)) {
+            $proc.Kill()
+            throw "التطبيق لم ينتهِ خلال 180 ثانية"
+          }
+          if (Test-Path $env:CLEANSHELF_SMOKE_LOG) { Get-Content $env:CLEANSHELF_SMOKE_LOG }
+          if ($proc.ExitCode -ne 0) { throw "فشل فحص التشغيل برمز $($proc.ExitCode)" }
+          Write-Host "فحص التشغيل نجح ✅"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: CleanShelf-windows-build
+          path: |
+            windows-cleaner-app/dist/*.exe
+          if-no-files-found: error
