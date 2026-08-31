@@ -27,7 +27,12 @@ function createWindow(): void {
     }
   })
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    win.show()
+    if (process.env['CLEANSHELF_SMOKE_TEST'] === '1') {
+      import('./smokeTest').then(({ runSmokeTest }) => runSmokeTest(win))
+    }
+  })
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
