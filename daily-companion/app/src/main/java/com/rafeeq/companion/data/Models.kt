@@ -159,6 +159,15 @@ data class Note(
 
 // ---------------------------------------------------------------- المساعد
 
+/** سجلّ أمر نفّذه المساعد على الهاتف — يُعرض في المحادثة ليعرف المستخدم ما جرى. */
+@Serializable
+data class ToolRun(
+    val name: String,
+    val label: String,
+    val ok: Boolean,
+    val denied: Boolean = false,
+)
+
 @Serializable
 data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),
@@ -166,6 +175,8 @@ data class ChatMessage(
     val content: String,
     val createdAt: Long = System.currentTimeMillis(),
     val error: Boolean = false,
+    /** الأوامر التي نفّذها المساعد ضمن هذا الرد. */
+    val toolRuns: List<ToolRun> = emptyList(),
 )
 
 @Serializable

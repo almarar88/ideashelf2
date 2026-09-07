@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,7 +53,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rafeeq.companion.core.Dates
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.rafeeq.companion.ConfirmationOverlay
 import com.rafeeq.companion.data.ChatMessage
+import com.rafeeq.companion.data.voice.VoiceEngine
+import com.rafeeq.companion.ui.components.VoiceWave
 import com.rafeeq.companion.data.ai.Assistant
 import com.rafeeq.companion.ui.AppViewModel
 import com.rafeeq.companion.ui.components.EmptyState
@@ -76,6 +83,25 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
     var input by remember { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+
+    val voiceState by viewModel.voice.state.collectAsState()
+    val amplitude by viewModel.voice.amplitude.collectAsState()
+    val partial by viewModel.voice.partial.collectAsState()
+    val listening = voiceState == VoiceEngine.State.LISTENING
+
+    val micPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            viewModel.voice.startListening(
+                languageTag = settings.voiceLanguage,
+                onResult = { viewModel.sendMessage(it, spoken = true) },
+                onFailure = { viewModel.showMessage(it) },
+            )
+        } else {
+            viewModel.showMessage("أحتاج إذن الميكروفون لأسمعك.")
+        }
+    }
 
     LaunchedEffect(messages.size, messages.lastOrNull()?.content?.length) {
         if (messages.isNotEmpty()) {
@@ -150,7 +176,7 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                 ) {
                     items(messages, key = { it.id }) { message -> MessageBubble(message) }
                     if (ai.streaming && messages.lastOrNull()?.content.isNullOrBlank()) {
-                        item { TypingIndicator() }
+                        item { TypingIndicator(ai) }
                     }
                 }
             }
@@ -158,6 +184,26 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
 
         ai.error?.let {
             ErrorBanner(it, Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+        }
+
+        AnimatedVisibility(visible = listening) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                VoiceWave(
+                    amplitude = amplitude,
+                    active = true,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth(0.6f).height(22.dp),
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    partial.ifBlank { "أستمع…" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         // ------------------------------------------------ الأوامر السريعة
@@ -190,10 +236,38 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (listening) Brush.linearGradient(Gradients.Ember)
+                        else Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.surfaceContainerHighest,
+                                MaterialTheme.colorScheme.surfaceContainerHighest,
+                            ),
+                        ),
+                    )
+                    .clickable {
+                        if (listening) viewModel.voice.cancel()
+                        else micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Mic,
+                    contentDescription = "التحدّث",
+                    tint = if (listening) Color(0xFF06121F)
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(21.dp),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
-                placeholder = { Text("اكتب رسالتك…") },
+                placeholder = { Text("اكتب أو تحدّث…") },
                 shape = RoundedCornerShape(24.dp),
                 maxLines = 5,
                 modifier = Modifier.weight(1f).heightIn(max = 148.dp),
@@ -233,6 +307,8 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
             }
         }
     }
+
+    ConfirmationOverlay(viewModel)
 
     if (showHistory) {
         ModalBottomSheet(onDismissRequest = { showHistory = false }) {
@@ -295,6 +371,33 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
 }
 
 @Composable
+private fun ToolRunChip(run: com.rafeeq.companion.data.ToolRun) {
+    Row(
+        modifier = Modifier
+            .padding(vertical = 2.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                when {
+                    run.denied -> MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                    run.ok -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    else -> MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                },
+            )
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(if (run.denied) "🚫" else if (run.ok) "✅" else "⚠️")
+        Spacer(Modifier.width(6.dp))
+        Text(
+            run.label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (run.ok && !run.denied) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
+@Composable
 private fun MessageBubble(message: ChatMessage) {
     val isUser = message.role == "user"
     Row(
@@ -326,18 +429,26 @@ private fun MessageBubble(message: ChatMessage) {
                     )
                     .padding(horizontal = 15.dp, vertical = 12.dp),
             ) {
-                RichText(
-                    text = message.content,
-                    color = if (message.error) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onSurface,
-                )
+                Column {
+                    message.toolRuns.forEach { ToolRunChip(it) }
+                    if (message.toolRuns.isNotEmpty() && message.content.isNotBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    if (message.content.isNotBlank()) {
+                        RichText(
+                            text = message.content,
+                            color = if (message.error) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun TypingIndicator() {
+private fun TypingIndicator(ai: com.rafeeq.companion.ui.AiState) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
@@ -349,7 +460,7 @@ private fun TypingIndicator() {
                 CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(9.dp))
                 Text(
-                    "يفكّر…",
+                    ai.runningTool?.let { "أنفّذ الأمر…" } ?: "يفكّر…",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

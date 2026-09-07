@@ -241,7 +241,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 Notifier.show(
                     context, id = 300, channel = Channels.BRIEF,
                     title = "${Dates.greeting(java.time.LocalTime.now().hour)} 👋",
-                    body = "موجز ${Dates.weekdayAr(today)} جاهز. افتح رفيقي لتراه.",
+                    body = "موجز ${Dates.weekdayAr(today)} جاهز. افتح Alcode Ai لتراه.",
                 )
             }
         }

@@ -13,7 +13,10 @@ import com.rafeeq.companion.data.Topic
 import com.rafeeq.companion.data.JsonListStore
 import com.rafeeq.companion.data.JsonValueStore
 import com.rafeeq.companion.data.WeatherBundle
+import com.rafeeq.companion.data.ai.AgentRunner
 import com.rafeeq.companion.data.ai.ClaudeClient
+import com.rafeeq.companion.data.control.PhoneController
+import com.rafeeq.companion.data.voice.VoiceEngine
 import com.rafeeq.companion.data.location.LocationRepository
 import com.rafeeq.companion.data.news.DefaultSources
 import com.rafeeq.companion.data.news.NewsRepository
@@ -28,9 +31,14 @@ class Repos(app: Application) {
     val location = LocationRepository(app)
     val weather = WeatherRepository()
     val news = NewsRepository()
-    val claude = ClaudeClient {
+    private val apiKey: () -> String = {
         runCatching { runBlocking { settings.settings.first().apiKey } }.getOrDefault("")
     }
+
+    val claude = ClaudeClient(apiKey)
+    val agent = AgentRunner(apiKey)
+    val phone = PhoneController(app)
+    val voice = VoiceEngine(app)
 
     val tasks = JsonListStore(app, "tasks.json", Task.serializer())
     val habits = JsonListStore(app, "habits.json", Habit.serializer())

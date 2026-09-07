@@ -57,6 +57,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.rafeeq.companion.ui.screens.AssistantScreen
+import com.rafeeq.companion.ui.screens.ControlScreen
 import com.rafeeq.companion.ui.screens.DayScreen
 import com.rafeeq.companion.ui.screens.HomeScreen
 import com.rafeeq.companion.ui.screens.NewsScreen
@@ -65,6 +66,7 @@ import com.rafeeq.companion.ui.screens.PrayerScreen
 import com.rafeeq.companion.ui.screens.SettingsScreen
 import com.rafeeq.companion.ui.screens.SourcesScreen
 import com.rafeeq.companion.ui.screens.WeatherScreen
+import com.rafeeq.companion.VoiceAssistantActivity
 import com.rafeeq.companion.ui.theme.Gradients
 
 object Routes {
@@ -77,6 +79,7 @@ object Routes {
     const val DAY = "day"
     const val SETTINGS = "settings"
     const val SOURCES = "sources"
+    const val CONTROL = "control"
 }
 
 private data class Tab(
@@ -129,8 +132,19 @@ fun RafeeqNavigation(viewModel: AppViewModel) {
         }.onFailure { viewModel.showMessage("تعذّر فتح الرابط.") }
     }
 
+    val openVoice: () -> Unit = {
+        runCatching {
+            context.startActivity(
+                Intent(context, VoiceAssistantActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }.onFailure { viewModel.showMessage("تعذّر فتح المساعد الصوتي.") }
+    }
+
     val showBottomBar = currentRoute in tabs.map { it.route }
-    val isSubScreen = currentRoute == Routes.SETTINGS || currentRoute == Routes.SOURCES
+    val isSubScreen = currentRoute == Routes.SETTINGS ||
+        currentRoute == Routes.SOURCES ||
+        currentRoute == Routes.CONTROL
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHost) },
@@ -190,6 +204,12 @@ fun RafeeqNavigation(viewModel: AppViewModel) {
                         onOpenDay = { navController.navigate(Routes.DAY) },
                         onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                         onOpenArticle = openArticle,
+                        onOpenVoice = openVoice,
+                        onQuickCommand = { prompt ->
+                            navController.navigate(Routes.ASSISTANT)
+                            viewModel.newConversation()
+                            viewModel.sendMessage(prompt)
+                        },
                     )
                 }
 
@@ -216,10 +236,16 @@ fun RafeeqNavigation(viewModel: AppViewModel) {
                 }
 
                 composable(Routes.SETTINGS) {
-                    SettingsScreen(viewModel) { navController.navigate(Routes.SOURCES) }
+                    SettingsScreen(
+                        viewModel = viewModel,
+                        onOpenSources = { navController.navigate(Routes.SOURCES) },
+                        onOpenControl = { navController.navigate(Routes.CONTROL) },
+                    )
                 }
 
                 composable(Routes.SOURCES) { SourcesScreen(viewModel) }
+
+                composable(Routes.CONTROL) { ControlScreen(viewModel) }
             }
         }
     }

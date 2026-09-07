@@ -20,8 +20,17 @@ import com.rafeeq.companion.data.SavedArticle
 import com.rafeeq.companion.data.Task
 import com.rafeeq.companion.data.Topic
 import com.rafeeq.companion.data.WeatherBundle
+import com.rafeeq.companion.data.ToolRun
+import com.rafeeq.companion.data.ai.AgentRunner
 import com.rafeeq.companion.data.ai.Assistant
 import com.rafeeq.companion.data.ai.ClaudeClient
+import com.rafeeq.companion.data.ai.ControlPrompt
+import com.rafeeq.companion.data.control.ActionResult
+import com.rafeeq.companion.data.control.Capability
+import com.rafeeq.companion.data.control.PhoneController
+import com.rafeeq.companion.data.control.ToolCatalog
+import com.rafeeq.companion.data.control.ToolSpec
+import com.rafeeq.companion.data.voice.VoiceEngine
 import com.rafeeq.companion.data.news.NewsCategories
 import com.rafeeq.companion.data.prayer.AsrMethod
 import com.rafeeq.companion.data.prayer.CalculationMethod
@@ -31,6 +40,7 @@ import com.rafeeq.companion.data.prayer.Prayer
 import com.rafeeq.companion.data.prayer.PrayerTimes
 import com.rafeeq.companion.notify.PrayerScheduler
 import com.rafeeq.companion.ui.theme.ThemeMode
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +54,10 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 data class NewsState(
     val articles: List<Article> = emptyList(),
@@ -64,6 +78,15 @@ data class AiState(
     val streaming: Boolean = false,
     val error: String? = null,
     val briefLoading: Boolean = false,
+    /** الأمر الجاري تنفيذه على الهاتف الآن، إن وُجد. */
+    val runningTool: String? = null,
+)
+
+/** طلب تأكيد لأمر حسّاس قبل تنفيذه. */
+data class PendingConfirmation(
+    val toolName: String,
+    val title: String,
+    val details: String,
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -106,6 +129,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var streamJob: Job? = null
 
+    val phone: PhoneController get() = repos.phone
+    val voice: VoiceEngine get() = repos.voice
+
+    private val _capabilities = MutableStateFlow<Set<Capability>>(emptySet())
+    val capabilities: StateFlow<Set<Capability>> = _capabilities.asStateFlow()
+
+    private val _pendingConfirmation = MutableStateFlow<PendingConfirmation?>(null)
+    val pendingConfirmation: StateFlow<PendingConfirmation?> = _pendingConfirmation.asStateFlow()
+    private var confirmationGate: CompletableDeferred<Boolean>? = null
+
+    /** يُعاد فحص القدرات كلما عاد المستخدم من إعدادات النظام. */
+    fun refreshCapabilities() {
+        _capabilities.value = runCatching { repos.phone.availableCapabilities() }.getOrDefault(emptySet())
+    }
+
+    fun resolveConfirmation(approved: Boolean) {
+        _pendingConfirmation.value = null
+        confirmationGate?.complete(approved)
+        confirmationGate = null
+    }
+
+    private fun missingCapabilityNames(): List<String> =
+        Capability.entries
+            .filter { it != Capability.NONE && it !in _capabilities.value }
+            .map { it.arabic }
+
     init {
         viewModelScope.launch {
             repos.tasks.load(); repos.habits.load(); repos.notes.load()
@@ -132,6 +181,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             rescheduleAlarms()
         }
+        refreshCapabilities()
     }
 
     // ------------------------------------------------------------ الوقت والموقع
@@ -408,7 +458,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    fun sendMessage(text: String) {
+    /**
+     * يرسل رسالة إلى المساعد. حين يكون التحكّم مفعّلًا يعمل النموذج بحلقة أدوات:
+     * يردّ، ينفّذ أوامر على الهاتف، يقرأ نتيجتها، ثم يكمل — حتى ينهي المهمة.
+     *
+     * [spoken] يعني أن الطلب جاء بالصوت، فيُقرأ الرد بصوت عالٍ ويُطلب من النموذج
+     * أن يجعله قصيرًا صالحًا للنطق.
+     */
+    fun sendMessage(text: String, spoken: Boolean = false) {
         val s = settings.value
         if (!s.hasApiKey) {
             _ai.value = _ai.value.copy(error = "أضِف مفتاح Anthropic من الإعدادات لتفعيل المساعد.")
@@ -422,57 +479,157 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
-            _ai.value = _ai.value.copy(streaming = true, error = null)
+            _ai.value = _ai.value.copy(streaming = true, error = null, runningTool = null)
             appendMessages(conversation.id, listOf(userMessage, placeholder))
+            refreshCapabilities()
 
-            val history = (activeConversation()?.messages.orEmpty())
-                .filter { it.content.isNotBlank() && !it.error }
-                .takeLast(30)
-                .map { ClaudeClient.Msg(it.role, it.content) }
+            val useTools = s.controlEnabled
+            val history = buildApiHistory(conversation.id)
+            val system = Assistant.systemPrompt(assistantContext()) +
+                if (useTools) ControlPrompt.instructions(spoken, missingCapabilityNames()) else ""
 
             val builder = StringBuilder()
+            val runs = mutableListOf<ToolRun>()
             var failure: String? = null
 
             runCatching {
-                repos.claude.stream(
+                repos.agent.run(
                     model = s.aiModel,
-                    system = Assistant.systemPrompt(assistantContext()),
-                    messages = history,
+                    system = system,
+                    history = history,
+                    tools = if (useTools) ToolCatalog.toJson(_capabilities.value) else JsonArray(emptyList()),
                     effort = s.aiEffort,
-                ).collect { event ->
+                    specOf = { name -> ToolCatalog.byName(name) },
+                    confirm = { call, spec -> requestConfirmation(call, spec, s.confirmSensitive) },
+                    execute = { call -> repos.phone.execute(call.name, call.input) },
+                ) { event ->
                     when (event) {
-                        is ClaudeClient.StreamEvent.Delta -> {
-                            builder.append(event.text)
-                            replaceLastAssistant(conversation.id, placeholder.id, builder.toString())
+                        is AgentRunner.Event.Text -> {
+                            builder.append(event.delta)
+                            updateAssistant(conversation.id, placeholder.id, builder.toString(), runs)
                         }
-                        is ClaudeClient.StreamEvent.Refused -> failure = event.explanation
-                        is ClaudeClient.StreamEvent.Failure -> failure = event.error.friendlyMessage()
-                        is ClaudeClient.StreamEvent.Done -> Unit
+
+                        is AgentRunner.Event.ToolStarted -> {
+                            _ai.value = _ai.value.copy(runningTool = event.call.name)
+                        }
+
+                        is AgentRunner.Event.ToolFinished -> {
+                            runs += ToolRun(
+                                name = event.call.name,
+                                label = event.result.display,
+                                ok = event.result.ok,
+                            )
+                            _ai.value = _ai.value.copy(runningTool = null)
+                            updateAssistant(conversation.id, placeholder.id, builder.toString(), runs)
+                        }
+
+                        is AgentRunner.Event.ToolDenied -> {
+                            runs += ToolRun(
+                                name = event.call.name,
+                                label = "أُلغي بطلبك",
+                                ok = false,
+                                denied = true,
+                            )
+                            _ai.value = _ai.value.copy(runningTool = null)
+                            updateAssistant(conversation.id, placeholder.id, builder.toString(), runs)
+                        }
+
+                        is AgentRunner.Event.Failed -> failure = event.message
+                        AgentRunner.Event.Completed -> Unit
                     }
                 }
             }.onFailure { failure = it.friendlyMessage() }
 
-            if (builder.isBlank()) {
-                replaceLastAssistant(
+            val finalText = builder.toString().trim()
+            if (finalText.isBlank() && runs.isEmpty()) {
+                updateAssistant(
                     conversation.id, placeholder.id,
-                    failure ?: "لم يصل رد. حاول مرة أخرى.",
-                    isError = true,
+                    failure ?: "لم يصل رد. حاول مرة أخرى.", runs, isError = true,
                 )
             } else if (failure != null) {
-                replaceLastAssistant(
+                updateAssistant(
                     conversation.id, placeholder.id,
-                    builder.toString() + "\n\n⚠️ توقّف الرد: $failure",
+                    (finalText + "\n\n⚠️ " + failure).trim(), runs,
                 )
             }
 
-            _ai.value = _ai.value.copy(streaming = false, error = failure)
+            _ai.value = _ai.value.copy(streaming = false, error = failure, runningTool = null)
             maybeTitleConversation(conversation.id)
+
+            if (spoken && settings.value.voiceReplies && finalText.isNotBlank()) {
+                repos.voice.speak(finalText)
+            }
+        }
+    }
+
+    /** يعرض حوار التأكيد وينتظر قرار المستخدم. */
+    private suspend fun requestConfirmation(
+        call: AgentRunner.ToolCall,
+        spec: ToolSpec,
+        confirmEnabled: Boolean,
+    ): Boolean {
+        if (!confirmEnabled) return true
+        val gate = CompletableDeferred<Boolean>()
+        confirmationGate = gate
+        _pendingConfirmation.value = PendingConfirmation(
+            toolName = call.name,
+            title = when (call.name) {
+                "call" -> "إجراء مكالمة"
+                "send_sms" -> "إرسال رسالة نصية"
+                "send_whatsapp" -> "فتح واتساب برسالة"
+                "compose_email" -> "كتابة بريد"
+                "clear_notifications" -> "مسح الإشعارات"
+                else -> "تنفيذ أمر"
+            },
+            details = call.input.entries.joinToString("\n") { (key, value) ->
+                "$key: ${value.toString().trim('"')}"
+            }.ifBlank { spec.description },
+        )
+        return gate.await()
+    }
+
+    /** يبني سجلّ المحادثة بالصيغة التي تفهمها الواجهة البرمجية. */
+    private fun buildApiHistory(conversationId: String): MutableList<JsonObject> {
+        val messages = conversations.value.firstOrNull { it.id == conversationId }?.messages.orEmpty()
+        return messages
+            .filter { it.content.isNotBlank() && !it.error }
+            .takeLast(24)
+            .map { message ->
+                buildJsonObject {
+                    put("role", message.role)
+                    put("content", message.content)
+                }
+            }
+            .toMutableList()
+    }
+
+    private suspend fun updateAssistant(
+        conversationId: String,
+        messageId: String,
+        content: String,
+        runs: List<ToolRun>,
+        isError: Boolean = false,
+    ) {
+        repos.conversations.update { list ->
+            list.map { conversation ->
+                if (conversation.id != conversationId) conversation
+                else conversation.copy(
+                    messages = conversation.messages.map { message ->
+                        if (message.id == messageId) {
+                            message.copy(content = content, error = isError, toolRuns = runs.toList())
+                        } else message
+                    },
+                    updatedAt = System.currentTimeMillis(),
+                )
+            }
         }
     }
 
     fun stopStreaming() {
         streamJob?.cancel()
-        _ai.value = _ai.value.copy(streaming = false)
+        resolveConfirmation(false)
+        repos.voice.stopSpeaking()
+        _ai.value = _ai.value.copy(streaming = false, runningTool = null)
     }
 
     private suspend fun appendMessages(conversationId: String, messages: List<ChatMessage>) {
@@ -653,6 +810,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setNewsRefreshMinutes(value: Int) = viewModelScope.launch {
         repos.settings.setNewsRefreshMinutes(value)
+    }
+
+    fun setControlEnabled(value: Boolean) = viewModelScope.launch {
+        repos.settings.setControlEnabled(value)
+    }
+
+    fun setConfirmSensitive(value: Boolean) = viewModelScope.launch {
+        repos.settings.setConfirmSensitive(value)
+    }
+
+    fun setVoiceReplies(value: Boolean) = viewModelScope.launch {
+        repos.settings.setVoiceReplies(value)
+    }
+
+    fun setVoiceLanguage(value: String) = viewModelScope.launch {
+        repos.settings.setVoiceLanguage(value)
     }
 
     fun rescheduleAlarms() {

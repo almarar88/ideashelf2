@@ -1,6 +1,11 @@
 package com.rafeeq.companion.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -11,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,14 +28,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,40 +44,46 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.rafeeq.companion.core.Dates
 import com.rafeeq.companion.data.Article
+import com.rafeeq.companion.data.Task
 import com.rafeeq.companion.data.prayer.Prayer
 import com.rafeeq.companion.data.weather.WeatherCodes
 import com.rafeeq.companion.ui.AppViewModel
 import com.rafeeq.companion.ui.components.GlassCard
 import com.rafeeq.companion.ui.components.GradientCard
-import com.rafeeq.companion.ui.components.PrimaryButton
 import com.rafeeq.companion.ui.components.ProgressRing
 import com.rafeeq.companion.ui.components.RichText
 import com.rafeeq.companion.ui.components.SectionTitle
 import com.rafeeq.companion.ui.components.ShimmerBox
-import com.rafeeq.companion.ui.components.StatTile
 import com.rafeeq.companion.ui.theme.Amber
 import com.rafeeq.companion.ui.theme.Cyan
 import com.rafeeq.companion.ui.theme.Emerald
 import com.rafeeq.companion.ui.theme.Gradients
+import com.rafeeq.companion.ui.theme.Rose
 import com.rafeeq.companion.ui.theme.Sky
 import com.rafeeq.companion.ui.theme.Violet
 import com.rafeeq.companion.ui.theme.gradientForHour
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.util.Locale
 
 @Composable
 fun HomeScreen(
@@ -83,12 +95,15 @@ fun HomeScreen(
     onOpenDay: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenArticle: (Article) -> Unit,
+    onOpenVoice: () -> Unit = {},
+    onQuickCommand: (String) -> Unit = {},
 ) {
     val settings by viewModel.settings.collectAsState()
     val tick by viewModel.tick.collectAsState()
     val weather by viewModel.weather.collectAsState()
     val news by viewModel.news.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
+    val habits by viewModel.habits.collectAsState()
     val brief by viewModel.brief.collectAsState()
     val ai by viewModel.ai.collectAsState()
 
@@ -97,14 +112,17 @@ fun HomeScreen(
     val heroColors = gradientForHour(now.hour)
     val nextPrayer = viewModel.nextPrayer(now)
     val todayPrayers = viewModel.todayPrayers()
+    val zone = viewModel.zoneId()
 
     val openTasks = tasks.filter { !it.done }
-        .sortedWith(compareByDescending<com.rafeeq.companion.data.Task> { it.priority }.thenBy { it.createdAt })
+        .sortedWith(compareByDescending<Task> { it.priority }.thenBy { it.createdAt })
     val doneToday = tasks.count { it.done }
+    val todayKey = today.toString()
+    val habitsDone = habits.count { (it.log[todayKey] ?: 0) >= it.targetPerDay }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 28.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 30.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
 
@@ -123,16 +141,20 @@ fun HomeScreen(
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                     )
-                    Text(
-                        text = Dates.longGregorianAr(today),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = Dates.longHijriAr(today, settings.hijriOffset),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    Row {
+                        Text(
+                            text = Dates.longHijriAr(today, settings.hijriOffset),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = "  ·  ${Dates.longGregorianAr(today)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 IconButton(onClick = onOpenSettings) {
                     Icon(Icons.Filled.Settings, contentDescription = "الإعدادات")
@@ -142,144 +164,152 @@ fun HomeScreen(
 
         // ---------------------------------------------------- البطاقة الرئيسية
         item {
-            GradientCard(colors = heroColors, padding = PaddingValues(20.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = Dates.formatTime(now, settings.use24hClock),
-                            style = MaterialTheme.typography.displayMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Filled.LocationOn,
-                                contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.85f),
-                                modifier = Modifier.size(15.dp),
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = settings.place?.label ?: "لم يُحدَّد موقع",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.9f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.clickable { onOpenSettings() },
-                            )
-                        }
+            HeroCard(
+                colors = heroColors,
+                now = now,
+                use24h = settings.use24hClock,
+                placeLabel = settings.place?.label,
+                weatherEmoji = weather.bundle?.let {
+                    WeatherCodes.describe(it.now.weatherCode, it.now.isDay).emoji
+                },
+                weatherText = weather.bundle?.let {
+                    "${it.now.temperature.toInt()}° · ${WeatherCodes.describe(it.now.weatherCode, it.now.isDay).text}"
+                },
+                nextPrayerName = nextPrayer?.first?.arabic,
+                nextPrayerAt = nextPrayer?.let { Dates.formatTime(it.second, settings.use24hClock) },
+                remaining = nextPrayer?.let { Duration.between(now, it.second) },
+                progress = nextPrayer?.let { (_, time) ->
+                    val previous = todayPrayers?.current(now)?.second ?: time.minusHours(5)
+                    val total = Duration.between(previous, time).seconds.coerceAtLeast(1)
+                    1f - Duration.between(now, time).seconds.toFloat() / total.toFloat()
+                } ?: 0f,
+                onWeatherClick = onOpenWeather,
+                onPrayerClick = onOpenPrayer,
+                onPlaceClick = onOpenSettings,
+            )
+        }
 
-                        weather.bundle?.let { bundle ->
-                            val info = WeatherCodes.describe(bundle.now.weatherCode, bundle.now.isDay)
-                            Spacer(Modifier.height(10.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable { onOpenWeather() },
-                            ) {
-                                Text(info.emoji, style = MaterialTheme.typography.headlineSmall)
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    "${bundle.now.temperature.toInt()}° · ${info.text}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.White,
-                                )
-                            }
-                        }
-                    }
+        // ---------------------------------------------------- شريط المساعد الصوتي
+        item {
+            VoiceBar(
+                enabled = settings.hasApiKey,
+                onVoice = onOpenVoice,
+                onChat = onOpenAssistant,
+                onSetup = onOpenSettings,
+            )
+        }
 
-                    // عدّاد الصلاة القادمة
-                    if (nextPrayer != null && todayPrayers != null) {
-                        val (prayer, time) = nextPrayer
-                        val previous = todayPrayers.current(now)?.second
-                            ?: time.minusHours(5)
-                        val total = Duration.between(previous, time).seconds.coerceAtLeast(1)
-                        val remaining = Duration.between(now, time)
-                        val progress = 1f - (remaining.seconds.toFloat() / total.toFloat())
-
-                        ProgressRing(
-                            progress = progress.coerceIn(0f, 1f),
-                            colors = listOf(Color.White, Color.White.copy(alpha = 0.55f)),
-                            strokeWidth = 7.dp,
-                            modifier = Modifier
-                                .size(124.dp)
-                                .clickable { onOpenPrayer() },
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    prayer.arabic,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = Color.White.copy(alpha = 0.9f),
-                                )
-                                Text(
-                                    Dates.clockDuration(remaining),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                )
-                                Text(
-                                    Dates.formatTime(time, settings.use24hClock),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White.copy(alpha = 0.85f),
-                                )
-                            }
-                        }
-                    }
+        // ---------------------------------------------------- أوامر سريعة
+        item {
+            val actions = listOf(
+                QuickAction("رتّب يومي", "🗓️", Violet, "رتّب لي يومي بالاعتماد على مهامي وأوقات الصلاة."),
+                QuickAction("لخّص أخباري", "📰", Sky, "لخّص لي أهم أخبار اليوم في خمس نقاط."),
+                QuickAction("حالة هاتفي", "🔋", Emerald, "كيف حالة هاتفي الآن؟"),
+                QuickAction("ماذا ألبس؟", "🧥", Amber, "بناءً على طقس اليوم، بماذا تنصحني أن ألبس؟"),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                actions.forEach { action ->
+                    QuickActionTile(
+                        action = action,
+                        modifier = Modifier.weight(1f),
+                        enabled = settings.hasApiKey,
+                        onClick = { onQuickCommand(action.prompt) },
+                    )
                 }
             }
         }
 
-        // ---------------------------------------------------- مؤشرات الطقس
+        // ---------------------------------------------------- الطقس بالساعة
         weather.bundle?.let { bundle ->
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatTile(
-                        Icons.Filled.WbSunny,
-                        "${bundle.now.feelsLike.toInt()}°",
-                        "محسوسة",
-                        Amber,
-                        Modifier.weight(1f),
-                    )
-                    StatTile(
-                        Icons.Filled.WaterDrop,
-                        "${bundle.now.humidity}%",
-                        "الرطوبة",
-                        Sky,
-                        Modifier.weight(1f),
-                    )
-                    StatTile(
-                        Icons.Filled.Air,
-                        "${bundle.now.windSpeed.toInt()}",
-                        "كم/س رياح",
-                        Cyan,
-                        Modifier.weight(1f),
-                    )
-                    val aqi = bundle.airQuality
-                    StatTile(
-                        Icons.Filled.Bolt,
-                        aqi?.aqi?.toString() ?: "—",
-                        aqi?.let { WeatherCodes.airQualityLabel(it.aqi).first } ?: "جودة الهواء",
-                        Emerald,
-                        Modifier.weight(1f),
-                    )
+            val upcoming = bundle.hourly
+                .filter { it.epochSeconds >= System.currentTimeMillis() / 1000 - 1800 }
+                .take(12)
+            if (upcoming.isNotEmpty()) {
+                item {
+                    GlassCard(
+                        padding = PaddingValues(vertical = 12.dp, horizontal = 6.dp),
+                        onClick = onOpenWeather,
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "الساعات القادمة",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            bundle.daily.firstOrNull()?.let {
+                                Text(
+                                    "${it.max.toInt()}° / ${it.min.toInt()}°",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                        ) {
+                            items(upcoming) { hour ->
+                                val time = Instant.ofEpochSecond(hour.epochSeconds).atZone(zone)
+                                val info = WeatherCodes.describe(hour.weatherCode, hour.isDay)
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(
+                                        String.format(Locale.ENGLISH, "%02d", time.hour),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(info.emoji, style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "${hour.temperature.toInt()}°",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
 
         if (weather.bundle == null && weather.loading) {
-            item { ShimmerBox(Modifier.fillMaxWidth(), height = 84.dp, RoundedCornerShape(18.dp)) }
+            item { ShimmerBox(Modifier.fillMaxWidth(), height = 110.dp, RoundedCornerShape(24.dp)) }
         }
 
-        // ---------------------------------------------------- موجز الذكاء الاصطناعي
+        // ---------------------------------------------------- شريط الصلوات
+        if (todayPrayers != null) {
+            item { SectionTitle("أوقات الصلاة", action = "الكل", onAction = onOpenPrayer) }
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(Prayer.entries.toList()) { prayer ->
+                        val time = todayPrayers[prayer]
+                        val isNext = nextPrayer?.first == prayer && time.toLocalDate() == today
+                        PrayerPill(
+                            name = prayer.arabic,
+                            time = Dates.formatTime(time, settings.use24hClock),
+                            highlighted = isNext,
+                            dimmed = time.isBefore(now) && !isNext,
+                            onClick = onOpenPrayer,
+                        )
+                    }
+                }
+            }
+        }
+
+        // ---------------------------------------------------- موجز اليوم
         item {
             GlassCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(Violet.copy(alpha = 0.18f)),
+                        Modifier.size(34.dp).clip(CircleShape).background(Violet.copy(alpha = 0.18f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -302,10 +332,7 @@ fun HomeScreen(
                             enabled = !ai.briefLoading,
                         ) {
                             if (ai.briefLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(17.dp),
-                                    strokeWidth = 2.dp,
-                                )
+                                CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp)
                             } else {
                                 Icon(Icons.Filled.Refresh, contentDescription = "تحديث الموجز")
                             }
@@ -314,7 +341,6 @@ fun HomeScreen(
                 }
                 Spacer(Modifier.height(8.dp))
 
-                val todayKey = today.toString()
                 when {
                     !settings.hasApiKey -> Text(
                         "فعّل المساعد الذكي بإضافة مفتاح Anthropic من الإعدادات، " +
@@ -337,137 +363,36 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(10.dp))
-                        PrimaryButton("أنشئ موجز اليوم") { viewModel.generateBrief(force = true) }
+                        com.rafeeq.companion.ui.components.PrimaryButton("أنشئ موجز اليوم") {
+                            viewModel.generateBrief(force = true)
+                        }
                     }
                 }
             }
         }
 
-        // ---------------------------------------------------- شريط الصلوات
-        if (todayPrayers != null) {
-            item {
-                SectionTitle("أوقات الصلاة", action = "الكل", onAction = onOpenPrayer)
-            }
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(Prayer.entries.toList()) { prayer ->
-                        val time = todayPrayers[prayer]
-                        val isNext = nextPrayer?.first == prayer &&
-                            time.toLocalDate() == today
-                        val passed = time.isBefore(now)
-                        PrayerPill(
-                            name = prayer.arabic,
-                            time = Dates.formatTime(time, settings.use24hClock),
-                            highlighted = isNext,
-                            dimmed = passed && !isNext,
-                            onClick = onOpenPrayer,
-                        )
-                    }
-                }
-            }
-        }
-
-        // ---------------------------------------------------- مهام اليوم
+        // ---------------------------------------------------- يومي
         item {
             SectionTitle(
-                if (openTasks.isEmpty()) "مهامك" else "مهامك (${openTasks.size})",
+                if (openTasks.isEmpty()) "يومك" else "يومك (${openTasks.size} مهمة)",
                 action = "فتح",
                 onAction = onOpenDay,
             )
         }
         item {
-            GlassCard(padding = PaddingValues(vertical = 6.dp, horizontal = 6.dp)) {
-                if (openTasks.isEmpty()) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Filled.CheckCircle,
-                            contentDescription = null,
-                            tint = Emerald,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            if (doneToday > 0) "أنجزت كل مهامك اليوم 🎉" else "لا مهام بعد. أضِف واحدة لتبدأ.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            "إضافة",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable { onOpenDay() }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                        )
-                    }
-                } else {
-                    openTasks.take(4).forEach { task ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .clickable { viewModel.toggleTask(task) }
-                                .padding(horizontal = 10.dp, vertical = 11.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                Icons.Filled.RadioButtonUnchecked,
-                                contentDescription = null,
-                                tint = when (task.priority) {
-                                    2 -> MaterialTheme.colorScheme.error
-                                    0 -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    else -> MaterialTheme.colorScheme.primary
-                                },
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    task.title,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                val due = task.dueDate
-                                if (due != null) {
-                                    val overdue = runCatching { LocalDate.parse(due).isBefore(today) }
-                                        .getOrDefault(false)
-                                    Text(
-                                        text = (if (overdue) "متأخرة · " else "") +
-                                            due + (task.dueTime?.let { " · $it" } ?: ""),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (overdue) MaterialTheme.colorScheme.error
-                                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    if (openTasks.size > 4) {
-                        Text(
-                            "و${openTasks.size - 4} مهام أخرى",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onOpenDay() }
-                                .padding(10.dp),
-                        )
-                    }
-                }
-            }
+            TodayCard(
+                openTasks = openTasks,
+                doneCount = doneToday,
+                habitsDone = habitsDone,
+                habitsTotal = habits.size,
+                today = today,
+                onToggle = { viewModel.toggleTask(it) },
+                onOpen = onOpenDay,
+            )
         }
 
-        // ---------------------------------------------------- أبرز الأخبار
-        item {
-            SectionTitle("أبرز الأخبار", action = "الكل", onAction = onOpenNews)
-        }
+        // ---------------------------------------------------- الأخبار
+        item { SectionTitle("أبرز الأخبار", action = "الكل", onAction = onOpenNews) }
         item {
             AnimatedVisibility(
                 visible = news.loading && news.articles.isEmpty(),
@@ -476,7 +401,7 @@ fun HomeScreen(
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     repeat(2) {
-                        ShimmerBox(Modifier.width(230.dp), 168.dp, RoundedCornerShape(20.dp))
+                        ShimmerBox(Modifier.width(240.dp), 190.dp, RoundedCornerShape(22.dp))
                     }
                 }
             }
@@ -499,27 +424,364 @@ fun HomeScreen(
                 }
             }
         }
+    }
+}
 
-        // ---------------------------------------------------- زر المساعد
-        item {
-            GradientCard(colors = Gradients.Dusk, onClick = onOpenAssistant) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("✨", style = MaterialTheme.typography.headlineMedium)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
+// ---------------------------------------------------------------- المكوّنات
+
+@Composable
+private fun HeroCard(
+    colors: List<Color>,
+    now: LocalDateTime,
+    use24h: Boolean,
+    placeLabel: String?,
+    weatherEmoji: String?,
+    weatherText: String?,
+    nextPrayerName: String?,
+    nextPrayerAt: String?,
+    remaining: Duration?,
+    progress: Float,
+    onWeatherClick: () -> Unit,
+    onPrayerClick: () -> Unit,
+    onPlaceClick: () -> Unit,
+) {
+    // تدرّج يتحرّك ببطء فيبدو الحيّز حيًّا دون أن يشتّت.
+    val transition = rememberInfiniteTransition(label = "hero")
+    val shift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(11000, easing = LinearEasing)),
+        label = "shift",
+    )
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(30.dp))
+            .background(
+                Brush.linearGradient(
+                    colors = colors,
+                    start = Offset(900f * shift, 0f),
+                    end = Offset(900f * (1f - shift) + 400f, 1100f),
+                ),
+            ),
+    ) {
+        // وهج زخرفي خفيف في الزاوية
+        Box(
+            Modifier
+                .size(190.dp)
+                .padding(10.dp)
+                .blur(48.dp)
+                .background(Color.White.copy(alpha = 0.16f), CircleShape)
+                .align(Alignment.TopEnd),
+        )
+
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = Dates.formatTime(now, use24h),
+                    style = MaterialTheme.typography.displayMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                )
+                Spacer(Modifier.height(2.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { onPlaceClick() },
+                ) {
+                    Icon(
+                        Icons.Filled.LocationOn,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.size(15.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = placeLabel ?: "لم يُحدَّد موقع",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.9f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                if (weatherText != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White.copy(alpha = 0.16f))
+                            .clickable { onWeatherClick() }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                    ) {
+                        Text(weatherEmoji.orEmpty(), style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.width(6.dp))
                         Text(
-                            "اسأل رفيقك",
+                            weatherText,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                        )
+                    }
+                }
+            }
+
+            if (nextPrayerName != null && remaining != null) {
+                ProgressRing(
+                    progress = progress.coerceIn(0f, 1f),
+                    colors = listOf(Color.White, Color.White.copy(alpha = 0.5f)),
+                    strokeWidth = 7.dp,
+                    modifier = Modifier
+                        .size(126.dp)
+                        .clickable { onPrayerClick() },
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            nextPrayerName,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White.copy(alpha = 0.92f),
+                        )
+                        Text(
+                            Dates.clockDuration(remaining),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                         )
                         Text(
-                            "رتّب يومك، لخّص خبرًا، اكتب رسالة، أو ناقش قرارًا.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.9f),
+                            nextPrayerAt.orEmpty(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.85f),
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceBar(
+    enabled: Boolean,
+    onVoice: () -> Unit,
+    onChat: () -> Unit,
+    onSetup: () -> Unit,
+) {
+    val transition = rememberInfiniteTransition(label = "voicebar")
+    val pulse by transition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing)),
+        label = "pulse",
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(26.dp))
+            .background(Brush.horizontalGradient(Gradients.Dusk))
+            .clickable { if (enabled) onChat() else onSetup() }
+            .padding(start = 8.dp, end = 18.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.18f + 0.10f * pulse))
+                .clickable { if (enabled) onVoice() else onSetup() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.Mic,
+                contentDescription = "التحدّث إلى Alcode Ai",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                if (enabled) "تحدّث إلى Alcode Ai" else "فعّل المساعد الذكي",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
+            Text(
+                if (enabled) "«افتح واتساب» · «ضبط منبّه ٧ الصبح» · «كيف الجو؟»"
+                else "أضِف مفتاح Anthropic من الإعدادات",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.88f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+private data class QuickAction(
+    val label: String,
+    val emoji: String,
+    val tint: Color,
+    val prompt: String,
+)
+
+@Composable
+private fun QuickActionTile(
+    action: QuickAction,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerHigh
+                    .copy(alpha = if (enabled) 0.6f else 0.3f),
+            )
+            .clickable(enabled = enabled) { onClick() }
+            .padding(vertical = 14.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            Modifier.size(36.dp).clip(CircleShape).background(action.tint.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(action.emoji, style = MaterialTheme.typography.titleMedium)
+        }
+        Text(
+            action.label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun TodayCard(
+    openTasks: List<Task>,
+    doneCount: Int,
+    habitsDone: Int,
+    habitsTotal: Int,
+    today: LocalDate,
+    onToggle: (Task) -> Unit,
+    onOpen: () -> Unit,
+) {
+    GlassCard(padding = PaddingValues(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val total = openTasks.size + doneCount
+            val ratio = if (total == 0) 0f else doneCount.toFloat() / total
+            ProgressRing(
+                progress = ratio,
+                colors = Gradients.Mint,
+                strokeWidth = 6.dp,
+                modifier = Modifier.size(58.dp),
+            ) {
+                Text(
+                    "$doneCount/$total",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    when {
+                        total == 0 -> "لا مهام اليوم"
+                        openTasks.isEmpty() -> "أنجزت كل مهامك 🎉"
+                        else -> "بقيت ${openTasks.size} مهمة"
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (habitsTotal > 0) {
+                    Text(
+                        "العادات: $habitsDone من $habitsTotal اليوم",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Text(
+                "فتح",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onOpen() }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        }
+
+        if (openTasks.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            openTasks.take(3).forEach { task ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onToggle(task) }
+                        .padding(horizontal = 4.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.RadioButtonUnchecked,
+                        contentDescription = null,
+                        tint = when (task.priority) {
+                            2 -> Rose
+                            0 -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> Cyan
+                        },
+                        modifier = Modifier.size(19.dp),
+                    )
+                    Spacer(Modifier.width(11.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            task.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        task.dueDate?.let { due ->
+                            val overdue = runCatching {
+                                LocalDate.parse(due).isBefore(today)
+                            }.getOrDefault(false)
+                            Text(
+                                text = (if (overdue) "متأخرة · " else "") + due +
+                                    (task.dueTime?.let { " · $it" } ?: ""),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (overdue) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        } else if (doneCount > 0) {
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = Emerald,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "يوم نظيف. استرِح قليلًا.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -533,10 +795,8 @@ private fun PrayerPill(
     dimmed: Boolean,
     onClick: () -> Unit,
 ) {
-    val background = when {
-        highlighted -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f)
-    }
+    val background = if (highlighted) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f)
     val contentColor = when {
         highlighted -> MaterialTheme.colorScheme.onPrimary
         dimmed -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
@@ -565,28 +825,37 @@ private fun PrayerPill(
 private fun HeadlineCard(article: Article, onClick: () -> Unit) {
     Column(
         modifier = Modifier
-            .width(238.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .width(240.dp)
+            .clip(RoundedCornerShape(22.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.7f))
             .clickable { onClick() },
     ) {
         if (article.hasImage) {
-            AsyncImage(
-                model = article.imageUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(118.dp),
-            )
+            Box {
+                AsyncImage(
+                    model = article.imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(1.7f),
+                )
+                // تدرّج أسفل الصورة ليبقى النص مقروءًا فوق أي صورة.
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1.7f)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)),
+                            ),
+                        ),
+                )
+            }
         } else {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(72.dp)
-                    .background(
-                        androidx.compose.ui.graphics.Brush.linearGradient(Gradients.Ocean),
-                    ),
+                    .height(76.dp)
+                    .background(Brush.linearGradient(Gradients.Ocean)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text("📰", style = MaterialTheme.typography.headlineMedium)
@@ -599,7 +868,6 @@ private fun HeadlineCard(article: Article, onClick: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
-                lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
             )
             Spacer(Modifier.height(6.dp))
             Text(

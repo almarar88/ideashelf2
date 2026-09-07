@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">رفيقي</string>
+    <string name="app_name" translatable="false">Alcode Ai</string>
+    <string name="accessibility_label">Alcode Ai — التحكّم بالهاتف</string>
+    <string name="accessibility_description">تتيح لـ Alcode Ai قراءة ما على الشاشة والضغط والكتابة داخل التطبيقات، لتنفيذ الأوامر التي تطلبها منه. لا تُستخدم إلا عند طلبك، ولا تُرسل شيئًا خارج جهازك من تلقاء نفسها.</string>
+    <string name="notification_listener_label">Alcode Ai — قراءة الإشعارات</string>
 </resources>

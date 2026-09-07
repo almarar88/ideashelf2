@@ -93,7 +93,7 @@ fun OnboardingScreen(viewModel: AppViewModel, onDone: () -> Unit) {
 
             Spacer(Modifier.height(18.dp))
             Text(
-                "رفيقي",
+                "Alcode Ai",
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
@@ -115,7 +115,7 @@ fun OnboardingScreen(viewModel: AppViewModel, onDone: () -> Unit) {
                 when (current) {
                     0 -> StepCard(
                         title = "مرحبًا 👋",
-                        body = "رفيقي يجمع لك أخبارك المختارة، الطقس، أوقات الصلاة والقبلة، " +
+                        body = "Alcode Ai يجمع لك أخبارك المختارة، الطقس، أوقات الصلاة والقبلة، " +
                             "مهامك وعاداتك، ومساعدًا ذكيًا يعرف سياق يومك.\n\n" +
                             "لا حسابات، ولا تتبّع — كل شيء يبقى على جهازك.",
                     ) {
@@ -167,7 +167,7 @@ fun OnboardingScreen(viewModel: AppViewModel, onDone: () -> Unit) {
                             append("بقية التطبيق يعمل كاملًا بدون أي مفتاح.")
                         },
                     ) {
-                        PrimaryButton("ادخل إلى رفيقي") {
+                        PrimaryButton("ادخل إلى Alcode Ai") {
                             viewModel.setOnboarded(true)
                             viewModel.rescheduleAlarms()
                             onDone()

@@ -51,6 +51,11 @@ data class AppSettings(
     val briefHour: Int = 7,
 
     val newsRefreshMinutes: Int = 30,
+
+    val controlEnabled: Boolean = true,
+    val confirmSensitive: Boolean = true,
+    val voiceReplies: Boolean = true,
+    val voiceLanguage: String = "ar-SA",
 ) {
     val prayerConfig: PrayerConfig
         get() = PrayerConfig(
@@ -99,6 +104,11 @@ class SettingsRepository(private val context: Context) {
         val briefHour = intPreferencesKey("brief_hour")
 
         val newsRefresh = intPreferencesKey("news_refresh")
+
+        val controlEnabled = booleanPreferencesKey("control_enabled")
+        val confirmSensitive = booleanPreferencesKey("confirm_sensitive")
+        val voiceReplies = booleanPreferencesKey("voice_replies")
+        val voiceLanguage = stringPreferencesKey("voice_language")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -143,6 +153,10 @@ class SettingsRepository(private val context: Context) {
             briefNotification = p[Keys.briefNotification] ?: true,
             briefHour = p[Keys.briefHour] ?: 7,
             newsRefreshMinutes = p[Keys.newsRefresh] ?: 30,
+            controlEnabled = p[Keys.controlEnabled] ?: true,
+            confirmSensitive = p[Keys.confirmSensitive] ?: true,
+            voiceReplies = p[Keys.voiceReplies] ?: true,
+            voiceLanguage = p[Keys.voiceLanguage] ?: "ar-SA",
         )
     }
 
@@ -196,6 +210,10 @@ class SettingsRepository(private val context: Context) {
     suspend fun setBriefNotification(value: Boolean) = edit { it[Keys.briefNotification] = value }
     suspend fun setBriefHour(value: Int) = edit { it[Keys.briefHour] = value.coerceIn(0, 23) }
     suspend fun setNewsRefreshMinutes(value: Int) = edit { it[Keys.newsRefresh] = value }
+    suspend fun setControlEnabled(value: Boolean) = edit { it[Keys.controlEnabled] = value }
+    suspend fun setConfirmSensitive(value: Boolean) = edit { it[Keys.confirmSensitive] = value }
+    suspend fun setVoiceReplies(value: Boolean) = edit { it[Keys.voiceReplies] = value }
+    suspend fun setVoiceLanguage(value: String) = edit { it[Keys.voiceLanguage] = value }
 
     private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         context.dataStore.edit(block)

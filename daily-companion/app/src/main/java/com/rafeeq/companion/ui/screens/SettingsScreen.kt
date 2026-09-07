@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhonelinkSetup
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
@@ -70,7 +71,11 @@ import com.rafeeq.companion.ui.theme.Violet
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(viewModel: AppViewModel, onOpenSources: () -> Unit) {
+fun SettingsScreen(
+    viewModel: AppViewModel,
+    onOpenSources: () -> Unit,
+    onOpenControl: () -> Unit = {},
+) {
     val settings by viewModel.settings.collectAsState()
     val locating by viewModel.locating.collectAsState()
 
@@ -238,6 +243,20 @@ fun SettingsScreen(viewModel: AppViewModel, onOpenSources: () -> Unit) {
             }
         }
 
+        // ------------------------------------------------ التحكّم بالهاتف
+        item { SectionTitle("التحكّم بالهاتف") }
+        item {
+            GlassCard(padding = PaddingValues(6.dp)) {
+                SettingRow(
+                    title = "صلاحيات التحكّم",
+                    subtitle = "ما يستطيع Alcode Ai فعله بهاتفك — وتفعيله بزر التشغيل",
+                    value = if (settings.controlEnabled) "مفعّل" else "معطّل",
+                    icon = Icons.Filled.PhonelinkSetup,
+                    tint = Emerald,
+                ) { onOpenControl() }
+            }
+        }
+
         // ------------------------------------------------ الأخبار
         item { SectionTitle("الأخبار") }
         item {
@@ -299,7 +318,7 @@ fun SettingsScreen(viewModel: AppViewModel, onOpenSources: () -> Unit) {
 
         item {
             GlassCard {
-                Text("رفيقي", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text("Alcode Ai", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "الإصدار ١٫٠٫٠ · يعمل بلا حسابات ولا تتبّع. " +
