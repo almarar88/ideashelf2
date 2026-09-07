@@ -57,6 +57,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.rafeeq.companion.ui.screens.AssistantScreen
+import com.rafeeq.companion.ui.screens.AzkarScreen
 import com.rafeeq.companion.ui.screens.ControlScreen
 import com.rafeeq.companion.ui.screens.DayScreen
 import com.rafeeq.companion.ui.screens.HomeScreen
@@ -80,6 +81,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val SOURCES = "sources"
     const val CONTROL = "control"
+    const val AZKAR = "azkar"
 }
 
 private data class Tab(
@@ -144,7 +146,8 @@ fun RafeeqNavigation(viewModel: AppViewModel) {
     val showBottomBar = currentRoute in tabs.map { it.route }
     val isSubScreen = currentRoute == Routes.SETTINGS ||
         currentRoute == Routes.SOURCES ||
-        currentRoute == Routes.CONTROL
+        currentRoute == Routes.CONTROL ||
+        currentRoute == Routes.AZKAR
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHost) },
@@ -226,7 +229,11 @@ fun RafeeqNavigation(viewModel: AppViewModel) {
                 }
 
                 composable(Routes.PRAYER) {
-                    PrayerScreen(viewModel) { navController.navigate(Routes.SETTINGS) }
+                    PrayerScreen(
+                        viewModel = viewModel,
+                        onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                        onOpenAzkar = { navController.navigate(Routes.AZKAR) },
+                    )
                 }
 
                 composable(Routes.DAY) { DayScreen(viewModel) }
@@ -246,6 +253,8 @@ fun RafeeqNavigation(viewModel: AppViewModel) {
                 composable(Routes.SOURCES) { SourcesScreen(viewModel) }
 
                 composable(Routes.CONTROL) { ControlScreen(viewModel) }
+
+                composable(Routes.AZKAR) { AzkarScreen() }
             }
         }
     }

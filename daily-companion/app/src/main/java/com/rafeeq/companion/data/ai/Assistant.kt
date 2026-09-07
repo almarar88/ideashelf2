@@ -45,67 +45,80 @@ object Assistant {
 - استعمل معطيات اليوم أدناه عندما تكون ذات صلة فقط، ولا تسردها بلا داعٍ.
 - إذا سألك المستخدم بالإنجليزية أو بلهجته، أجبه بنفس لغته."""
 
-    fun systemPrompt(context: Context): String = buildString {
+    /**
+     * الجزء الثابت من تعليمات النظام — لا يحوي أي شيء متغيّر (وقت، طقس، مهام).
+     *
+     * هذا مقصود: الواجهة البرمجية تخزّن البادئة الثابتة مؤقتًا، وأي حرف يتغيّر
+     * يُبطل التخزين ويعيد معالجة الآلاف من الرموز في كل رسالة. إبقاء الوقت هنا
+     * كان يجعل التخزين عديم الفائدة تمامًا ويُبطئ كل رد.
+     */
+    fun stableSystem(persona: String, control: String = ""): String = buildString {
         appendLine(BASE_PERSONA)
-        if (context.persona.isNotBlank()) {
+        if (persona.isNotBlank()) {
             appendLine()
             appendLine("تعليمات إضافية من المستخدم (لها الأولوية على أسلوبك الافتراضي):")
-            appendLine(context.persona.trim())
+            appendLine(persona.trim())
         }
-        appendLine()
-        appendLine("--- معطيات اليوم ---")
-        if (context.userName.isNotBlank()) appendLine("اسم المستخدم: ${context.userName}")
-        appendLine("الوقت الآن: ${Dates.formatTime(context.now, context.use24h)}")
-        appendLine("التاريخ: ${context.gregorianDate} — ${context.hijriDate}")
+        if (control.isNotBlank()) append(control)
+    }
+
+    /**
+     * حالة اليوم المتغيّرة. تُرفق مع رسالة المستخدم لا مع تعليمات النظام،
+     * حتى تبقى البادئة المخزّنة سليمة. مختصرة عمدًا — كل سطر زائد يبطئ الرد.
+     */
+    fun contextBlock(context: Context): String = buildString {
+        appendLine("<حالة_اليوم>")
+        if (context.userName.isNotBlank()) appendLine("المستخدم: ${context.userName}")
+        appendLine("الآن: ${Dates.formatTime(context.now, context.use24h)} — ${context.gregorianDate}")
+        appendLine("هجري: ${context.hijriDate}")
         if (context.placeLabel.isNotBlank()) appendLine("الموقع: ${context.placeLabel}")
 
         context.weather?.let { w ->
             val info = WeatherCodes.describe(w.now.weatherCode, w.now.isDay)
+            val today = w.daily.firstOrNull()
             appendLine(
-                "الطقس: ${info.text}، ${w.now.temperature.toInt()}° " +
-                    "(محسوسة ${w.now.feelsLike.toInt()}°)، رطوبة ${w.now.humidity}%، " +
-                    "رياح ${w.now.windSpeed.toInt()} كم/س",
+                "الطقس: ${info.text} ${w.now.temperature.toInt()}° " +
+                    "(محسوسة ${w.now.feelsLike.toInt()}°، رطوبة ${w.now.humidity}%)" +
+                    (today?.let { ", اليوم ${it.max.toInt()}°/${it.min.toInt()}°، مطر ${it.precipitationProbability}%" } ?: ""),
             )
-            w.daily.firstOrNull()?.let {
-                appendLine("توقّع اليوم: عظمى ${it.max.toInt()}° / صغرى ${it.min.toInt()}°، احتمال مطر ${it.precipitationProbability}%")
-            }
         }
 
         context.prayers?.let { p ->
-            val times = Prayer.entries.filter { it.isObligatory }.joinToString("، ") {
-                "${it.arabic} ${Dates.formatTime(p[it], context.use24h)}"
-            }
-            appendLine("أوقات الصلاة: $times")
             p.next(context.now)?.let { (prayer, time) ->
                 appendLine(
-                    "الصلاة القادمة: ${prayer.arabic} بعد " +
-                        Dates.humanDuration(java.time.Duration.between(context.now, time)),
+                    "الصلاة القادمة: ${prayer.arabic} ${Dates.formatTime(time, context.use24h)} " +
+                        "(بعد ${Dates.humanDuration(java.time.Duration.between(context.now, time))})",
                 )
             }
+            appendLine(
+                "أوقات اليوم: " + Prayer.entries.filter { it.isObligatory }.joinToString("، ") {
+                    "${it.arabic} ${Dates.formatTime(p[it], context.use24h)}"
+                },
+            )
         }
 
         val pending = context.tasks.filter { !it.done }
         if (pending.isNotEmpty()) {
-            appendLine("مهام غير منجزة (${pending.size}):")
-            pending.take(15).forEach { task ->
-                val due = task.dueDate?.let { d -> " — موعدها $d${task.dueTime?.let { " $it" } ?: ""}" }.orEmpty()
-                val priority = when (task.priority) { 2 -> " [مهمة]"; 0 -> " [منخفضة]"; else -> "" }
-                appendLine("• ${task.title}$due$priority")
-            }
+            appendLine("مهام مفتوحة (${pending.size}): " + pending.take(6).joinToString("، ") { task ->
+                task.title + (task.dueDate?.let { " [$it]" } ?: "")
+            })
         }
 
         val today = LocalDate.now().toString()
-        val habitsToday = context.habits.filter { (it.log[today] ?: 0) < it.targetPerDay }
-        if (habitsToday.isNotEmpty()) {
-            appendLine("عادات لم تكتمل اليوم: " + habitsToday.joinToString("، ") { it.title })
+        val habitsLeft = context.habits.filter { (it.log[today] ?: 0) < it.targetPerDay }
+        if (habitsLeft.isNotEmpty()) {
+            appendLine("عادات لم تكتمل: " + habitsLeft.take(5).joinToString("، ") { it.title })
         }
 
         if (context.headlines.isNotEmpty()) {
-            appendLine("أبرز العناوين الآن:")
-            context.headlines.take(8).forEach { appendLine("• ${it.title} (${it.sourceName})") }
+            appendLine("عناوين: " + context.headlines.take(5).joinToString(" | ") { it.title })
         }
-        appendLine("--- نهاية المعطيات ---")
+        append("</حالة_اليوم>")
     }
+
+    /** للطلبات المفردة (الموجز، التلخيص) حيث لا تتكرّر البادئة. */
+    fun systemPrompt(context: Context): String =
+        stableSystem(context.persona) + "\n\n" + contextBlock(context)
 
     /** الملخّص اليومي — النص الذي يظهر في بطاقة "موجزك". */
     fun dailyBriefPrompt(): String = """

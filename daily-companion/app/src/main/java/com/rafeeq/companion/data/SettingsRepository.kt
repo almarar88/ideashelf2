@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.rafeeq.companion.core.Net
+import com.rafeeq.companion.data.ai.ClaudeClient
 import com.rafeeq.companion.data.prayer.AsrMethod
 import com.rafeeq.companion.data.prayer.CalculationMethod
 import com.rafeeq.companion.data.prayer.HighLatitudeRule
@@ -53,7 +54,9 @@ data class AppSettings(
     val newsRefreshMinutes: Int = 30,
 
     val controlEnabled: Boolean = true,
-    val confirmSensitive: Boolean = true,
+    /** إيقافه هو الافتراضي بطلب المستخدم: الأمر يُنفَّذ فور صدوره بلا حوار. */
+    val confirmSensitive: Boolean = false,
+    val responseSpeed: ClaudeClient.ResponseSpeed = ClaudeClient.ResponseSpeed.FAST,
     val voiceReplies: Boolean = true,
     val voiceLanguage: String = "ar-SA",
 ) {
@@ -67,6 +70,10 @@ data class AppSettings(
         )
 
     val hasApiKey: Boolean get() = apiKey.isNotBlank()
+
+    /** النموذج وعمق التفكير المستخدمان فعليًا — يشتقّان من مستوى السرعة. */
+    val effectiveModel: String get() = responseSpeed.model
+    val effectiveEffort: String get() = responseSpeed.effort
 }
 
 class SettingsRepository(private val context: Context) {
@@ -107,6 +114,7 @@ class SettingsRepository(private val context: Context) {
 
         val controlEnabled = booleanPreferencesKey("control_enabled")
         val confirmSensitive = booleanPreferencesKey("confirm_sensitive")
+        val responseSpeed = stringPreferencesKey("response_speed")
         val voiceReplies = booleanPreferencesKey("voice_replies")
         val voiceLanguage = stringPreferencesKey("voice_language")
     }
@@ -154,7 +162,8 @@ class SettingsRepository(private val context: Context) {
             briefHour = p[Keys.briefHour] ?: 7,
             newsRefreshMinutes = p[Keys.newsRefresh] ?: 30,
             controlEnabled = p[Keys.controlEnabled] ?: true,
-            confirmSensitive = p[Keys.confirmSensitive] ?: true,
+            confirmSensitive = p[Keys.confirmSensitive] ?: false,
+            responseSpeed = ClaudeClient.ResponseSpeed.from(p[Keys.responseSpeed]),
             voiceReplies = p[Keys.voiceReplies] ?: true,
             voiceLanguage = p[Keys.voiceLanguage] ?: "ar-SA",
         )
@@ -212,6 +221,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setNewsRefreshMinutes(value: Int) = edit { it[Keys.newsRefresh] = value }
     suspend fun setControlEnabled(value: Boolean) = edit { it[Keys.controlEnabled] = value }
     suspend fun setConfirmSensitive(value: Boolean) = edit { it[Keys.confirmSensitive] = value }
+    suspend fun setResponseSpeed(value: ClaudeClient.ResponseSpeed) =
+        edit { it[Keys.responseSpeed] = value.name }
     suspend fun setVoiceReplies(value: Boolean) = edit { it[Keys.voiceReplies] = value }
     suspend fun setVoiceLanguage(value: String) = edit { it[Keys.voiceLanguage] = value }
 

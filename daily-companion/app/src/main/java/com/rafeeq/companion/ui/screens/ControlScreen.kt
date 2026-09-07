@@ -131,7 +131,10 @@ fun ControlScreen(viewModel: AppViewModel) {
                 )
                 SwitchRow(
                     title = "تأكيد الأوامر الحسّاسة",
-                    subtitle = "يسألك قبل الاتصال أو إرسال رسالة أو مسح الإشعارات",
+                    subtitle = if (settings.confirmSensitive)
+                        "يسألك قبل الاتصال أو إرسال رسالة أو مسح الإشعارات"
+                    else
+                        "معطّل — الأوامر تُنفَّذ فور صدورها بلا سؤال، بما فيها المكالمات والرسائل",
                     checked = settings.confirmSensitive,
                     onCheckedChange = { viewModel.setConfirmSensitive(it) },
                 )

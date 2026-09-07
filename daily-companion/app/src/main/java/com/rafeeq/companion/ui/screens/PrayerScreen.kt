@@ -62,7 +62,11 @@ import java.time.Duration
 import java.time.LocalDate
 
 @Composable
-fun PrayerScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
+fun PrayerScreen(
+    viewModel: AppViewModel,
+    onOpenSettings: () -> Unit,
+    onOpenAzkar: () -> Unit = {},
+) {
     val settings by viewModel.settings.collectAsState()
     val tick by viewModel.tick.collectAsState()
     val zone = viewModel.zoneId()
@@ -290,6 +294,28 @@ fun PrayerScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                                 color = MaterialTheme.colorScheme.tertiary,
                             )
                         }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------- الأذكار
+        item {
+            GlassCard(onClick = onOpenAzkar) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("📿", style = MaterialTheme.typography.headlineSmall)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "الأذكار والمسبحة",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            "أذكار الصباح والمساء ومسبحة بعدّاد — تعمل بلا إنترنت",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }

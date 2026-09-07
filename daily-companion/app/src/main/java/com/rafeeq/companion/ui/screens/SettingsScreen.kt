@@ -83,8 +83,7 @@ fun SettingsScreen(
     var showMethodPicker by remember { mutableStateOf(false) }
     var showAsrPicker by remember { mutableStateOf(false) }
     var showHighLatPicker by remember { mutableStateOf(false) }
-    var showModelPicker by remember { mutableStateOf(false) }
-    var showEffortPicker by remember { mutableStateOf(false) }
+    var showSpeedPicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
     var showApiKeyDialog by remember { mutableStateOf(false) }
     var showOffsets by remember { mutableStateOf(false) }
@@ -208,19 +207,12 @@ fun SettingsScreen(
                 ) { showApiKeyDialog = true }
 
                 SettingRow(
-                    title = "النموذج",
-                    value = ClaudeClient.models.firstOrNull { it.id == settings.aiModel }?.label
-                        ?: settings.aiModel,
+                    title = "سرعة الاستجابة",
+                    value = settings.responseSpeed.arabic,
+                    subtitle = settings.responseSpeed.description,
                     icon = Icons.Filled.Bolt,
                     tint = Cyan,
-                ) { showModelPicker = true }
-
-                SettingRow(
-                    title = "مستوى التفكير",
-                    value = ClaudeClient.effortLevels.firstOrNull { it.first == settings.aiEffort }?.second
-                        ?: settings.aiEffort,
-                    subtitle = "أعلى = إجابات أعمق وأبطأ وأعلى كلفة",
-                ) { showEffortPicker = true }
+                ) { showSpeedPicker = true }
 
                 SettingRow(
                     title = "تعليمات شخصية",
@@ -379,28 +371,15 @@ fun SettingsScreen(
         )
     }
 
-    if (showModelPicker) {
+    if (showSpeedPicker) {
         PickerDialog(
-            title = "نموذج المساعد",
-            options = ClaudeClient.models,
-            selected = ClaudeClient.models.firstOrNull { it.id == settings.aiModel }
-                ?: ClaudeClient.models.first(),
-            label = { it.label },
+            title = "سرعة الاستجابة",
+            options = ClaudeClient.ResponseSpeed.entries.toList(),
+            selected = settings.responseSpeed,
+            label = { it.arabic },
             description = { it.description },
-            onDismiss = { showModelPicker = false },
-            onSelect = { viewModel.setAiModel(it.id) },
-        )
-    }
-
-    if (showEffortPicker) {
-        PickerDialog(
-            title = "مستوى التفكير",
-            options = ClaudeClient.effortLevels,
-            selected = ClaudeClient.effortLevels.firstOrNull { it.first == settings.aiEffort }
-                ?: ClaudeClient.effortLevels[1],
-            label = { it.second },
-            onDismiss = { showEffortPicker = false },
-            onSelect = { viewModel.setAiEffort(it.first) },
+            onDismiss = { showSpeedPicker = false },
+            onSelect = { viewModel.setResponseSpeed(it) },
         )
     }
 

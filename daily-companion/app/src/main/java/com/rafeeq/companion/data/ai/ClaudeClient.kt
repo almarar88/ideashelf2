@@ -53,6 +53,41 @@ class ClaudeClient(private val apiKeyProvider: () -> String) {
         )
     }
 
+    /**
+     * مستوى السرعة الذي يختاره المستخدم. يحدّد النموذج وعمق التفكير معًا،
+     * لأن فصلهما يربك أكثر مما يفيد: النموذج الأخف مع تفكير أقل = رد أسرع بوضوح.
+     */
+    enum class ResponseSpeed(
+        val arabic: String,
+        val description: String,
+        val model: String,
+        val effort: String,
+    ) {
+        INSTANT(
+            "فوري",
+            "أسرع رد ممكن — مناسب للأوامر المباشرة مثل «افتح واتساب» أو «ضبط منبّه»",
+            "claude-haiku-4-5",
+            "low",
+        ),
+        FAST(
+            "سريع",
+            "الأفضل للاستخدام اليومي — سريع ويفهم الطلبات المركّبة",
+            "claude-sonnet-5",
+            "low",
+        ),
+        SMART(
+            "الأذكى",
+            "أعمق تفكيرًا وأبطأ — للتخطيط والتحليل والمهام المعقّدة",
+            "claude-opus-5",
+            "medium",
+        );
+
+        companion object {
+            fun from(value: String?): ResponseSpeed =
+                entries.firstOrNull { it.name == value } ?: FAST
+        }
+    }
+
     data class ModelOption(val id: String, val label: String, val description: String)
 
     data class Msg(val role: String, val content: String)
@@ -193,19 +228,8 @@ class ClaudeClient(private val apiKeyProvider: () -> String) {
         put("max_tokens", maxTokens)
         if (stream) put("stream", true)
 
-        if (system.isNotBlank()) {
-            // نضع تعليمات النظام في كتلة قابلة للتخزين المؤقت لتقليل الكلفة
-            // في المحادثات الطويلة (نفس البادئة تتكرّر مع كل رسالة).
-            putJsonArray("system") {
-                add(
-                    buildJsonObject {
-                        put("type", "text")
-                        put("text", system)
-                        putJsonObject("cache_control") { put("type", "ephemeral") }
-                    },
-                )
-            }
-        }
+        // طلب مفرد: البادئة تختلف في كل مرة، فالتخزين المؤقت هنا كلفة بلا عائد.
+        if (system.isNotBlank()) put("system", system)
 
         putJsonObject("output_config") { put("effort", effort) }
 

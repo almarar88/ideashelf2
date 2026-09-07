@@ -39,6 +39,7 @@ import com.rafeeq.companion.data.prayer.HighLatitudeRule
 import com.rafeeq.companion.data.prayer.Prayer
 import com.rafeeq.companion.data.prayer.PrayerTimes
 import com.rafeeq.companion.notify.PrayerScheduler
+import com.rafeeq.companion.notify.TaskScheduler
 import com.rafeeq.companion.ui.theme.ThemeMode
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
@@ -180,6 +181,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 refreshNews()
             }
             rescheduleAlarms()
+            rescheduleTaskReminders()
         }
         refreshCapabilities()
     }
@@ -363,10 +365,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------ يومي
 
-    fun addTask(task: Task) = viewModelScope.launch { repos.tasks.update { listOf(task) + it } }
+    fun addTask(task: Task) = viewModelScope.launch {
+        repos.tasks.update { listOf(task) + it }
+        rescheduleTaskReminders()
+    }
+
+    /** تنبيهات المهام تُعاد جدولتها بعد كل تغيير حتى لا يفوت موعد. */
+    fun rescheduleTaskReminders() {
+        runCatching { TaskScheduler.reschedule(getApplication(), tasks.value, zoneId()) }
+    }
 
     fun updateTask(task: Task) = viewModelScope.launch {
         repos.tasks.update { list -> list.map { if (it.id == task.id) task else it } }
+        rescheduleTaskReminders()
     }
 
     fun toggleTask(task: Task) = viewModelScope.launch {
@@ -378,10 +389,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 ) else it
             }
         }
+        rescheduleTaskReminders()
     }
 
     fun deleteTask(task: Task) = viewModelScope.launch {
         repos.tasks.update { list -> list.filterNot { it.id == task.id } }
+        rescheduleTaskReminders()
     }
 
     fun clearCompletedTasks() = viewModelScope.launch {
@@ -484,9 +497,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             refreshCapabilities()
 
             val useTools = s.controlEnabled
-            val history = buildApiHistory(conversation.id)
-            val system = Assistant.systemPrompt(assistantContext()) +
-                if (useTools) ControlPrompt.instructions(spoken, missingCapabilityNames()) else ""
+            // البادئة ثابتة ليعمل التخزين المؤقت؛ حالة اليوم المتغيّرة تُرفق بآخر رسالة.
+            val system = Assistant.stableSystem(
+                persona = s.aiPersona,
+                control = if (useTools) ControlPrompt.instructions(spoken, missingCapabilityNames()) else "",
+            )
+            val history = buildApiHistory(conversation.id, Assistant.contextBlock(assistantContext()))
 
             val builder = StringBuilder()
             val runs = mutableListOf<ToolRun>()
@@ -494,11 +510,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
             runCatching {
                 repos.agent.run(
-                    model = s.aiModel,
+                    model = s.effectiveModel,
                     system = system,
                     history = history,
                     tools = if (useTools) ToolCatalog.toJson(_capabilities.value) else JsonArray(emptyList()),
-                    effort = s.aiEffort,
+                    effort = s.effectiveEffort,
                     specOf = { name -> ToolCatalog.byName(name) },
                     confirm = { call, spec -> requestConfirmation(call, spec, s.confirmSensitive) },
                     execute = { call -> repos.phone.execute(call.name, call.input) },
@@ -588,19 +604,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return gate.await()
     }
 
-    /** يبني سجلّ المحادثة بالصيغة التي تفهمها الواجهة البرمجية. */
-    private fun buildApiHistory(conversationId: String): MutableList<JsonObject> {
+    /**
+     * يبني سجلّ المحادثة بالصيغة التي تفهمها الواجهة البرمجية.
+     * [contextBlock] يُرفق بآخر رسالة للمستخدم فقط — لا بتعليمات النظام —
+     * حتى تبقى البادئة الثابتة صالحة للتخزين المؤقت.
+     */
+    private fun buildApiHistory(
+        conversationId: String,
+        contextBlock: String = "",
+    ): MutableList<JsonObject> {
         val messages = conversations.value.firstOrNull { it.id == conversationId }?.messages.orEmpty()
-        return messages
             .filter { it.content.isNotBlank() && !it.error }
-            .takeLast(24)
-            .map { message ->
-                buildJsonObject {
-                    put("role", message.role)
-                    put("content", message.content)
-                }
+            .takeLast(16)
+
+        val lastUserIndex = messages.indexOfLast { it.role == "user" }
+        return messages.mapIndexed { index, message ->
+            buildJsonObject {
+                put("role", message.role)
+                put(
+                    "content",
+                    if (index == lastUserIndex && contextBlock.isNotBlank()) {
+                        contextBlock + "\n\n" + message.content
+                    } else {
+                        message.content
+                    },
+                )
             }
-            .toMutableList()
+        }.toMutableList()
     }
 
     private suspend fun updateAssistant(
@@ -684,7 +714,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _ai.value = _ai.value.copy(briefLoading = true)
             runCatching {
                 repos.claude.complete(
-                    model = s.aiModel,
+                    model = s.effectiveModel,
                     system = Assistant.systemPrompt(assistantContext()),
                     messages = listOf(ClaudeClient.Msg("user", Assistant.dailyBriefPrompt())),
                     maxTokens = 1200,
@@ -709,7 +739,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val result = runCatching {
                 repos.claude.complete(
-                    model = s.aiModel,
+                    model = s.effectiveModel,
                     system = Assistant.systemPrompt(assistantContext()),
                     messages = listOf(ClaudeClient.Msg("user", Assistant.summarizeArticlePrompt(article))),
                     maxTokens = 900,
@@ -737,7 +767,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val result = runCatching {
                 val output = repos.claude.complete(
-                    model = s.aiModel,
+                    model = s.effectiveModel,
                     system = "أنت محلّل نصوص دقيق. اتبع صيغة الإخراج المطلوبة حرفيًا دون أي إضافات.",
                     messages = listOf(
                         ClaudeClient.Msg(
@@ -758,7 +788,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun validateApiKey(): Result<Unit> =
-        repos.claude.validateKey(settings.value.aiModel)
+        repos.claude.validateKey(settings.value.effectiveModel)
 
     // ------------------------------------------------------------ الإعدادات
 
@@ -818,6 +848,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setConfirmSensitive(value: Boolean) = viewModelScope.launch {
         repos.settings.setConfirmSensitive(value)
+    }
+
+    fun setResponseSpeed(value: ClaudeClient.ResponseSpeed) = viewModelScope.launch {
+        repos.settings.setResponseSpeed(value)
     }
 
     fun setVoiceReplies(value: Boolean) = viewModelScope.launch {

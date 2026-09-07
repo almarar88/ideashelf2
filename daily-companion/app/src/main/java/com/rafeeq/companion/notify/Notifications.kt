@@ -236,6 +236,21 @@ class AlarmReceiver : BroadcastReceiver() {
                     body = "استعد للصلاة.",
                 )
             }
+            TaskScheduler.KIND_TASK -> {
+                val title = intent.getStringExtra(TaskScheduler.EXTRA_TASK_TITLE).orEmpty()
+                val at = intent.getStringExtra(TaskScheduler.EXTRA_TASK_WHEN).orEmpty()
+                if (title.isNotBlank()) {
+                    Notifier.show(
+                        context,
+                        id = 400 + title.hashCode().and(0xFF),
+                        channel = Channels.TASKS,
+                        title = "تذكير بمهمة",
+                        body = if (at.isBlank()) title else "$title — $at",
+                        big = true,
+                    )
+                }
+            }
+
             PrayerScheduler.KIND_BRIEF -> {
                 val today = LocalDate.now()
                 Notifier.show(
@@ -253,5 +268,13 @@ class AlarmReceiver : BroadcastReceiver() {
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         runCatching { PrayerScheduler.rescheduleAll(context) }
+        // تنبيهات المهام تُمسح عند إعادة التشغيل، فنعيد بناءها من الملف مباشرة.
+        runCatching {
+            val app = context.applicationContext as? com.rafeeq.companion.RafeeqApp ?: return@runCatching
+            kotlinx.coroutines.runBlocking {
+                val tasks = app.repos.tasks.load()
+                TaskScheduler.reschedule(context, tasks, java.time.ZoneId.systemDefault())
+            }
+        }
     }
 }

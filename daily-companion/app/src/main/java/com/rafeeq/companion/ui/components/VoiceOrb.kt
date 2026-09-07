@@ -180,3 +180,90 @@ fun VoiceWave(
         }
     }
 }
+
+/**
+ * مؤشّر صوتي مضغوط وهادئ — دائرة واحدة تتنفّس مع الصوت وحلقة رفيعة حولها.
+ *
+ * صُمّم للبطاقة الصغيرة: عند الأحجام الصغيرة تبدو الحلقات المتعدّدة مزدحمة،
+ * فاكتفينا بعنصرين اثنين ليبقى المؤشّر واضحًا ومتزنًا.
+ */
+@Composable
+fun VoicePulse(
+    state: OrbState,
+    amplitude: Float,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    val transition = rememberInfiniteTransition(label = "pulse")
+
+    val sweep by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing)),
+        label = "sweep",
+    )
+    val breathe by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing)),
+        label = "breathe",
+    )
+
+    val level by animateFloatAsState(
+        targetValue = when (state) {
+            OrbState.LISTENING -> amplitude.coerceIn(0f, 1f)
+            OrbState.SPEAKING -> 0.4f
+            OrbState.THINKING -> 0.15f
+            OrbState.IDLE -> 0f
+        },
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 300f),
+        label = "level",
+    )
+
+    Canvas(modifier) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val base = min(size.width, size.height) / 2f
+        val idle = 1f + 0.04f * sin(breathe)
+
+        // حلقة رفيعة ثابتة
+        drawCircle(
+            color = accent.copy(alpha = 0.22f),
+            radius = base * 0.92f,
+            center = center,
+            style = Stroke(width = 1.5f),
+        )
+
+        // قوس دوّار أثناء التفكير فقط — إشارة تقدّم بلا ضجيج
+        if (state == OrbState.THINKING) {
+            drawArc(
+                color = accent,
+                startAngle = sweep,
+                sweepAngle = 80f,
+                useCenter = false,
+                topLeft = Offset(center.x - base * 0.92f, center.y - base * 0.92f),
+                size = androidx.compose.ui.geometry.Size(base * 1.84f, base * 1.84f),
+                style = Stroke(width = 2f, cap = StrokeCap.Round),
+            )
+        }
+
+        // هالة ناعمة تكبر مع الصوت
+        if (level > 0.02f) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(accent.copy(alpha = 0.30f * level), Color.Transparent),
+                    center = center,
+                    radius = base * (0.6f + level * 0.5f),
+                ),
+                radius = base * (0.6f + level * 0.5f),
+                center = center,
+            )
+        }
+
+        // القلب
+        drawCircle(
+            color = accent,
+            radius = base * (0.34f + level * 0.24f) * idle,
+            center = center,
+        )
+    }
+}
