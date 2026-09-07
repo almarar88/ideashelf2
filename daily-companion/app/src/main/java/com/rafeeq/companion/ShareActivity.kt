@@ -123,6 +123,7 @@ private fun ShareSheet(
     onClose: () -> Unit,
 ) {
     val settings by viewModel.settings.collectAsState()
+    val settingsLoaded by viewModel.settingsLoaded.collectAsState()
     val ai by viewModel.ai.collectAsState()
     val conversations by viewModel.conversations.collectAsState()
     val activeId by viewModel.activeConversationId.collectAsState()
@@ -201,7 +202,7 @@ private fun ShareSheet(
                     }
                 }
 
-                if (!settings.hasApiKey) {
+                if (settingsLoaded && !settings.hasApiKey) {
                     Text(
                         "أضِف مفتاح Anthropic من إعدادات Alcode Ai لتفعيل هذه الميزة.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -211,7 +212,14 @@ private fun ShareSheet(
                     return@Column
                 }
 
-                if (!sent) {
+                if (!settingsLoaded) {
+                    Text(
+                        "لحظة…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(18.dp),
+                    )
+                } else if (!sent) {
                     Spacer(Modifier.height(12.dp))
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

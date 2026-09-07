@@ -97,6 +97,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val settings: StateFlow<AppSettings> = repos.settings.settings
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
 
+    private val _settingsLoaded = MutableStateFlow(false)
+
+    /**
+     * هل وصلت الإعدادات المحفوظة فعلًا من القرص؟
+     *
+     * القيمة الابتدائية لتدفّق الإعدادات هي كائن فارغ (بلا مفتاح ولا موقع)،
+     * لأن Compose يحتاج قيمة فورية بينما القراءة من القرص غير متزامنة.
+     * أي قرار يُتخذ قبل وصول القيمة الحقيقية سيقرأ «لا يوجد مفتاح» خطأً.
+     */
+    val settingsLoaded: StateFlow<Boolean> = _settingsLoaded.asStateFlow()
+
+    /** ينتظر أول قراءة حقيقية ثم يعيدها — يُستخدم قبل أي قرار يعتمد على المفتاح. */
+    suspend fun awaitSettings(): AppSettings = repos.settings.settings.first()
+
     val tasks: StateFlow<List<Task>> = repos.tasks.items
     val habits: StateFlow<List<Habit>> = repos.habits.items
     val notes: StateFlow<List<Note>> = repos.notes.items
@@ -157,6 +171,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             .map { it.arabic }
 
     init {
+        viewModelScope.launch {
+            awaitSettings()
+            _settingsLoaded.value = true
+        }
         viewModelScope.launch {
             repos.tasks.load(); repos.habits.load(); repos.notes.load()
             repos.saved.load(); repos.sources.load(); repos.topics.load()
@@ -479,11 +497,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * أن يجعله قصيرًا صالحًا للنطق.
      */
     fun sendMessage(text: String, spoken: Boolean = false) {
-        val s = settings.value
-        if (!s.hasApiKey) {
-            _ai.value = _ai.value.copy(error = "أضِف مفتاح Anthropic من الإعدادات لتفعيل المساعد.")
-            return
-        }
         if (text.isBlank() || _ai.value.streaming) return
 
         val conversation = activeConversation() ?: newConversation()
@@ -492,6 +505,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
+            // ننتظر الإعدادات المحفوظة قبل فحص المفتاح: القيمة الابتدائية فارغة،
+            // وقراءتها مباشرةً عند الإقلاع تُظهر «لا يوجد مفتاح» رغم وجوده.
+            val s = awaitSettings()
+            if (!s.hasApiKey) {
+                _ai.value = _ai.value.copy(
+                    error = "أضِف مفتاح Anthropic من الإعدادات لتفعيل المساعد.",
+                )
+                return@launch
+            }
+
             _ai.value = _ai.value.copy(streaming = true, error = null, runningTool = null)
             appendMessages(conversation.id, listOf(userMessage, placeholder))
             refreshCapabilities()

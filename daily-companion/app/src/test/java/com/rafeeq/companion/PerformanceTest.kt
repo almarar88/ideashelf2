@@ -1,5 +1,6 @@
 package com.rafeeq.companion
 
+import com.rafeeq.companion.data.AppSettings
 import com.rafeeq.companion.data.Task
 import com.rafeeq.companion.data.ai.Assistant
 import com.rafeeq.companion.data.ai.ClaudeClient
@@ -105,6 +106,26 @@ class PerformanceTest {
         assertEquals(ClaudeClient.ResponseSpeed.FAST, ClaudeClient.ResponseSpeed.from(null))
         assertEquals(ClaudeClient.ResponseSpeed.FAST, ClaudeClient.ResponseSpeed.from("NONSENSE"))
         assertEquals(ClaudeClient.ResponseSpeed.SMART, ClaudeClient.ResponseSpeed.from("SMART"))
+    }
+
+    // ---------------------------------------------------------- الإعدادات الابتدائية
+
+    /**
+     * القيمة الابتدائية لتدفّق الإعدادات كائن فارغ يُعرض ريثما تصل القراءة من القرص.
+     * لا يجوز أن تبدو «جاهزة»، وإلا اتخذت الواجهة قرارًا بناءً عليها وهو خطأ —
+     * وهذا ما كان يُظهر «أضِف المفتاح» رغم أن المفتاح محفوظ.
+     */
+    @Test
+    fun `placeholder settings never look configured`() {
+        val placeholder = AppSettings()
+        assertFalse("الكائن الابتدائي يجب ألّا يبدو حاملًا لمفتاح", placeholder.hasApiKey)
+        assertNull("ولا حاملًا لموقع", placeholder.place)
+    }
+
+    @Test
+    fun `settings with a key are configured`() {
+        assertTrue(AppSettings(apiKey = "sk-ant-test").hasApiKey)
+        assertFalse(AppSettings(apiKey = "   ").hasApiKey)
     }
 
     // ---------------------------------------------------------- تذكير المهام

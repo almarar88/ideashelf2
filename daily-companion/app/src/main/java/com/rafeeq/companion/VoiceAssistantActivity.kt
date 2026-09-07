@@ -135,7 +135,7 @@ private fun VoiceAssistantScreen(
     ) { granted ->
         if (granted) {
             viewModel.voice.startListening(
-                languageTag = settings.voiceLanguage,
+                languageTag = settings.voiceLanguage.ifBlank { "ar-SA" },
                 onResult = { spokenText = it },
                 onFailure = { errorText = it },
             )
@@ -149,7 +149,10 @@ private fun VoiceAssistantScreen(
         viewModel.refreshCapabilities()
         if (!started) {
             started = true
-            if (!settings.hasApiKey) {
+            // ننتظر وصول الإعدادات من القرص أولًا. القراءة الفورية تعطي كائنًا
+            // فارغًا فيظهر خطأ «أضِف المفتاح» رغم أن المفتاح محفوظ.
+            val saved = viewModel.awaitSettings()
+            if (!saved.hasApiKey) {
                 errorText = "أضِف مفتاح Anthropic من إعدادات Alcode Ai أولًا."
             } else {
                 micPermission.launch(Manifest.permission.RECORD_AUDIO)
