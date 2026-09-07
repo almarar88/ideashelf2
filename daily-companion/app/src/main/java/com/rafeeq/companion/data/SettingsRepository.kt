@@ -59,6 +59,11 @@ data class AppSettings(
     val responseSpeed: ClaudeClient.ResponseSpeed = ClaudeClient.ResponseSpeed.FAST,
     val voiceReplies: Boolean = true,
     val voiceLanguage: String = "ar-SA",
+    /** مضاعف حجم الخط في كل التطبيق: من ٠٫٨ إلى ١٫٤ */
+    val fontScale: Float = 1.0f,
+    val haptics: Boolean = true,
+    /** رابط نغمة الأذان المختارة من النظام، أو فارغ للنغمة الافتراضية. */
+    val adhanSoundUri: String = "",
 ) {
     val prayerConfig: PrayerConfig
         get() = PrayerConfig(
@@ -117,6 +122,9 @@ class SettingsRepository(private val context: Context) {
         val responseSpeed = stringPreferencesKey("response_speed")
         val voiceReplies = booleanPreferencesKey("voice_replies")
         val voiceLanguage = stringPreferencesKey("voice_language")
+        val fontScale = stringPreferencesKey("font_scale")
+        val haptics = booleanPreferencesKey("haptics")
+        val adhanSoundUri = stringPreferencesKey("adhan_sound_uri")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -166,6 +174,9 @@ class SettingsRepository(private val context: Context) {
             responseSpeed = ClaudeClient.ResponseSpeed.from(p[Keys.responseSpeed]),
             voiceReplies = p[Keys.voiceReplies] ?: true,
             voiceLanguage = p[Keys.voiceLanguage] ?: "ar-SA",
+            fontScale = p[Keys.fontScale]?.toFloatOrNull()?.coerceIn(0.8f, 1.4f) ?: 1.0f,
+            haptics = p[Keys.haptics] ?: true,
+            adhanSoundUri = p[Keys.adhanSoundUri].orEmpty(),
         )
     }
 
@@ -225,6 +236,10 @@ class SettingsRepository(private val context: Context) {
         edit { it[Keys.responseSpeed] = value.name }
     suspend fun setVoiceReplies(value: Boolean) = edit { it[Keys.voiceReplies] = value }
     suspend fun setVoiceLanguage(value: String) = edit { it[Keys.voiceLanguage] = value }
+    suspend fun setFontScale(value: Float) =
+        edit { it[Keys.fontScale] = value.coerceIn(0.8f, 1.4f).toString() }
+    suspend fun setHaptics(value: Boolean) = edit { it[Keys.haptics] = value }
+    suspend fun setAdhanSoundUri(value: String) = edit { it[Keys.adhanSoundUri] = value }
 
     private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         context.dataStore.edit(block)

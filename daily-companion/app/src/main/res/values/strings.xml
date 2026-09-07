@@ -4,4 +4,12 @@
     <string name="accessibility_label">Alcode Ai — التحكّم بالهاتف</string>
     <string name="accessibility_description">تتيح لـ Alcode Ai قراءة ما على الشاشة والضغط والكتابة داخل التطبيقات، لتنفيذ الأوامر التي تطلبها منه. لا تُستخدم إلا عند طلبك، ولا تُرسل شيئًا خارج جهازك من تلقاء نفسها.</string>
     <string name="notification_listener_label">Alcode Ai — قراءة الإشعارات</string>
+    <string name="shortcut_voice_short">تحدّث</string>
+    <string name="shortcut_voice_long">المساعد الصوتي</string>
+    <string name="shortcut_assistant_short">المساعد</string>
+    <string name="shortcut_assistant_long">محادثة مع المساعد</string>
+    <string name="shortcut_day_short">يومي</string>
+    <string name="shortcut_day_long">المهام والعادات</string>
+    <string name="shortcut_prayer_short">الصلاة</string>
+    <string name="shortcut_prayer_long">أوقات الصلاة</string>
 </resources>

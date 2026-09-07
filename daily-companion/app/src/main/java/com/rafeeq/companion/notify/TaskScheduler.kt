@@ -98,3 +98,72 @@ object TaskScheduler {
         }
     }
 }
+
+/**
+ * تذكير العادات: تنبيه يومي واحد لكل عادة لها وقت محدّد.
+ *
+ * العادة لا تُبنى بالنية بل بالتذكير في الوقت نفسه كل يوم،
+ * لذلك نجدّد الموعد إلى الغد إن مضى وقت اليوم.
+ */
+object HabitScheduler {
+
+    private const val REQUEST_BASE = 31_000
+    private const val MAX_SCHEDULED = 20
+
+    const val EXTRA_HABIT_TITLE = "habit_title"
+    const val EXTRA_HABIT_EMOJI = "habit_emoji"
+    const val KIND_HABIT = "habit"
+
+    fun reschedule(context: Context, habits: List<com.rafeeq.companion.data.Habit>, zone: ZoneId) {
+        val manager = context.getSystemService(AlarmManager::class.java) ?: return
+        cancelAll(context, manager)
+
+        val now = LocalDateTime.now(zone)
+        habits.asSequence()
+            .mapNotNull { habit -> nextFire(habit, now)?.let { habit to it } }
+            .sortedBy { (_, at) -> at }
+            .take(MAX_SCHEDULED)
+            .forEachIndexed { index, (habit, at) ->
+                val intent = Intent(context, AlarmReceiver::class.java).apply {
+                    putExtra(PrayerScheduler.EXTRA_KIND, KIND_HABIT)
+                    putExtra(EXTRA_HABIT_TITLE, habit.title)
+                    putExtra(EXTRA_HABIT_EMOJI, habit.emoji)
+                }
+                val pending = PendingIntent.getBroadcast(
+                    context, REQUEST_BASE + index, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                val millis = at.atZone(zone).toInstant().toEpochMilli()
+                runCatching {
+                    val exact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                        manager.canScheduleExactAlarms()
+                    if (exact) manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pending)
+                    else manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pending)
+                }
+            }
+    }
+
+    /** أقرب موعد قادم للعادة، أو null إن لم يكن لها تذكير. */
+    internal fun nextFire(
+        habit: com.rafeeq.companion.data.Habit,
+        now: LocalDateTime,
+    ): LocalDateTime? {
+        val time = habit.reminderTime?.let { runCatching { LocalTime.parse(it) }.getOrNull() }
+            ?: return null
+        val today = LocalDateTime.of(now.toLocalDate(), time)
+        return if (today.isAfter(now)) today else today.plusDays(1)
+    }
+
+    private fun cancelAll(context: Context, manager: AlarmManager) {
+        for (code in REQUEST_BASE until REQUEST_BASE + MAX_SCHEDULED) {
+            val pending = PendingIntent.getBroadcast(
+                context, code, Intent(context, AlarmReceiver::class.java),
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+            )
+            if (pending != null) {
+                manager.cancel(pending)
+                pending.cancel()
+            }
+        }
+    }
+}

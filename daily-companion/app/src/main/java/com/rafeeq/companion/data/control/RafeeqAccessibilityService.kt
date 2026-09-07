@@ -2,12 +2,15 @@ package com.rafeeq.companion.data.control
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.annotation.RequiresApi
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Locale
 
 /**
@@ -199,6 +202,34 @@ class RafeeqAccessibilityService : AccessibilityService() {
     private operator fun Quad.component2() = b
     private operator fun Quad.component3() = c
     private operator fun Quad.component4() = d
+
+    /**
+     * يلتقط صورة الشاشة الحالية. متاح من أندرويد ١١ فقط، وهو الطريق الوحيد
+     * المسموح به لتطبيق عادي دون طلب إذن تسجيل الشاشة في كل مرة.
+     */
+    @RequiresApi(Build.VERSION_CODES.R)
+    suspend fun captureScreen(): Bitmap? = suspendCancellableCoroutine { cont ->
+        runCatching {
+            takeScreenshot(
+                android.view.Display.DEFAULT_DISPLAY,
+                { runnable -> runnable.run() },
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(result: ScreenshotResult) {
+                        val bitmap = runCatching {
+                            Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)
+                                ?.copy(Bitmap.Config.ARGB_8888, false)
+                        }.getOrNull()
+                        runCatching { result.hardwareBuffer.close() }
+                        if (cont.isActive) cont.resumeWith(Result.success(bitmap))
+                    }
+
+                    override fun onFailure(errorCode: Int) {
+                        if (cont.isActive) cont.resumeWith(Result.success(null))
+                    }
+                },
+            )
+        }.onFailure { if (cont.isActive) cont.resumeWith(Result.success(null)) }
+    }
 
     fun pressKey(key: String): Boolean = when (key.lowercase(Locale.ROOT)) {
         "back", "رجوع" -> performGlobalAction(GLOBAL_ACTION_BACK)

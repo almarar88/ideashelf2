@@ -16,13 +16,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Notifications
@@ -30,6 +33,7 @@ import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -45,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.rafeeq.companion.core.Dates
 import com.rafeeq.companion.data.prayer.Prayer
@@ -73,6 +78,7 @@ fun PrayerScreen(
     val now = tick.toLocalDateTime()
 
     var offsetDays by remember { mutableStateOf(0) }
+    var showMonth by remember { mutableStateOf(false) }
     val shownDate = LocalDate.now(zone).plusDays(offsetDays.toLong())
     val place = settings.place
 
@@ -91,6 +97,15 @@ fun PrayerScreen(
     val day = viewModel.prayersFor(shownDate) ?: return
     val nextPrayer = viewModel.nextPrayer(now)
 
+    if (showMonth) {
+        MonthTimetableSheet(
+            viewModel = viewModel,
+            anchor = shownDate,
+            use24h = settings.use24hClock,
+            onDismiss = { showMonth = false },
+        )
+    }
+
     LazyColumn(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -104,6 +119,9 @@ fun PrayerScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                IconButton(onClick = { showMonth = true }) {
+                    Icon(Icons.Filled.CalendarMonth, contentDescription = "جدول الشهر")
                 }
                 IconButton(onClick = onOpenSettings) {
                     Icon(Icons.Filled.Notifications, contentDescription = "إعدادات الصلاة")
@@ -394,6 +412,115 @@ fun PrayerScreen(
 /**
  * يقرأ اتجاه الجهاز من مستشعرات الدوران. يُرجع null إن لم تتوفّر بوصلة.
  */
+/**
+ * جدول الشهر كاملًا. الحساب فلكي محلي، فلا حاجة لإنترنت ولا لتحميل جدول جاهز.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun MonthTimetableSheet(
+    viewModel: AppViewModel,
+    anchor: LocalDate,
+    use24h: Boolean,
+    onDismiss: () -> Unit,
+) {
+    var monthOffset by remember { mutableStateOf(0) }
+    val month = remember(anchor, monthOffset) { anchor.withDayOfMonth(1).plusMonths(monthOffset.toLong()) }
+    val today = LocalDate.now(viewModel.zoneId())
+    val columns = listOf(Prayer.FAJR, Prayer.SUNRISE, Prayer.DHUHR, Prayer.ASR, Prayer.MAGHRIB, Prayer.ISHA)
+
+    val days = remember(month, viewModel.settings.value) {
+        (0 until month.lengthOfMonth()).mapNotNull { i ->
+            val date = month.plusDays(i.toLong())
+            viewModel.prayersFor(date)?.let { date to it }
+        }
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 26.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { monthOffset-- }) {
+                    Icon(Icons.Filled.ChevronRight, contentDescription = "الشهر السابق")
+                }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        Dates.longGregorianAr(month).substringAfter("، "),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        "جدول الشهر — ${days.size} يومًا",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = { monthOffset++ }) {
+                    Icon(Icons.Filled.ChevronLeft, contentDescription = "الشهر التالي")
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    .padding(vertical = 6.dp, horizontal = 4.dp),
+            ) {
+                Text(
+                    "اليوم",
+                    Modifier.width(38.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                columns.forEach {
+                    Text(
+                        it.arabic,
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+
+            LazyColumn(Modifier.heightIn(max = 460.dp)) {
+                items(days, key = { it.first.toString() }) { (date, prayers) ->
+                    val isToday = date == today
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(
+                                if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                else Color.Transparent,
+                            )
+                            .padding(vertical = 7.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            date.dayOfMonth.toString(),
+                            Modifier.width(38.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                        )
+                        columns.forEach { prayer ->
+                            Text(
+                                Dates.formatTime(prayers[prayer], use24h),
+                                Modifier.weight(1f),
+                                style = MaterialTheme.typography.labelSmall,
+                                textAlign = TextAlign.Center,
+                                color = if (prayer == Prayer.SUNRISE)
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                else MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun rememberCompassHeading(context: Context): Pair<Boolean, Float?> {
     val sensorManager = remember {

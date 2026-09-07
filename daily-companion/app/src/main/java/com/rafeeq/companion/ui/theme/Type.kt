@@ -49,3 +49,28 @@ val RafeeqTypography = Typography(
     labelMedium = style(12, 17, FontWeight.Medium),
     labelSmall = style(11, 15, FontWeight.Medium),
 )
+
+/** يضاعف كل أحجام الخط وارتفاعات الأسطر بمعامل واحد. */
+fun Typography.scaledBy(factor: Float): Typography {
+    fun TextStyle.scale() = copy(
+        fontSize = fontSize * factor,
+        lineHeight = lineHeight * factor,
+    )
+    return Typography(
+        displayLarge = displayLarge.scale(),
+        displayMedium = displayMedium.scale(),
+        displaySmall = displaySmall.scale(),
+        headlineLarge = headlineLarge.scale(),
+        headlineMedium = headlineMedium.scale(),
+        headlineSmall = headlineSmall.scale(),
+        titleLarge = titleLarge.scale(),
+        titleMedium = titleMedium.scale(),
+        titleSmall = titleSmall.scale(),
+        bodyLarge = bodyLarge.scale(),
+        bodyMedium = bodyMedium.scale(),
+        bodySmall = bodySmall.scale(),
+        labelLarge = labelLarge.scale(),
+        labelMedium = labelMedium.scale(),
+        labelSmall = labelSmall.scale(),
+    )
+}

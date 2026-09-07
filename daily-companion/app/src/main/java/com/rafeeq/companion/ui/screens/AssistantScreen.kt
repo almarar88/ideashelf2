@@ -25,11 +25,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +51,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,6 +63,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.rafeeq.companion.ConfirmationOverlay
 import com.rafeeq.companion.data.ChatMessage
+import com.rafeeq.companion.data.Shortcut
 import com.rafeeq.companion.data.voice.VoiceEngine
 import com.rafeeq.companion.ui.components.VoiceWave
 import com.rafeeq.companion.data.ai.Assistant
@@ -80,6 +86,17 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
     val conversation = conversations.firstOrNull { it.id == activeId }
     val messages = conversation?.messages.orEmpty()
 
+    val shortcuts by viewModel.shortcuts.collectAsState()
+
+    // اختصارات المستخدم أولًا، ثم الاقتراحات الجاهزة لملء الصف.
+    val suggestions = remember(shortcuts) {
+        val builtIn = Assistant.quickActions.map {
+            Shortcut(id = "builtin:" + it.label, label = it.label, emoji = it.emoji, prompt = it.prompt)
+        }
+        (shortcuts + builtIn).take(10)
+    }
+
+    val clipboard = LocalClipboardManager.current
     var input by remember { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
@@ -174,7 +191,18 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(messages, key = { it.id }) { message -> MessageBubble(message) }
+                    items(messages, key = { it.id }) { message ->
+                        MessageBubble(
+                            message = message,
+                            isLast = message.id == messages.lastOrNull()?.id,
+                            onCopy = {
+                                clipboard.setText(AnnotatedString(message.content))
+                                viewModel.showMessage("نُسخ النص.")
+                            },
+                            onSpeak = { viewModel.speak(message.content) },
+                            onRegenerate = { viewModel.regenerateLast() },
+                        )
+                    }
                     if (ai.streaming && messages.lastOrNull()?.content.isNullOrBlank()) {
                         item { TypingIndicator(ai) }
                     }
@@ -212,7 +240,7 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             ) {
-                items(Assistant.quickActions) { action ->
+                items(suggestions, key = { it.id }) { action ->
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
@@ -397,9 +425,20 @@ private fun ToolRunChip(run: com.rafeeq.companion.data.ToolRun) {
     }
 }
 
+/**
+ * فقاعة رسالة. الضغط على ردّ المساعد يُظهر أزرار النسخ والقراءة وإعادة التوليد،
+ * ونُبقيها مخفية حتى لا تزدحم المحادثة.
+ */
 @Composable
-private fun MessageBubble(message: ChatMessage) {
+private fun MessageBubble(
+    message: ChatMessage,
+    isLast: Boolean = false,
+    onCopy: () -> Unit = {},
+    onSpeak: () -> Unit = {},
+    onRegenerate: () -> Unit = {},
+) {
     val isUser = message.role == "user"
+    var showActions by remember(message.id) { mutableStateOf(false) }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -419,31 +458,73 @@ private fun MessageBubble(message: ChatMessage) {
                 )
             }
         } else {
-            Box(
-                modifier = Modifier
-                    .widthIn(max = 340.dp)
-                    .clip(RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp))
-                    .background(
-                        if (message.error) MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
-                        else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.7f),
-                    )
-                    .padding(horizontal = 15.dp, vertical = 12.dp),
-            ) {
-                Column {
-                    message.toolRuns.forEach { ToolRunChip(it) }
-                    if (message.toolRuns.isNotEmpty() && message.content.isNotBlank()) {
-                        Spacer(Modifier.height(8.dp))
-                    }
-                    if (message.content.isNotBlank()) {
-                        RichText(
-                            text = message.content,
-                            color = if (message.error) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.onSurface,
+            Column(horizontalAlignment = Alignment.Start) {
+                Box(
+                    modifier = Modifier
+                        .widthIn(max = 340.dp)
+                        .clip(RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp))
+                        .background(
+                            if (message.error) MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                            else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.7f),
                         )
+                        .clickable { showActions = !showActions }
+                        .padding(horizontal = 15.dp, vertical = 12.dp),
+                ) {
+                    Column {
+                        message.toolRuns.forEach { ToolRunChip(it) }
+                        if (message.toolRuns.isNotEmpty() && message.content.isNotBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        if (message.content.isNotBlank()) {
+                            RichText(
+                                text = message.content,
+                                color = if (message.error) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+                AnimatedVisibility(visible = showActions && message.content.isNotBlank()) {
+                    Row(
+                        Modifier.padding(top = 2.dp, start = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        MessageAction(Icons.Filled.ContentCopy, "نسخ", onCopy)
+                        MessageAction(Icons.Filled.VolumeUp, "استمع", onSpeak)
+                        if (isLast) MessageAction(Icons.Filled.Refresh, "أعد التوليد", onRegenerate)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MessageAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            icon,
+            contentDescription = label,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp),
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

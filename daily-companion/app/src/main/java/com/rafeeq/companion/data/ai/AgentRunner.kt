@@ -45,6 +45,9 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
         /** المستخدم رفض تنفيذ أمر حسّاس. */
         data class ToolDenied(val call: ToolCall) : Event
 
+        /** تقدير استهلاك الرموز لهذه الجولة — يُقرأ من ردّ الواجهة. */
+        data class Usage(val input: Long, val output: Long, val cached: Long) : Event
+
         data class Failed(val message: String) : Event
 
         data object Completed : Event
@@ -56,6 +59,9 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
         val toolCalls: List<ToolCall>,
         val stopReason: String?,
         val refusal: String?,
+        val inputTokens: Long = 0,
+        val outputTokens: Long = 0,
+        val cachedTokens: Long = 0,
     )
 
     /**
@@ -88,6 +94,10 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
             } catch (error: Throwable) {
                 emit(Event.Failed(error.friendlyMessage()))
                 return
+            }
+
+            if (turn.inputTokens > 0 || turn.outputTokens > 0) {
+                emit(Event.Usage(turn.inputTokens, turn.outputTokens, turn.cachedTokens))
             }
 
             if (turn.refusal != null) {
@@ -227,6 +237,9 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
             var stopReason: String? = null
             var refusal: String? = null
             var currentEvent = ""
+            var inputTokens = 0L
+            var outputTokens = 0L
+            var cachedTokens = 0L
 
             while (!source.exhausted()) {
                 val line = source.readUtf8LineStrict()
@@ -240,6 +253,14 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
                         }.getOrNull() ?: continue
 
                         when (obj.string("type") ?: currentEvent) {
+                            "message_start" -> {
+                                // الاستهلاك المدخل يصل مرة واحدة في بداية الرسالة.
+                                obj["message"]?.jsonObject?.get("usage")?.jsonObject?.let { usage ->
+                                    inputTokens += usage.long("input_tokens")
+                                    cachedTokens += usage.long("cache_read_input_tokens")
+                                }
+                            }
+
                             "content_block_start" -> {
                                 val index = obj.int("index") ?: continue
                                 val block = obj["content_block"]?.jsonObject ?: continue
@@ -280,6 +301,9 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
                             "message_delta" -> {
                                 val delta = obj["delta"]?.jsonObject
                                 stopReason = delta?.string("stop_reason") ?: stopReason
+                                obj["usage"]?.jsonObject?.let {
+                                    outputTokens += it.long("output_tokens")
+                                }
                                 if (stopReason == "refusal") {
                                     refusal = delta?.get("stop_details")?.jsonObject
                                         ?.string("explanation")
@@ -298,7 +322,15 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
                 }
             }
 
-            Turn(text.toString(), toolCalls, stopReason, refusal)
+            Turn(
+                text = text.toString(),
+                toolCalls = toolCalls,
+                stopReason = stopReason,
+                refusal = refusal,
+                inputTokens = inputTokens,
+                outputTokens = outputTokens,
+                cachedTokens = cachedTokens,
+            )
         }
     }
 
@@ -310,6 +342,9 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
         val element: JsonElement = this[key] ?: return null
         element.jsonPrimitive.let { if (it is kotlinx.serialization.json.JsonNull) null else it.content }
     }.getOrNull()
+
+    private fun JsonObject.long(key: String): Long =
+        runCatching { this[key]?.jsonPrimitive?.content?.toLongOrNull() }.getOrNull() ?: 0L
 
     private fun JsonObject.int(key: String): Int? =
         runCatching { this[key]?.jsonPrimitive?.content?.toIntOrNull() }.getOrNull()

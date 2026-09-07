@@ -89,7 +89,11 @@ class VoiceAssistantActivity : ComponentActivity() {
         setContent {
             val vm: AppViewModel = viewModel()
             val settings by vm.settings.collectAsState()
-            RafeeqTheme(mode = settings.themeMode, dynamicColor = settings.dynamicColor) {
+            RafeeqTheme(
+                mode = settings.themeMode,
+                dynamicColor = settings.dynamicColor,
+                fontScale = settings.fontScale,
+            ) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     VoiceAssistantScreen(
                         viewModel = vm,

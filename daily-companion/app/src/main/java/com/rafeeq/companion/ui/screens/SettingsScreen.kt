@@ -1,5 +1,9 @@
 package com.rafeeq.companion.ui.screens
 
+import android.content.Intent
+import android.media.RingtoneManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +23,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
@@ -46,9 +55,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.rafeeq.companion.data.BackupManager
 import com.rafeeq.companion.data.Place
 import com.rafeeq.companion.data.ai.ClaudeClient
 import com.rafeeq.companion.data.prayer.AsrMethod
@@ -66,6 +77,7 @@ import com.rafeeq.companion.ui.components.SwitchRow
 import com.rafeeq.companion.ui.theme.Amber
 import com.rafeeq.companion.ui.theme.Cyan
 import com.rafeeq.companion.ui.theme.Emerald
+import com.rafeeq.companion.ui.theme.Sky
 import com.rafeeq.companion.ui.theme.ThemeMode
 import com.rafeeq.companion.ui.theme.Violet
 import kotlinx.coroutines.launch
@@ -75,6 +87,9 @@ fun SettingsScreen(
     viewModel: AppViewModel,
     onOpenSources: () -> Unit,
     onOpenControl: () -> Unit = {},
+    onOpenStats: () -> Unit = {},
+    onOpenShortcuts: () -> Unit = {},
+    onOpenSaved: () -> Unit = {},
 ) {
     val settings by viewModel.settings.collectAsState()
     val locating by viewModel.locating.collectAsState()
@@ -89,6 +104,26 @@ fun SettingsScreen(
     var showOffsets by remember { mutableStateOf(false) }
     var showPersona by remember { mutableStateOf(false) }
     var showNameDialog by remember { mutableStateOf(false) }
+    var showFontDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // اختيار الملفات يمرّ عبر النظام، فلا يحتاج التطبيق إذن تخزين إطلاقًا.
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri -> uri?.let { viewModel.exportBackup(it) } }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let { viewModel.importBackup(it) } }
+
+    val ringtoneLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val picked = result.data?.getParcelableExtra<android.net.Uri>(
+            RingtoneManager.EXTRA_RINGTONE_PICKED_URI,
+        )
+        viewModel.setAdhanSound(picked?.toString().orEmpty())
+    }
 
     LazyColumn(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 30.dp),
@@ -160,6 +195,24 @@ fun SettingsScreen(
                     val next = options[(options.indexOf(settings.preAdhanMinutes)
                         .takeIf { it >= 0 }?.plus(1) ?: 0) % options.size]
                     viewModel.setPreAdhanMinutes(next)
+                }
+
+                SettingRow(
+                    title = "صوت التنبيه",
+                    subtitle = "اختر نغمة من نغمات جهازك لتنبيه الصلاة",
+                    value = if (settings.adhanSoundUri.isBlank()) "افتراضي" else "مخصّص",
+                    icon = Icons.Filled.MusicNote,
+                    tint = Violet,
+                ) {
+                    val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "اختر صوت التنبيه")
+                        putExtra(
+                            RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                            settings.adhanSoundUri.takeIf { it.isNotBlank() }?.let { android.net.Uri.parse(it) },
+                        )
+                    }
+                    runCatching { ringtoneLauncher.launch(intent) }
                 }
 
                 SettingRow(
@@ -249,6 +302,24 @@ fun SettingsScreen(
             }
         }
 
+        item {
+            GlassCard(padding = PaddingValues(6.dp)) {
+                SettingRow(
+                    title = "اختصاراتي",
+                    subtitle = "أوامر جاهزة بضغطة واحدة في شاشة المساعد",
+                    icon = Icons.Filled.Bolt,
+                    tint = Violet,
+                ) { onOpenShortcuts() }
+
+                SettingRow(
+                    title = "إحصاءاتي",
+                    subtitle = "الإنجاز الأسبوعي والعادات واستهلاك المساعد",
+                    icon = Icons.Filled.Insights,
+                    tint = Emerald,
+                ) { onOpenStats() }
+            }
+        }
+
         // ------------------------------------------------ الأخبار
         item { SectionTitle("الأخبار") }
         item {
@@ -259,6 +330,13 @@ fun SettingsScreen(
                     icon = Icons.Filled.Tune,
                     tint = Amber,
                 ) { onOpenSources() }
+
+                SettingRow(
+                    title = "المحفوظات",
+                    subtitle = "المقالات التي حفظتها للقراءة لاحقًا",
+                    icon = Icons.Filled.Bookmark,
+                    tint = Sky,
+                ) { onOpenSaved() }
 
                 SettingRow(
                     title = "فترة التحديث",
@@ -301,11 +379,56 @@ fun SettingsScreen(
                 )
 
                 SettingRow(
+                    title = "حجم الخط",
+                    value = "${(settings.fontScale * 100).toInt()}%",
+                    subtitle = "يكبّر أو يصغّر كل نصوص التطبيق",
+                ) { showFontDialog = true }
+
+                SwitchRow(
+                    title = "الاهتزاز عند اللمس",
+                    subtitle = "في المسبحة وعدّاد الأذكار",
+                    checked = settings.haptics,
+                    onCheckedChange = { viewModel.setHaptics(it) },
+                )
+
+                SettingRow(
                     title = "اسمك",
                     value = settings.userName.ifBlank { "غير محدّد" },
                     subtitle = "يستخدمه المساعد في مخاطبتك",
                 ) { showNameDialog = true }
             }
+        }
+
+        item { SectionTitle("النسخ الاحتياطي") }
+        item {
+            GlassCard(padding = PaddingValues(6.dp)) {
+                SettingRow(
+                    title = "حفظ نسخة احتياطية",
+                    subtitle = "مهامك وملاحظاتك وعاداتك ومحفوظاتك ومحادثاتك في ملف واحد",
+                    icon = Icons.Filled.Save,
+                    tint = Emerald,
+                ) {
+                    runCatching { exportLauncher.launch(BackupManager.suggestedFileName()) }
+                }
+
+                SettingRow(
+                    title = "استعادة من ملف",
+                    subtitle = "يضيف إلى بياناتك الحالية ولا يمحوها",
+                    icon = Icons.Filled.Restore,
+                    tint = Cyan,
+                ) {
+                    runCatching { importLauncher.launch(arrayOf("application/json")) }
+                }
+            }
+        }
+        item {
+            Text(
+                "المفتاح غير مشمول في النسخة عمدًا — ملف النسخة قد يُنقل أو يُشارك، " +
+                    "ووضع مفتاح فوترة بداخله مخاطرة لا داعي لها.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
         }
 
         item {
@@ -430,6 +553,26 @@ fun SettingsScreen(
                 }
             },
             dismissButton = { TextButton(onClick = { showPersona = false }) { Text("إلغاء") } },
+        )
+    }
+
+    if (showFontDialog) {
+        PickerDialog(
+            title = "حجم الخط",
+            options = listOf(0.85f, 1.0f, 1.15f, 1.3f),
+            selected = listOf(0.85f, 1.0f, 1.15f, 1.3f)
+                .minByOrNull { kotlin.math.abs(it - settings.fontScale) } ?: 1.0f,
+            label = {
+                when (it) {
+                    0.85f -> "صغير"
+                    1.0f -> "عادي"
+                    1.15f -> "كبير"
+                    else -> "كبير جدًا"
+                }
+            },
+            description = { "${(it * 100).toInt()}%" },
+            onDismiss = { showFontDialog = false },
+            onSelect = { viewModel.setFontScale(it) },
         )
     }
 

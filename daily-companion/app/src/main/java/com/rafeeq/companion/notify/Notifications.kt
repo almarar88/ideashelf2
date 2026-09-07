@@ -251,17 +251,56 @@ class AlarmReceiver : BroadcastReceiver() {
                 }
             }
 
+            HabitScheduler.KIND_HABIT -> {
+                val title = intent.getStringExtra(HabitScheduler.EXTRA_HABIT_TITLE).orEmpty()
+                val emoji = intent.getStringExtra(HabitScheduler.EXTRA_HABIT_EMOJI).orEmpty()
+                if (title.isNotBlank()) {
+                    Notifier.show(
+                        context,
+                        id = 500 + title.hashCode().and(0xFF),
+                        channel = Channels.TASKS,
+                        title = "$emoji وقت: $title",
+                        body = "دقيقة واحدة الآن تحفظ السلسلة.",
+                    )
+                }
+            }
+
             PrayerScheduler.KIND_BRIEF -> {
                 val today = LocalDate.now()
+                // نبني سطرًا مفيدًا من البيانات المخزّنة بدل «الموجز جاهز».
+                val body = runCatching {
+                    val app = context.applicationContext as com.rafeeq.companion.RafeeqApp
+                    kotlinx.coroutines.runBlocking {
+                        BriefText.build(
+                            today = today,
+                            weather = app.repos.weatherCache.load(),
+                            tasks = app.repos.tasks.load(),
+                        )
+                    }
+                }.getOrElse { "افتح Alcode Ai لترى موجز يومك." }
+
                 Notifier.show(
                     context, id = 300, channel = Channels.BRIEF,
-                    title = "${Dates.greeting(java.time.LocalTime.now().hour)} 👋",
-                    body = "موجز ${Dates.weekdayAr(today)} جاهز. افتح Alcode Ai لتراه.",
+                    title = "${Dates.greeting(java.time.LocalTime.now().hour)} — ${Dates.weekdayAr(today)} 👋",
+                    body = body,
+                    big = true,
                 )
             }
         }
         // نعيد الجدولة بعد كل تنبيه لضمان استمرارية السلسلة.
         runCatching { PrayerScheduler.rescheduleAll(context) }
+        if (kind == HabitScheduler.KIND_HABIT) {
+            // تذكير العادة يومي، فنعيد جدولته لليوم التالي فور إطلاقه.
+            runCatching {
+                val app = context.applicationContext as? com.rafeeq.companion.RafeeqApp
+                    ?: return@runCatching
+                kotlinx.coroutines.runBlocking {
+                    HabitScheduler.reschedule(
+                        context, app.repos.habits.load(), java.time.ZoneId.systemDefault(),
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -272,8 +311,9 @@ class BootReceiver : BroadcastReceiver() {
         runCatching {
             val app = context.applicationContext as? com.rafeeq.companion.RafeeqApp ?: return@runCatching
             kotlinx.coroutines.runBlocking {
-                val tasks = app.repos.tasks.load()
-                TaskScheduler.reschedule(context, tasks, java.time.ZoneId.systemDefault())
+                val zone = java.time.ZoneId.systemDefault()
+                TaskScheduler.reschedule(context, app.repos.tasks.load(), zone)
+                HabitScheduler.reschedule(context, app.repos.habits.load(), zone)
             }
         }
     }

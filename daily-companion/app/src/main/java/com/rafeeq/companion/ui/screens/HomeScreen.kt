@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
@@ -95,6 +96,7 @@ fun HomeScreen(
     onOpenDay: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenArticle: (Article) -> Unit,
+    onOpenSearch: () -> Unit = {},
     onOpenVoice: () -> Unit = {},
     onQuickCommand: (String) -> Unit = {},
 ) {
@@ -155,6 +157,9 @@ fun HomeScreen(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                }
+                IconButton(onClick = onOpenSearch) {
+                    Icon(Icons.Filled.Search, contentDescription = "بحث")
                 }
                 IconButton(onClick = onOpenSettings) {
                     Icon(Icons.Filled.Settings, contentDescription = "الإعدادات")

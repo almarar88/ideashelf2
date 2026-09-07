@@ -133,6 +133,8 @@ data class Task(
     val createdAt: Long = System.currentTimeMillis(),
     val tag: String = "",
     val reminderMinutesBefore: Int = 0,
+    /** تكرار المهمة: daily أو weekly أو monthly. عند الإنجاز تُولَّد النسخة التالية. */
+    val repeat: String? = null,
 )
 
 @Serializable
@@ -145,6 +147,8 @@ data class Habit(
     val log: Map<String, Int> = emptyMap(),
     val createdAt: Long = System.currentTimeMillis(),
     val colorIndex: Int = 0,
+    /** وقت التذكير اليومي بصيغة HH:mm، أو null بلا تذكير. */
+    val reminderTime: String? = null,
 )
 
 @Serializable
@@ -185,6 +189,25 @@ data class Conversation(
     val title: String = "محادثة جديدة",
     val messages: List<ChatMessage> = emptyList(),
     val updatedAt: Long = System.currentTimeMillis(),
+)
+
+/** اختصار يعرّفه المستخدم: عبارة قصيرة تُرسل أمرًا جاهزًا للمساعد. */
+@Serializable
+data class Shortcut(
+    val id: String = UUID.randomUUID().toString(),
+    val label: String,
+    val emoji: String = "⚡",
+    val prompt: String,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+/** تقدير استهلاك المحادثة — يُقرأ من ردّ الواجهة البرمجية. */
+@Serializable
+data class UsageStats(
+    val inputTokens: Long = 0,
+    val outputTokens: Long = 0,
+    val cachedTokens: Long = 0,
+    val requests: Long = 0,
 )
 
 @Serializable

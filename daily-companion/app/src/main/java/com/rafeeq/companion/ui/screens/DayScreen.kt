@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -49,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import com.rafeeq.companion.core.Dates
 import com.rafeeq.companion.data.Habit
 import com.rafeeq.companion.data.Note
+import com.rafeeq.companion.data.Recurrence
 import com.rafeeq.companion.data.Task
 import com.rafeeq.companion.ui.AppViewModel
 import com.rafeeq.companion.ui.components.Chip
@@ -138,7 +141,12 @@ fun DayScreen(viewModel: AppViewModel) {
         when (tab) {
             TAB_TASKS -> TasksTab(viewModel, tasks, today) { showTaskDialog = true }
             TAB_HABITS -> HabitsTab(viewModel, habits, today) { showHabitDialog = true }
-            else -> NotesTab(notes, onEdit = { editingNote = it }, onDelete = { viewModel.deleteNote(it) })
+            else -> NotesTab(
+                notes = notes,
+                onEdit = { editingNote = it },
+                onDelete = { viewModel.deleteNote(it) },
+                onTogglePin = { viewModel.saveNote(it.copy(pinned = !it.pinned)) },
+            )
         }
     }
 
@@ -272,6 +280,8 @@ private fun TaskRow(task: Task, today: LocalDate, onToggle: () -> Unit, onDelete
             val meta = listOfNotNull(
                 task.dueDate,
                 task.dueTime,
+                Recurrence.labelAr(task.repeat).takeIf { it.isNotBlank() }?.let { "🔁 $it" },
+                task.reminderMinutesBefore.takeIf { it > 0 }?.let { "🔔 قبل $it د" },
                 task.tag.takeIf { it.isNotBlank() }?.let { "#$it" },
             )
             if (meta.isNotEmpty()) {
@@ -301,6 +311,8 @@ private fun TaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
     var date by remember { mutableStateOf("") }
     var time by remember { mutableStateOf("") }
     var priority by remember { mutableStateOf(1) }
+    var repeat by remember { mutableStateOf<String?>(null) }
+    var remindBefore by remember { mutableStateOf(0) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -324,6 +336,33 @@ private fun TaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                         Chip(label, priority == value, { priority = value })
                     }
                 }
+
+                Text("التكرار", style = MaterialTheme.typography.labelMedium)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                ) {
+                    listOf(
+                        null to "بلا", "daily" to "يومي",
+                        "weekly" to "أسبوعي", "monthly" to "شهري",
+                    ).forEach { (value, label) ->
+                        Chip(label, repeat == value, { repeat = value })
+                    }
+                }
+
+                // التذكير قبل الموعد لا معنى له بلا موعد، فنخفيه حتى يُحدَّد تاريخ.
+                if (date.isNotBlank()) {
+                    Text("التذكير قبل", style = MaterialTheme.typography.labelMedium)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    ) {
+                        listOf(0 to "بلا", 10 to "١٠ د", 30 to "٣٠ د", 60 to "ساعة", 1440 to "يوم")
+                            .forEach { (value, label) ->
+                                Chip(label, remindBefore == value, { remindBefore = value })
+                            }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -336,6 +375,8 @@ private fun TaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                             dueDate = date.trim().ifBlank { null },
                             dueTime = time.trim().ifBlank { null },
                             priority = priority,
+                            repeat = repeat,
+                            reminderMinutesBefore = remindBefore,
                         ),
                     )
                 },
@@ -448,6 +489,7 @@ private fun HabitsTab(
                             buildString {
                                 append("$count / ${habit.targetPerDay} اليوم")
                                 if (streak > 0) append("  ·  🔥 $streak ${if (streak == 1) "يوم" else "أيام"}")
+                                habit.reminderTime?.let { append("  ·  ⏰ $it") }
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -500,6 +542,7 @@ private fun HabitDialog(onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
     var emoji by remember { mutableStateOf("✅") }
     var target by remember { mutableStateOf("1") }
     var colorIndex by remember { mutableStateOf(0) }
+    var reminder by remember { mutableStateOf("") }
     val emojiChoices = listOf("✅", "📖", "🏃", "💧", "🕌", "🧘", "💪", "🌙", "✍️", "🥗")
 
     AlertDialog(
@@ -512,6 +555,10 @@ private fun HabitDialog(onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
                     target, { target = it.filter { c -> c.isDigit() }.take(2) },
                     "المرات المطلوبة يوميًا",
                     keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
+                )
+                RafeeqTextField(
+                    reminder, { reminder = it }, "تذكير يومي (اختياري)",
+                    placeholder = "07:00",
                 )
                 Text("الرمز", style = MaterialTheme.typography.labelMedium)
                 Row(
@@ -558,6 +605,9 @@ private fun HabitDialog(onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
                             emoji = emoji,
                             targetPerDay = target.toIntOrNull()?.coerceIn(1, 20) ?: 1,
                             colorIndex = colorIndex,
+                            reminderTime = reminder.trim().takeIf { t ->
+                                runCatching { java.time.LocalTime.parse(t) }.isSuccess
+                            },
                         ),
                     )
                 },
@@ -570,7 +620,12 @@ private fun HabitDialog(onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
 // ------------------------------------------------------------------ الملاحظات
 
 @Composable
-private fun NotesTab(notes: List<Note>, onEdit: (Note) -> Unit, onDelete: (Note) -> Unit) {
+private fun NotesTab(
+    notes: List<Note>,
+    onEdit: (Note) -> Unit,
+    onDelete: (Note) -> Unit,
+    onTogglePin: (Note) -> Unit,
+) {
     if (notes.isEmpty()) {
         EmptyState(
             emoji = "🗒️",
@@ -580,12 +635,34 @@ private fun NotesTab(notes: List<Note>, onEdit: (Note) -> Unit, onDelete: (Note)
         return
     }
 
-    val sorted = notes.sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updatedAt })
+    var query by remember { mutableStateOf("") }
+    val sorted = notes
+        .filter {
+            query.isBlank() ||
+                it.title.contains(query, true) || it.body.contains(query, true)
+        }
+        .sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updatedAt })
 
     LazyColumn(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // البحث يظهر فقط حين تتراكم الملاحظات؛ قبل ذلك هو ضجيج.
+        if (notes.size >= 5) {
+            item {
+                RafeeqTextField(query, { query = it }, "بحث في الملاحظات", placeholder = "كلمة…")
+            }
+        }
+        if (sorted.isEmpty()) {
+            item {
+                Text(
+                    "لا نتائج لـ «$query».",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 20.dp),
+                )
+            }
+        }
         items(sorted, key = { it.id }) { note ->
             val color = noteColors[note.colorIndex % noteColors.size]
             Row(
@@ -619,13 +696,24 @@ private fun NotesTab(notes: List<Note>, onEdit: (Note) -> Unit, onDelete: (Note)
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = { onDelete(note) }, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Filled.Delete,
-                        contentDescription = "حذف",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.size(16.dp),
-                    )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    IconButton(onClick = { onTogglePin(note) }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            if (note.pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                            contentDescription = if (note.pinned) "إلغاء التثبيت" else "تثبيت",
+                            tint = if (note.pinned) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    IconButton(onClick = { onDelete(note) }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = "حذف",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }

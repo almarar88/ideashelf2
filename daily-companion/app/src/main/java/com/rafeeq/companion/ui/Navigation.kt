@@ -58,6 +58,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.rafeeq.companion.ui.screens.AssistantScreen
 import com.rafeeq.companion.ui.screens.AzkarScreen
+import com.rafeeq.companion.ui.screens.SavedScreen
+import com.rafeeq.companion.ui.screens.SearchScreen
+import com.rafeeq.companion.ui.screens.ShortcutsScreen
+import com.rafeeq.companion.ui.screens.StatsScreen
 import com.rafeeq.companion.ui.screens.ControlScreen
 import com.rafeeq.companion.ui.screens.DayScreen
 import com.rafeeq.companion.ui.screens.HomeScreen
@@ -82,6 +86,10 @@ object Routes {
     const val SOURCES = "sources"
     const val CONTROL = "control"
     const val AZKAR = "azkar"
+    const val SAVED = "saved"
+    const val SEARCH = "search"
+    const val STATS = "stats"
+    const val SHORTCUTS = "shortcuts"
 }
 
 private data class Tab(
@@ -100,7 +108,11 @@ private val tabs = listOf(
 )
 
 @Composable
-fun RafeeqNavigation(viewModel: AppViewModel) {
+fun RafeeqNavigation(
+    viewModel: AppViewModel,
+    requestedRoute: String? = null,
+    onRouteConsumed: () -> Unit = {},
+) {
     val navController = rememberNavController()
     val settings by viewModel.settings.collectAsState()
     val snackbar by viewModel.snackbar.collectAsState()
@@ -109,6 +121,14 @@ fun RafeeqNavigation(viewModel: AppViewModel) {
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+
+    // اختصار الأيقونة يفتح شاشته مباشرة بدل الرئيسية.
+    LaunchedEffect(requestedRoute, settings.onboarded) {
+        val target = requestedRoute ?: return@LaunchedEffect
+        if (!settings.onboarded) return@LaunchedEffect
+        runCatching { navController.navigate(target) { launchSingleTop = true } }
+        onRouteConsumed()
+    }
 
     LaunchedEffect(snackbar) {
         snackbar?.let {
@@ -147,7 +167,11 @@ fun RafeeqNavigation(viewModel: AppViewModel) {
     val isSubScreen = currentRoute == Routes.SETTINGS ||
         currentRoute == Routes.SOURCES ||
         currentRoute == Routes.CONTROL ||
-        currentRoute == Routes.AZKAR
+        currentRoute == Routes.AZKAR ||
+        currentRoute == Routes.SAVED ||
+        currentRoute == Routes.SEARCH ||
+        currentRoute == Routes.STATS ||
+        currentRoute == Routes.SHORTCUTS
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHost) },
@@ -207,6 +231,7 @@ fun RafeeqNavigation(viewModel: AppViewModel) {
                         onOpenDay = { navController.navigate(Routes.DAY) },
                         onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                         onOpenArticle = openArticle,
+                        onOpenSearch = { navController.navigate(Routes.SEARCH) },
                         onOpenVoice = openVoice,
                         onQuickCommand = { prompt ->
                             navController.navigate(Routes.ASSISTANT)
@@ -221,6 +246,7 @@ fun RafeeqNavigation(viewModel: AppViewModel) {
                         viewModel = viewModel,
                         onOpenArticle = openArticle,
                         onOpenSources = { navController.navigate(Routes.SOURCES) },
+                        onOpenSaved = { navController.navigate(Routes.SAVED) },
                     )
                 }
 
@@ -247,6 +273,9 @@ fun RafeeqNavigation(viewModel: AppViewModel) {
                         viewModel = viewModel,
                         onOpenSources = { navController.navigate(Routes.SOURCES) },
                         onOpenControl = { navController.navigate(Routes.CONTROL) },
+                        onOpenStats = { navController.navigate(Routes.STATS) },
+                        onOpenShortcuts = { navController.navigate(Routes.SHORTCUTS) },
+                        onOpenSaved = { navController.navigate(Routes.SAVED) },
                     )
                 }
 
@@ -255,6 +284,21 @@ fun RafeeqNavigation(viewModel: AppViewModel) {
                 composable(Routes.CONTROL) { ControlScreen(viewModel) }
 
                 composable(Routes.AZKAR) { AzkarScreen() }
+
+                composable(Routes.SAVED) { SavedScreen(viewModel, openArticle) }
+
+                composable(Routes.SEARCH) {
+                    SearchScreen(
+                        viewModel = viewModel,
+                        onOpenArticle = openArticle,
+                        onOpenDay = { navController.navigate(Routes.DAY) },
+                        onOpenAssistant = { navController.navigate(Routes.ASSISTANT) },
+                    )
+                }
+
+                composable(Routes.STATS) { StatsScreen(viewModel) }
+
+                composable(Routes.SHORTCUTS) { ShortcutsScreen(viewModel) }
             }
         }
     }

@@ -12,6 +12,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -91,6 +92,7 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 fun RafeeqTheme(
     mode: ThemeMode = ThemeMode.SYSTEM,
     dynamicColor: Boolean = false,
+    fontScale: Float = 1.0f,
     content: @Composable () -> Unit,
 ) {
     val dark = when (mode) {
@@ -115,9 +117,14 @@ fun RafeeqTheme(
         }
     }
 
+    // نضرب كل أحجام الخط بمعامل واحد بدل إضافة إعداد لكل نمط على حدة.
+    val scaled = remember(fontScale) {
+        if (fontScale == 1.0f) RafeeqTypography else RafeeqTypography.scaledBy(fontScale)
+    }
+
     MaterialTheme(
         colorScheme = scheme,
-        typography = RafeeqTypography,
+        typography = scaled,
         shapes = RafeeqShapes,
         content = content,
     )

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -63,6 +64,7 @@ fun NewsScreen(
     viewModel: AppViewModel,
     onOpenArticle: (Article) -> Unit,
     onOpenSources: () -> Unit,
+    onOpenSaved: () -> Unit = {},
 ) {
     val news by viewModel.news.collectAsState()
     val saved by viewModel.savedArticles.collectAsState()
@@ -71,9 +73,11 @@ fun NewsScreen(
     val categories = viewModel.availableCategories()
     val selected = if (news.selectedCategory in categories) news.selectedCategory
     else categories.firstOrNull().orEmpty()
-    val articles = viewModel.articlesFor(selected)
+    val base = viewModel.articlesFor(selected)
 
     var summaryFor by remember { mutableStateOf<Article?>(null) }
+    var query by remember { mutableStateOf("") }
+    var searching by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxWidth()) {
 
@@ -91,6 +95,12 @@ fun NewsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            IconButton(onClick = { searching = !searching; if (!searching) query = "" }) {
+                Icon(Icons.Filled.Search, contentDescription = "بحث في الأخبار")
+            }
+            IconButton(onClick = onOpenSaved) {
+                Icon(Icons.Filled.Bookmark, contentDescription = "المحفوظات")
+            }
             IconButton(onClick = onOpenSources) {
                 Icon(Icons.Filled.Tune, contentDescription = "مصادر الأخبار ومواضيعي")
             }
@@ -101,7 +111,17 @@ fun NewsScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        if (categories.isNotEmpty()) {
+        if (searching) {
+            com.rafeeq.companion.ui.components.RafeeqTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = "ابحث في الأخبار المحمّلة",
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+
+        if (categories.isNotEmpty() && !searching) {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp),
@@ -115,6 +135,10 @@ fun NewsScreen(
                 }
             }
             Spacer(Modifier.height(10.dp))
+        }
+
+        val articles = if (query.isBlank()) base else news.articles.filter {
+            (it.title + " " + it.summary + " " + it.sourceName).contains(query.trim(), ignoreCase = true)
         }
 
         PullToRefreshBox(

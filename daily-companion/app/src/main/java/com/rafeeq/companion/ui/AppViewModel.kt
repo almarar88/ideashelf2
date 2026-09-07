@@ -17,6 +17,7 @@ import com.rafeeq.companion.data.NewsSource
 import com.rafeeq.companion.data.Note
 import com.rafeeq.companion.data.Place
 import com.rafeeq.companion.data.SavedArticle
+import com.rafeeq.companion.data.Recurrence
 import com.rafeeq.companion.data.Task
 import com.rafeeq.companion.data.Topic
 import com.rafeeq.companion.data.WeatherBundle
@@ -27,6 +28,9 @@ import com.rafeeq.companion.data.ai.ClaudeClient
 import com.rafeeq.companion.data.ai.ControlPrompt
 import com.rafeeq.companion.data.control.ActionResult
 import com.rafeeq.companion.data.control.Capability
+import com.rafeeq.companion.data.Shortcut
+import com.rafeeq.companion.data.UsageStats
+import com.rafeeq.companion.data.control.AppActions
 import com.rafeeq.companion.data.control.PhoneController
 import com.rafeeq.companion.data.control.ToolCatalog
 import com.rafeeq.companion.data.control.ToolSpec
@@ -39,6 +43,7 @@ import com.rafeeq.companion.data.prayer.HighLatitudeRule
 import com.rafeeq.companion.data.prayer.Prayer
 import com.rafeeq.companion.data.prayer.PrayerTimes
 import com.rafeeq.companion.notify.PrayerScheduler
+import com.rafeeq.companion.notify.HabitScheduler
 import com.rafeeq.companion.notify.TaskScheduler
 import com.rafeeq.companion.ui.theme.ThemeMode
 import kotlinx.coroutines.CompletableDeferred
@@ -119,6 +124,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val topics: StateFlow<List<Topic>> = repos.topics.items
     val conversations: StateFlow<List<Conversation>> = repos.conversations.items
     val brief: StateFlow<DailyBrief?> = repos.brief.value
+    val shortcuts: StateFlow<List<Shortcut>> = repos.shortcuts.items
+    val usage: StateFlow<UsageStats?> = repos.usage.value
+
+    /**
+     * الأوامر التي تمسّ بيانات التطبيق (مهام، ملاحظات، عادات، أخبار).
+     * فصلها عن أوامر النظام يجعل المساعد قادرًا على إدارة يومك لا على تشغيل
+     * التطبيقات فحسب.
+     */
+    private val appActions = AppActions(
+        tasks = repos.tasks,
+        notes = repos.notes,
+        habits = repos.habits,
+        articleTitles = { _news.value.articles.map { Triple(it.title, it.link, it.sourceName) } },
+        zone = { zoneId() },
+        onTasksChanged = { rescheduleTaskReminders() },
+    )
 
     private val _news = MutableStateFlow(NewsState())
     val news: StateFlow<NewsState> = _news.asStateFlow()
@@ -179,6 +200,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             repos.tasks.load(); repos.habits.load(); repos.notes.load()
             repos.saved.load(); repos.sources.load(); repos.topics.load()
             repos.conversations.load(); repos.brief.load()
+            repos.shortcuts.load(); repos.usage.load()
             repos.weatherCache.load()?.let { cached ->
                 if (System.currentTimeMillis() - cached.fetchedAt < 3 * 60 * 60_000L) {
                     _weather.value = WeatherState(bundle = cached)
@@ -200,6 +222,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             rescheduleAlarms()
             rescheduleTaskReminders()
+            rescheduleHabitReminders()
         }
         refreshCapabilities()
     }
@@ -393,21 +416,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { TaskScheduler.reschedule(getApplication(), tasks.value, zoneId()) }
     }
 
+    /** تذكير العادات اليومية — يُعاد بناؤه بعد أي تغيير في القائمة. */
+    fun rescheduleHabitReminders() {
+        runCatching { HabitScheduler.reschedule(getApplication(), habits.value, zoneId()) }
+    }
+
     fun updateTask(task: Task) = viewModelScope.launch {
         repos.tasks.update { list -> list.map { if (it.id == task.id) task else it } }
         rescheduleTaskReminders()
     }
 
     fun toggleTask(task: Task) = viewModelScope.launch {
+        // إنجاز مهمة متكرّرة يولّد نسختها التالية حتى لا تختفي من الروتين.
+        val next = if (!task.done) Recurrence.next(task, zoneId()) else null
         repos.tasks.update { list ->
-            list.map {
+            val updated = list.map {
                 if (it.id == task.id) it.copy(
                     done = !it.done,
                     completedAt = if (!it.done) System.currentTimeMillis() else null,
                 ) else it
             }
+            if (next != null) listOf(next) + updated else updated
         }
         rescheduleTaskReminders()
+        if (next != null) showMessage("تكرار: النسخة التالية بتاريخ ${next.dueDate}")
     }
 
     fun deleteTask(task: Task) = viewModelScope.launch {
@@ -419,7 +451,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         repos.tasks.update { list -> list.filterNot { it.done } }
     }
 
-    fun addHabit(habit: Habit) = viewModelScope.launch { repos.habits.update { it + habit } }
+    fun addHabit(habit: Habit) = viewModelScope.launch {
+        repos.habits.update { it + habit }
+        rescheduleHabitReminders()
+    }
+
+    fun updateHabit(habit: Habit) = viewModelScope.launch {
+        repos.habits.update { list -> list.map { if (it.id == habit.id) habit else it } }
+        rescheduleHabitReminders()
+    }
 
     fun incrementHabit(habit: Habit, date: LocalDate = LocalDate.now(zoneId())) =
         viewModelScope.launch {
@@ -437,6 +477,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteHabit(habit: Habit) = viewModelScope.launch {
         repos.habits.update { list -> list.filterNot { it.id == habit.id } }
+        rescheduleHabitReminders()
     }
 
     fun saveNote(note: Note) = viewModelScope.launch {
@@ -540,7 +581,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     effort = s.effectiveEffort,
                     specOf = { name -> ToolCatalog.byName(name) },
                     confirm = { call, spec -> requestConfirmation(call, spec, s.confirmSensitive) },
-                    execute = { call -> repos.phone.execute(call.name, call.input) },
+                    execute = { call ->
+                        if (appActions.handles(call.name)) appActions.execute(call.name, call.input)
+                        else repos.phone.execute(call.name, call.input)
+                    },
                 ) { event ->
                     when (event) {
                         is AgentRunner.Event.Text -> {
@@ -573,6 +617,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             updateAssistant(conversation.id, placeholder.id, builder.toString(), runs)
                         }
 
+                        is AgentRunner.Event.Usage -> recordUsage(event)
+
                         is AgentRunner.Event.Failed -> failure = event.message
                         AgentRunner.Event.Completed -> Unit
                     }
@@ -599,6 +645,63 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 repos.voice.speak(finalText)
             }
         }
+    }
+
+    /** يراكم تقدير الاستهلاك ليعرضه المستخدم — مفيد لأن المفتاح مفتاحه. */
+    private suspend fun recordUsage(event: AgentRunner.Event.Usage) {
+        val current = repos.usage.value.value ?: UsageStats()
+        repos.usage.set(
+            current.copy(
+                inputTokens = current.inputTokens + event.input,
+                outputTokens = current.outputTokens + event.output,
+                cachedTokens = current.cachedTokens + event.cached,
+                requests = current.requests + 1,
+            ),
+        )
+    }
+
+    fun resetUsage() = viewModelScope.launch { repos.usage.set(UsageStats()) }
+
+    // ------------------------------------------------------------ الاختصارات
+
+    fun addShortcut(label: String, emoji: String, prompt: String) = viewModelScope.launch {
+        if (label.isBlank() || prompt.isBlank()) return@launch
+        repos.shortcuts.update {
+            it + Shortcut(label = label.trim(), emoji = emoji.ifBlank { "⚡" }, prompt = prompt.trim())
+        }
+    }
+
+    fun deleteShortcut(id: String) = viewModelScope.launch {
+        repos.shortcuts.update { list -> list.filterNot { it.id == id } }
+    }
+
+    // ------------------------------------------------------------ إعادة التوليد
+
+    /**
+     * يعيد آخر سؤال على المساعد بعد حذف رده.
+     * مفيد حين يأتي الرد ناقصًا أو ينقطع الاتصال في منتصفه.
+     */
+    fun regenerateLast() {
+        if (_ai.value.streaming) return
+        val conversation = activeConversation() ?: return
+        val index = conversation.messages.indexOfLast { it.role == "user" }
+        if (index < 0) return
+        val question = conversation.messages[index].content
+        viewModelScope.launch {
+            repos.conversations.update { list ->
+                list.map { c ->
+                    if (c.id != conversation.id) c
+                    else c.copy(messages = c.messages.take(index))
+                }
+            }
+            sendMessage(question)
+        }
+    }
+
+    /** يقرأ نصًا بصوت عالٍ (أو يوقف القراءة الجارية). */
+    fun speak(text: String) {
+        if (voice.state.value == VoiceEngine.State.SPEAKING) voice.stopSpeaking()
+        else voice.speak(text)
     }
 
     /** يعرض حوار التأكيد وينتظر قرار المستخدم. */
@@ -883,6 +986,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setVoiceLanguage(value: String) = viewModelScope.launch {
         repos.settings.setVoiceLanguage(value)
+    }
+
+    fun setFontScale(value: Float) = viewModelScope.launch { repos.settings.setFontScale(value) }
+    fun setHaptics(value: Boolean) = viewModelScope.launch { repos.settings.setHaptics(value) }
+
+    fun setAdhanSound(uri: String) = viewModelScope.launch {
+        repos.settings.setAdhanSoundUri(uri)
+    }
+
+    // ------------------------------------------------------------ النسخ الاحتياطي
+
+    fun exportBackup(target: android.net.Uri) = viewModelScope.launch {
+        repos.backup.export(target, awaitSettings())
+            .onSuccess { showMessage("حُفظت نسخة احتياطية تضم $it عنصرًا") }
+            .onFailure { showMessage("تعذّر الحفظ: ${it.message}") }
+    }
+
+    fun importBackup(source: android.net.Uri) = viewModelScope.launch {
+        repos.backup.import(source, merge = true)
+            .onSuccess {
+                showMessage("استُعيد $it عنصرًا")
+                rescheduleTaskReminders()
+                rescheduleHabitReminders()
+                rescheduleAlarms()
+            }
+            .onFailure { showMessage("تعذّر الاستعادة: ${it.message}") }
     }
 
     fun rescheduleAlarms() {

@@ -15,6 +15,11 @@ import com.rafeeq.companion.data.JsonValueStore
 import com.rafeeq.companion.data.WeatherBundle
 import com.rafeeq.companion.data.ai.AgentRunner
 import com.rafeeq.companion.data.ai.ClaudeClient
+import com.rafeeq.companion.data.BackupManager
+import com.rafeeq.companion.data.DefaultShortcuts
+import com.rafeeq.companion.data.Shortcut
+import com.rafeeq.companion.data.UsageStats
+import com.rafeeq.companion.data.control.AppActions
 import com.rafeeq.companion.data.control.PhoneController
 import com.rafeeq.companion.data.voice.VoiceEngine
 import com.rafeeq.companion.data.location.LocationRepository
@@ -47,7 +52,12 @@ class Repos(app: Application) {
     val sources = JsonListStore(app, "news_sources.json", NewsSource.serializer(), DefaultSources.all)
     val topics = JsonListStore(app, "topics.json", Topic.serializer())
     val conversations = JsonListStore(app, "conversations.json", Conversation.serializer())
+    val shortcuts = JsonListStore(app, "shortcuts.json", Shortcut.serializer(), DefaultShortcuts.all)
     val brief = JsonValueStore(app, "daily_brief.json", DailyBrief.serializer())
+    val usage = JsonValueStore(app, "usage.json", UsageStats.serializer())
+
+    /** يُنشأ كسولًا لأنه يحتاج الحاوية نفسها بعد اكتمالها. */
+    val backup: BackupManager by lazy { BackupManager(app, this) }
     val weatherCache = JsonValueStore(app, "weather_cache.json", WeatherBundle.serializer())
 }
 

@@ -375,6 +375,129 @@ object ToolCatalog {
         ),
     )
 
+
+    // ---------------------------------------------------- بيانات التطبيق نفسه
+
+    val addTask = ToolSpec(
+        name = "add_task",
+        description = "يضيف مهمة إلى قائمة مهام المستخدم داخل التطبيق. " +
+            "استخدمه حين يقول «ذكّرني» أو «أضِف مهمة» أو يذكر التزامًا عليه. " +
+            "التاريخ بصيغة yyyy-MM-dd والوقت HH:mm، ويُجدول تنبيه تلقائيًا إن ذُكر موعد.",
+        schema = schema(
+            Triple("title", "string", "عنوان المهمة"),
+            Triple("date", "string", "تاريخ الاستحقاق yyyy-MM-dd، أو اتركه فارغًا"),
+            Triple("time", "string", "وقت الاستحقاق HH:mm، أو اتركه فارغًا"),
+            Triple("priority", "integer", "0 منخفضة، 1 عادية، 2 مهمة"),
+            Triple("repeat", "string", "daily أو weekly أو monthly للمهام المتكرّرة"),
+            required = listOf("title"),
+        ),
+    )
+
+    val readTasks = ToolSpec(
+        name = "read_tasks",
+        description = "يقرأ مهام المستخدم الحالية مع مواعيدها وحالتها. " +
+            "استخدمه قبل تعديل أو إنجاز مهمة لتعرف عناوينها الدقيقة.",
+        schema = schema(
+            Triple("only_open", "boolean", "true للمهام غير المنجزة فقط"),
+            required = emptyList(),
+        ),
+    )
+
+    val completeTask = ToolSpec(
+        name = "complete_task",
+        description = "يضع علامة إنجاز على مهمة بمطابقة عنوانها. " +
+            "المهام المتكرّرة تُولَّد نسختها التالية تلقائيًا.",
+        schema = schema(Triple("title", "string", "عنوان المهمة أو جزء منه")),
+    )
+
+    val deleteTask = ToolSpec(
+        name = "delete_task",
+        description = "يحذف مهمة نهائيًا بمطابقة عنوانها. لا يمكن التراجع عن الحذف.",
+        schema = schema(Triple("title", "string", "عنوان المهمة أو جزء منه")),
+        sensitive = true,
+    )
+
+    val addNote = ToolSpec(
+        name = "add_note",
+        description = "يحفظ ملاحظة نصية في التطبيق. استخدمه حين يطلب المستخدم " +
+            "تدوين فكرة أو قائمة أو معلومة ليرجع إليها لاحقًا.",
+        schema = schema(
+            Triple("title", "string", "عنوان الملاحظة، اختياري"),
+            Triple("body", "string", "نص الملاحظة"),
+            required = listOf("body"),
+        ),
+    )
+
+    val readNotes = ToolSpec(
+        name = "read_notes",
+        description = "يبحث في ملاحظات المستخدم المحفوظة ويعيد المطابق منها.",
+        schema = schema(
+            Triple("query", "string", "نص للبحث، أو اتركه فارغًا لأحدث الملاحظات"),
+            required = emptyList(),
+        ),
+    )
+
+    val addHabit = ToolSpec(
+        name = "add_habit",
+        description = "ينشئ عادة يومية يتتبّعها المستخدم بعدّاد وسلسلة إنجاز.",
+        schema = schema(
+            Triple("title", "string", "اسم العادة"),
+            Triple("times_per_day", "integer", "عدد المرات المطلوبة يوميًا"),
+            required = listOf("title"),
+        ),
+    )
+
+    val logHabit = ToolSpec(
+        name = "log_habit",
+        description = "يسجّل إنجاز عادة لليوم الحالي بمطابقة اسمها.",
+        schema = schema(Triple("title", "string", "اسم العادة أو جزء منه")),
+    )
+
+    val searchNews = ToolSpec(
+        name = "search_news",
+        description = "يبحث في الأخبار المحمّلة داخل التطبيق عن كلمة أو موضوع، " +
+            "ويعيد العناوين المطابقة. لا يجلب من الإنترنت بل يبحث فيما وصل بالفعل.",
+        schema = schema(Triple("query", "string", "كلمة البحث")),
+    )
+
+    // ---------------------------------------------------- وسائط وحافظة
+
+    val mediaControl = ToolSpec(
+        name = "media_control",
+        description = "يتحكّم بالمشغّل الصوتي النشط أيًا كان (يوتيوب، سبوتيفاي، أي مشغّل): " +
+            "تشغيل، إيقاف مؤقت، التالي، السابق.",
+        schema = schema(
+            Triple("action", "string", "إحدى: play أو pause أو next أو previous أو toggle"),
+        ),
+    )
+
+    val readClipboard = ToolSpec(
+        name = "read_clipboard",
+        description = "يقرأ النص الموجود في حافظة النسخ. مفيد حين يقول المستخدم " +
+            "«لخّص اللي نسخته» أو «ترجم النص المنسوخ».",
+        schema = emptySchema,
+    )
+
+    val writeClipboard = ToolSpec(
+        name = "copy_to_clipboard",
+        description = "ينسخ نصًا إلى حافظة النسخ ليلصقه المستخدم في أي مكان.",
+        schema = schema(Triple("text", "string", "النص المراد نسخه")),
+    )
+
+    val shareText = ToolSpec(
+        name = "share_text",
+        description = "يفتح قائمة المشاركة في النظام لإرسال نص إلى أي تطبيق يختاره المستخدم.",
+        schema = schema(Triple("text", "string", "النص المراد مشاركته")),
+    )
+
+    val screenshot = ToolSpec(
+        name = "take_screenshot",
+        description = "يلتقط صورة للشاشة الحالية ويحفظها في الجهاز. " +
+            "يتطلّب أندرويد ١١ فأحدث مع خدمة الوصول.",
+        schema = emptySchema,
+        capability = Capability.ACCESSIBILITY,
+    )
+
     /** ترتيب الأدوات كما تُرسل إلى النموذج. */
     val all: List<ToolSpec> = listOf(
         openApp, listApps, openUrl, webSearch, navigate,
@@ -383,6 +506,15 @@ object ToolCatalog {
         setVolume, setRingerMode, setBrightness, flashlight, deviceStatus, openSettings,
         readNotifications, clearNotifications,
         readScreen, tapText, tapCoordinates, typeText, swipe, pressKey, waitTool,
+        addTask, readTasks, completeTask, deleteTask,
+        addNote, readNotes, addHabit, logHabit, searchNews,
+        mediaControl, readClipboard, writeClipboard, shareText, screenshot,
+    )
+
+    /** الأدوات التي تعمل على بيانات التطبيق نفسه لا على النظام. */
+    val appDataToolNames: Set<String> = setOf(
+        "add_task", "read_tasks", "complete_task", "delete_task",
+        "add_note", "read_notes", "add_habit", "log_habit", "search_news",
     )
 
     fun byName(name: String): ToolSpec? = all.firstOrNull { it.name == name }

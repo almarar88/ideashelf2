@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  اختصارات الضغط المطوّل على أيقونة التطبيق.
+  نمرّر الوجهة عبر رابط داخلي (alcode://route/...) لأن عناصر <extra>
+  غير مدعومة في اختصارات المانفست.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="voice"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_voice"
+        android:shortcutShortLabel="@string/shortcut_voice_short"
+        android:shortcutLongLabel="@string/shortcut_voice_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.rafeeq.companion"
+            android:targetClass="com.rafeeq.companion.VoiceAssistantActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="assistant"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_assistant"
+        android:shortcutShortLabel="@string/shortcut_assistant_short"
+        android:shortcutLongLabel="@string/shortcut_assistant_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="alcode://route/assistant"
+            android:targetPackage="com.rafeeq.companion"
+            android:targetClass="com.rafeeq.companion.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="day"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_task"
+        android:shortcutShortLabel="@string/shortcut_day_short"
+        android:shortcutLongLabel="@string/shortcut_day_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="alcode://route/day"
+            android:targetPackage="com.rafeeq.companion"
+            android:targetClass="com.rafeeq.companion.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="prayer"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_prayer"
+        android:shortcutShortLabel="@string/shortcut_prayer_short"
+        android:shortcutLongLabel="@string/shortcut_prayer_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="alcode://route/prayer"
+            android:targetPackage="com.rafeeq.companion"
+            android:targetClass="com.rafeeq.companion.MainActivity" />
+    </shortcut>
+</shortcuts>
