@@ -134,22 +134,31 @@ private fun VoiceAssistantScreen(
     val reply = conversations.firstOrNull { it.id == activeId }
         ?.messages?.lastOrNull { it.role == "assistant" }
 
+    // محادثة متصلة: بعد كل رد يعود للاستماع تلقائيًا حتى تغلق الشاشة.
+    val listen: () -> Unit = {
+        errorText = null
+        viewModel.voice.startListening(
+            languageTag = settings.voiceLanguage.ifBlank { "ar-AE" },
+            onResult = { spokenText = it },
+            onFailure = { errorText = it },
+        )
+    }
+
     val micPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (granted) {
-            viewModel.voice.startListening(
-                languageTag = settings.voiceLanguage.ifBlank { "ar-SA" },
-                onResult = { spokenText = it },
-                onFailure = { errorText = it },
-            )
-        } else {
-            errorText = "أحتاج إذن الميكروفون لأسمعك."
-        }
+        if (granted) listen() else errorText = "أحتاج إذن الميكروفون لأسمعك."
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.voice.prepareTts()
+    DisposableEffect(settings.continuousVoice) {
+        viewModel.onSpokenReplyDone = {
+            if (settings.continuousVoice) listen()
+        }
+        onDispose { viewModel.onSpokenReplyDone = null }
+    }
+
+    LaunchedEffect(settings.voiceLanguage) {
+        viewModel.voice.prepareTts(settings.voiceLanguage.ifBlank { "ar-AE" })
         viewModel.refreshCapabilities()
         if (!started) {
             started = true
@@ -166,13 +175,15 @@ private fun VoiceAssistantScreen(
 
     LaunchedEffect(spokenText) {
         if (spokenText.isNotBlank()) {
-            viewModel.newConversation()
+            // المحادثة المتصلة تبني على ما سبق؛ أول سؤال فقط يبدأ محادثة جديدة.
+            if (viewModel.activeConversation() == null) viewModel.newConversation()
             viewModel.sendMessage(spokenText, spoken = true)
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
+            viewModel.onSpokenReplyDone = null
             viewModel.voice.cancel()
             viewModel.voice.stopSpeaking()
         }
@@ -246,13 +257,22 @@ private fun VoiceAssistantScreen(
                             .clip(CircleShape)
                             .clickable {
                                 errorText = null
-                                if (busy) {
-                                    viewModel.voice.cancel()
-                                    viewModel.voice.stopSpeaking()
-                                    viewModel.stopStreaming()
-                                } else {
-                                    spokenText = ""
-                                    micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                                when {
+                                    // مقاطعة: اضغط أثناء كلامه ليصمت ويسمعك فورًا.
+                                    voiceState == VoiceEngine.State.SPEAKING -> {
+                                        viewModel.voice.stopSpeaking()
+                                        spokenText = ""
+                                        micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                                    }
+                                    busy -> {
+                                        viewModel.voice.cancel()
+                                        viewModel.voice.stopSpeaking()
+                                        viewModel.stopStreaming()
+                                    }
+                                    else -> {
+                                        spokenText = ""
+                                        micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                                    }
                                 }
                             },
                         contentAlignment = Alignment.Center,

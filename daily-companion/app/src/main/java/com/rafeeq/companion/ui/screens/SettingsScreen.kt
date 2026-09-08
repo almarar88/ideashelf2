@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Insights
@@ -62,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import com.rafeeq.companion.data.BackupManager
 import com.rafeeq.companion.data.Place
 import com.rafeeq.companion.data.ai.ClaudeClient
+import com.rafeeq.companion.data.ai.Dialect
 import com.rafeeq.companion.data.prayer.AsrMethod
 import com.rafeeq.companion.data.prayer.CalculationMethod
 import com.rafeeq.companion.data.prayer.HighLatitudeRule
@@ -99,6 +101,7 @@ fun SettingsScreen(
     var showAsrPicker by remember { mutableStateOf(false) }
     var showHighLatPicker by remember { mutableStateOf(false) }
     var showSpeedPicker by remember { mutableStateOf(false) }
+    var showDialectPicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
     var showApiKeyDialog by remember { mutableStateOf(false) }
     var showOffsets by remember { mutableStateOf(false) }
@@ -268,6 +271,21 @@ fun SettingsScreen(
                 ) { showSpeedPicker = true }
 
                 SettingRow(
+                    title = "اللهجة",
+                    value = settings.dialect.arabic,
+                    subtitle = settings.dialect.sample,
+                    icon = Icons.Filled.RecordVoiceOver,
+                    tint = Amber,
+                ) { showDialectPicker = true }
+
+                SwitchRow(
+                    title = "البحث في الإنترنت",
+                    subtitle = "يجيب عن الأسعار والأخبار والأحداث الجارية بمعلومة حديثة",
+                    checked = settings.webSearch,
+                    onCheckedChange = { viewModel.setWebSearch(it) },
+                )
+
+                SettingRow(
                     title = "تعليمات شخصية",
                     subtitle = "أخبر المساعد كيف تحب أن يخاطبك",
                     value = if (settings.aiPersona.isNotBlank()) "مضبوط" else "لا شيء",
@@ -299,6 +317,43 @@ fun SettingsScreen(
                     icon = Icons.Filled.PhonelinkSetup,
                     tint = Emerald,
                 ) { onOpenControl() }
+            }
+        }
+
+        // ------------------------------------------------ الصوت
+        item { SectionTitle("الصوت") }
+        item {
+            GlassCard(padding = PaddingValues(6.dp)) {
+                SwitchRow(
+                    title = "الرد بصوت عالٍ",
+                    subtitle = "ينطق ردّه حين تكلّمه بالصوت",
+                    checked = settings.voiceReplies,
+                    onCheckedChange = { viewModel.setVoiceReplies(it) },
+                )
+
+                if (settings.voiceReplies) {
+                    SwitchRow(
+                        title = "ينطق أثناء الكتابة",
+                        subtitle = "يبدأ الكلام بعد أول جملة بدل انتظار الرد كاملًا",
+                        checked = settings.speakWhileTyping,
+                        onCheckedChange = { viewModel.setSpeakWhileTyping(it) },
+                    )
+
+                    SwitchRow(
+                        title = "محادثة متصلة",
+                        subtitle = "يعود للاستماع تلقائيًا بعد كل رد — بلا ضغط زر",
+                        checked = settings.continuousVoice,
+                        onCheckedChange = { viewModel.setContinuousVoice(it) },
+                    )
+                }
+
+                SettingRow(
+                    title = "لغة النطق والتعرّف",
+                    value = settings.voiceLanguage,
+                    subtitle = "تتبع اللهجة تلقائيًا. اللكنة تعتمد على أصوات جهازك المتاحة",
+                    icon = Icons.Filled.RecordVoiceOver,
+                    tint = Cyan,
+                ) { showDialectPicker = true }
             }
         }
 
@@ -491,6 +546,18 @@ fun SettingsScreen(
             label = { it.arabic },
             onDismiss = { showHighLatPicker = false },
             onSelect = { viewModel.setHighLatitudeRule(it) },
+        )
+    }
+
+    if (showDialectPicker) {
+        PickerDialog(
+            title = "لهجة المساعد",
+            options = Dialect.entries.toList(),
+            selected = settings.dialect,
+            label = { it.arabic },
+            description = { it.sample },
+            onDismiss = { showDialectPicker = false },
+            onSelect = { viewModel.setDialect(it) },
         )
     }
 

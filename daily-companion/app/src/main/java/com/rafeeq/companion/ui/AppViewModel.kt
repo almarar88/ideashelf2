@@ -24,6 +24,8 @@ import com.rafeeq.companion.data.WeatherBundle
 import com.rafeeq.companion.data.ToolRun
 import com.rafeeq.companion.data.ai.AgentRunner
 import com.rafeeq.companion.data.ai.Assistant
+import com.rafeeq.companion.data.ai.ImageInput
+import com.rafeeq.companion.data.ai.ServerTools
 import com.rafeeq.companion.data.ai.ClaudeClient
 import com.rafeeq.companion.data.ai.ControlPrompt
 import com.rafeeq.companion.data.control.ActionResult
@@ -64,6 +66,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.putJsonArray
 
 data class NewsState(
     val articles: List<Article> = emptyList(),
@@ -86,6 +91,8 @@ data class AiState(
     val briefLoading: Boolean = false,
     /** الأمر الجاري تنفيذه على الهاتف الآن، إن وُجد. */
     val runningTool: String? = null,
+    /** عبارة البحث الجارية في الإنترنت الآن، إن وُجدت. */
+    val searching: String? = null,
 )
 
 /** طلب تأكيد لأمر حسّاس قبل تنفيذه. */
@@ -510,6 +517,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun activeConversation(): Conversation? =
         conversations.value.firstOrNull { it.id == _activeConversationId.value }
 
+    /**
+     * أدوات هذا الطلب: أدوات الهاتف حسب الصلاحيات الممنوحة، مع أداة البحث
+     * التي تعمل على خادم Anthropic لا على الجهاز.
+     */
+    private fun buildTools(useTools: Boolean, s: AppSettings): JsonArray {
+        val phone = if (useTools) ToolCatalog.toJson(_capabilities.value) else JsonArray(emptyList())
+        if (!s.webSearch) return phone
+        return JsonArray(phone + ServerTools.webSearch(s.effectiveModel))
+    }
+
     /** يبني السياق الكامل الذي يعرفه المساعد عن يومك. */
     private fun assistantContext(): Assistant.Context {
         val s = settings.value
@@ -537,8 +554,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * [spoken] يعني أن الطلب جاء بالصوت، فيُقرأ الرد بصوت عالٍ ويُطلب من النموذج
      * أن يجعله قصيرًا صالحًا للنطق.
      */
-    fun sendMessage(text: String, spoken: Boolean = false) {
-        if (text.isBlank() || _ai.value.streaming) return
+    fun sendMessage(text: String, spoken: Boolean = false, image: android.net.Uri? = null) {
+        if ((text.isBlank() && image == null) || _ai.value.streaming) return
 
         val conversation = activeConversation() ?: newConversation()
         val userMessage = ChatMessage(role = "user", content = text.trim())
@@ -557,7 +574,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             _ai.value = _ai.value.copy(streaming = true, error = null, runningTool = null)
-            appendMessages(conversation.id, listOf(userMessage, placeholder))
+            val withImage = if (image == null) userMessage else userMessage.copy(
+                imagePath = ImageInput.store(getApplication(), image),
+            )
+            appendMessages(conversation.id, listOf(withImage, placeholder))
             refreshCapabilities()
 
             val useTools = s.controlEnabled
@@ -565,6 +585,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val system = Assistant.stableSystem(
                 persona = s.aiPersona,
                 control = if (useTools) ControlPrompt.instructions(spoken, missingCapabilityNames()) else "",
+                dialect = s.dialect,
+                webSearch = s.webSearch,
             )
             val history = buildApiHistory(conversation.id, Assistant.contextBlock(assistantContext()))
 
@@ -572,12 +594,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val runs = mutableListOf<ToolRun>()
             var failure: String? = null
 
+            // النطق أثناء الكتابة: يبدأ الصوت بعد أول جملة بدل انتظار الرد كاملًا.
+            val streamSpeech = spoken && s.voiceReplies && s.speakWhileTyping
+            if (streamSpeech) repos.voice.beginStreamSpeech(s.voiceLanguage)
+
             runCatching {
                 repos.agent.run(
                     model = s.effectiveModel,
                     system = system,
                     history = history,
-                    tools = if (useTools) ToolCatalog.toJson(_capabilities.value) else JsonArray(emptyList()),
+                    tools = buildTools(useTools, s),
                     effort = s.effectiveEffort,
                     specOf = { name -> ToolCatalog.byName(name) },
                     confirm = { call, spec -> requestConfirmation(call, spec, s.confirmSensitive) },
@@ -589,6 +615,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     when (event) {
                         is AgentRunner.Event.Text -> {
                             builder.append(event.delta)
+                            if (streamSpeech) repos.voice.pushStreamSpeech(event.delta)
                             updateAssistant(conversation.id, placeholder.id, builder.toString(), runs)
                         }
 
@@ -617,6 +644,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             updateAssistant(conversation.id, placeholder.id, builder.toString(), runs)
                         }
 
+                        is AgentRunner.Event.Searching -> {
+                            _ai.value = _ai.value.copy(searching = event.query)
+                            runs += ToolRun(
+                                name = "web_search",
+                                label = "🔎 بحث: ${event.query}",
+                                ok = true,
+                            )
+                            updateAssistant(conversation.id, placeholder.id, builder.toString(), runs)
+                        }
+
                         is AgentRunner.Event.Usage -> recordUsage(event)
 
                         is AgentRunner.Event.Failed -> failure = event.message
@@ -638,11 +675,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
 
-            _ai.value = _ai.value.copy(streaming = false, error = failure, runningTool = null)
+            _ai.value = _ai.value.copy(streaming = false, error = failure, runningTool = null, searching = null)
             maybeTitleConversation(conversation.id)
 
-            if (spoken && settings.value.voiceReplies && finalText.isNotBlank()) {
-                repos.voice.speak(finalText)
+            if (spoken && s.voiceReplies && finalText.isNotBlank()) {
+                if (streamSpeech) {
+                    repos.voice.endStreamSpeech { onSpokenReplyDone?.invoke() }
+                } else {
+                    repos.voice.speak(finalText, s.voiceLanguage) { onSpokenReplyDone?.invoke() }
+                }
+            } else if (streamSpeech) {
+                repos.voice.stopSpeaking()
             }
         }
     }
@@ -701,8 +744,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** يقرأ نصًا بصوت عالٍ (أو يوقف القراءة الجارية). */
     fun speak(text: String) {
         if (voice.state.value == VoiceEngine.State.SPEAKING) voice.stopSpeaking()
-        else voice.speak(text)
+        else voice.speak(text, settings.value.voiceLanguage)
     }
+
+    /**
+     * تُستدعى بعد أن ينتهي المساعد من نطق رده.
+     * الشاشة الصوتية تستخدمها لتعاود الاستماع فورًا فتصير المحادثة متصلة.
+     */
+    var onSpokenReplyDone: (() -> Unit)? = null
 
     /** يعرض حوار التأكيد وينتظر قرار المستخدم. */
     private suspend fun requestConfirmation(
@@ -735,26 +784,54 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * [contextBlock] يُرفق بآخر رسالة للمستخدم فقط — لا بتعليمات النظام —
      * حتى تبقى البادئة الثابتة صالحة للتخزين المؤقت.
      */
-    private fun buildApiHistory(
+    private suspend fun buildApiHistory(
         conversationId: String,
         contextBlock: String = "",
     ): MutableList<JsonObject> {
         val messages = conversations.value.firstOrNull { it.id == conversationId }?.messages.orEmpty()
-            .filter { it.content.isNotBlank() && !it.error }
+            .filter { (it.content.isNotBlank() || it.imagePath != null) && !it.error }
             .takeLast(16)
 
         val lastUserIndex = messages.indexOfLast { it.role == "user" }
+        // الصور القديمة تُسقَط من السجلّ: إعادة إرسالها في كل دور يضاعف الكلفة
+        // بلا فائدة، والمهم منها انتقل إلى النص أصلًا.
+        val keepImageAt = messages.indexOfLast { it.imagePath != null }
+            .takeIf { it >= 0 && it >= messages.size - 2 }
+
         return messages.mapIndexed { index, message ->
+            val text = if (index == lastUserIndex && contextBlock.isNotBlank()) {
+                contextBlock + "\n\n" + message.content
+            } else {
+                message.content
+            }
+            val image = if (index == keepImageAt) {
+                message.imagePath?.let { ImageInput.encode(it) }
+            } else null
+
             buildJsonObject {
                 put("role", message.role)
-                put(
-                    "content",
-                    if (index == lastUserIndex && contextBlock.isNotBlank()) {
-                        contextBlock + "\n\n" + message.content
-                    } else {
-                        message.content
-                    },
-                )
+                if (image == null) {
+                    put("content", text)
+                } else {
+                    putJsonArray("content") {
+                        add(
+                            buildJsonObject {
+                                put("type", "image")
+                                putJsonObject("source") {
+                                    put("type", "base64")
+                                    put("media_type", "image/jpeg")
+                                    put("data", image)
+                                }
+                            },
+                        )
+                        add(
+                            buildJsonObject {
+                                put("type", "text")
+                                put("text", text.ifBlank { "شنو في هذي الصورة؟" })
+                            },
+                        )
+                    }
+                }
             }
         }.toMutableList()
     }
@@ -785,7 +862,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         streamJob?.cancel()
         resolveConfirmation(false)
         repos.voice.stopSpeaking()
-        _ai.value = _ai.value.copy(streaming = false, runningTool = null)
+        _ai.value = _ai.value.copy(streaming = false, runningTool = null, searching = null)
     }
 
     private suspend fun appendMessages(conversationId: String, messages: List<ChatMessage>) {
@@ -920,6 +997,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setOnboarded(value: Boolean) = viewModelScope.launch { repos.settings.setOnboarded(value) }
     fun setUserName(value: String) = viewModelScope.launch { repos.settings.setUserName(value) }
+    fun setDialect(value: com.rafeeq.companion.data.ai.Dialect) = viewModelScope.launch {
+        repos.settings.setDialect(value)
+        // الصوت يُهيّأ باللغة الجديدة فورًا، وإلا بقي على اللهجة السابقة حتى إعادة التشغيل.
+        runCatching { repos.voice.prepareTts(value.bcp47) }
+    }
+
+    fun setWebSearch(value: Boolean) = viewModelScope.launch { repos.settings.setWebSearch(value) }
+    fun setContinuousVoice(value: Boolean) = viewModelScope.launch {
+        repos.settings.setContinuousVoice(value)
+    }
+    fun setSpeakWhileTyping(value: Boolean) = viewModelScope.launch {
+        repos.settings.setSpeakWhileTyping(value)
+    }
     fun setThemeMode(value: ThemeMode) = viewModelScope.launch { repos.settings.setThemeMode(value) }
     fun setDynamicColor(value: Boolean) = viewModelScope.launch { repos.settings.setDynamicColor(value) }
     fun setUse24h(value: Boolean) = viewModelScope.launch { repos.settings.setUse24h(value) }

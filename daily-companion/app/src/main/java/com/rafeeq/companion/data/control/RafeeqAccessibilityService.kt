@@ -151,6 +151,36 @@ class RafeeqAccessibilityService : AccessibilityService() {
         return tapAt(bounds.exactCenterX(), bounds.exactCenterY())
     }
 
+    /** هل يظهر هذا النص على الشاشة الآن؟ يُستعمل قبل الضغط وبعد التمرير. */
+    fun hasText(text: String): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val wanted = normalize(text)
+        return findNode(root) { normalize(labelOf(it)).contains(wanted) } != null
+    }
+
+    /** ضغطة مطوّلة على عنصر بنصّه — تفتح قوائم السياق. */
+    fun longPressText(text: String): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val wanted = normalize(text)
+        val target = findNode(root) { normalize(labelOf(it)).contains(wanted) } ?: return false
+
+        var node: AccessibilityNodeInfo? = target
+        var hops = 0
+        while (node != null && !node.isLongClickable && hops < 6) {
+            node = node.parent
+            hops++
+        }
+        if (node?.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK) == true) return true
+
+        // إن لم يقبل العنصر الضغط المطوّل المنطقي، نرسل إيماءة حقيقية بمدّة أطول.
+        val bounds = Rect().also { target.getBoundsInScreen(it) }
+        val path = Path().apply { moveTo(bounds.exactCenterX(), bounds.exactCenterY()) }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 700))
+            .build()
+        return dispatchGesture(gesture, null, null)
+    }
+
     fun tapAt(x: Float, y: Float): Boolean {
         val path = Path().apply { moveTo(x, y) }
         val gesture = GestureDescription.Builder()
@@ -236,6 +266,16 @@ class RafeeqAccessibilityService : AccessibilityService() {
         "home", "الرئيسية" -> performGlobalAction(GLOBAL_ACTION_HOME)
         "recents", "التطبيقات" -> performGlobalAction(GLOBAL_ACTION_RECENTS)
         "notifications", "الإشعارات" -> performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+        "power", "خيارات الطاقة" ->
+            performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
+        "quick_settings", "الإعدادات السريعة" ->
+            performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
+        "split", "تقسيم الشاشة" ->
+            performGlobalAction(GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN)
+        "dismiss", "إغلاق الشريط" ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
+            } else false
         "lock", "قفل" ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)

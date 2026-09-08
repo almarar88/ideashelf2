@@ -181,6 +181,8 @@ data class ChatMessage(
     val error: Boolean = false,
     /** الأوامر التي نفّذها المساعد ضمن هذا الرد. */
     val toolRuns: List<ToolRun> = emptyList(),
+    /** مسار صورة أرفقها المستخدم مع هذه الرسالة، إن وُجدت. */
+    val imagePath: String? = null,
 )
 
 @Serializable

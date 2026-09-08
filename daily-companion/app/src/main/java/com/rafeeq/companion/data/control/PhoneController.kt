@@ -80,6 +80,7 @@ class PhoneController(private val context: Context) {
         if (hasPermission(Manifest.permission.CALL_PHONE)) add(Capability.PHONE)
         if (hasPermission(Manifest.permission.SEND_SMS)) add(Capability.SMS)
         if (hasPermission(Manifest.permission.CAMERA)) add(Capability.CAMERA)
+        if (hasPermission(Manifest.permission.READ_CALL_LOG)) add(Capability.CALL_LOG)
         // الكشّاف يعمل غالبًا بلا إذن كاميرا على أغلب الأجهزة.
         add(Capability.CAMERA)
     }
@@ -133,6 +134,21 @@ class PhoneController(private val context: Context) {
                 "copy_to_clipboard" -> writeClipboard(input.str("text"))
                 "share_text" -> shareText(input.str("text"))
                 "take_screenshot" -> takeScreenshot()
+                "look_at_screen" -> lookAtScreen()
+                "set_do_not_disturb" -> setDoNotDisturb(input.str("mode"))
+                "set_auto_rotate" -> setAutoRotate(input.bool("on"))
+                "set_screen_timeout" -> setScreenTimeout(input.int("seconds"))
+                "now_playing" -> nowPlaying()
+                "open_panel" -> openPanel(input.str("panel"))
+                "app_info" -> appInfo(input.str("name"))
+                "uninstall_app" -> uninstallApp(input.str("name"))
+                "read_call_log" -> readCallLog(input.intOrNull("count") ?: 10)
+                "create_contact" -> createContact(input.str("name"), input.str("phone"))
+                "open_camera" -> openCamera(runCatching { input.bool("video") }.getOrDefault(false))
+                "scroll_to_text" -> scrollToText(
+                    input.str("text"), input.intOrNull("max_swipes") ?: 6,
+                )
+                "long_press" -> longPress(input.str("text"))
                 else -> ActionResult.fail("أمر غير مدعوم: $name")
             }
         }.getOrElse { error ->
@@ -802,6 +818,245 @@ class PhoneController(private val context: Context) {
             )
         }
         startActivity(intent)
+    }
+
+    // ------------------------------------------------ ٤ · رؤية وتحكّم أعمق
+
+    /**
+     * يعطي النموذج لقطة الشاشة ليراها بنفسه.
+     *
+     * قراءة شجرة العناصر (read_screen) تفشل في الألعاب والخرائط والصور وكل
+     * واجهة ترسم نفسها، وهناك تصبح الصورة هي الطريق الوحيد لفهم ما يراه المستخدم.
+     */
+    private suspend fun lookAtScreen(): ActionResult {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return ActionResult.fail("رؤية الشاشة تتطلّب أندرويد ١١ فأحدث.")
+        }
+        val svc = service() ?: return ActionResult.needsCapability(Capability.ACCESSIBILITY)
+        val bitmap = svc.captureScreen() ?: return ActionResult.fail("تعذّر التقاط الشاشة.")
+        val encoded = encodeForModel(bitmap)
+            ?: return ActionResult.fail("التُقطت الصورة لكن تعذّر تجهيزها.")
+        return ActionResult.image(
+            display = "👁️ نظرت إلى الشاشة",
+            detail = "هذه لقطة الشاشة الحالية. صِف ما يهمّ الطلب فقط.",
+            base64 = encoded,
+        )
+    }
+
+    /** يصغّر اللقطة ويحوّلها JPEG: الحجم الكامل يبطئ الطلب بلا فائدة. */
+    private fun encodeForModel(bitmap: android.graphics.Bitmap, maxSide: Int = 1280): String? =
+        runCatching {
+            val scale = maxSide.toFloat() / maxOf(bitmap.width, bitmap.height)
+            val scaled = if (scale < 1f) {
+                android.graphics.Bitmap.createScaledBitmap(
+                    bitmap,
+                    (bitmap.width * scale).toInt(),
+                    (bitmap.height * scale).toInt(),
+                    true,
+                )
+            } else bitmap
+            val out = java.io.ByteArrayOutputStream()
+            scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, out)
+            android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+        }.getOrNull()
+
+    private fun setDoNotDisturb(mode: String): ActionResult {
+        val manager = context.getSystemService(NotificationManager::class.java)
+            ?: return ActionResult.fail("تعذّر الوصول إلى الإشعارات.")
+        val filter = when (mode.lowercase(Locale.ROOT)) {
+            "on", "all", "تشغيل" -> NotificationManager.INTERRUPTION_FILTER_NONE
+            "priority", "مهم" -> NotificationManager.INTERRUPTION_FILTER_PRIORITY
+            "alarms" -> NotificationManager.INTERRUPTION_FILTER_ALARMS
+            else -> NotificationManager.INTERRUPTION_FILTER_ALL
+        }
+        return runCatching {
+            manager.setInterruptionFilter(filter)
+            ActionResult.ok(
+                when (filter) {
+                    NotificationManager.INTERRUPTION_FILTER_NONE -> "شغّلت عدم الإزعاج"
+                    NotificationManager.INTERRUPTION_FILTER_PRIORITY -> "عدم الإزعاج مع السماح بالمهم"
+                    NotificationManager.INTERRUPTION_FILTER_ALARMS -> "عدم الإزعاج مع السماح بالمنبّهات"
+                    else -> "أوقفت عدم الإزعاج"
+                },
+            )
+        }.getOrElse { ActionResult.fail("تعذّر تغيير وضع عدم الإزعاج: ${it.message}") }
+    }
+
+    private fun setAutoRotate(on: Boolean): ActionResult = runCatching {
+        Settings.System.putInt(
+            context.contentResolver,
+            Settings.System.ACCELEROMETER_ROTATION,
+            if (on) 1 else 0,
+        )
+        ActionResult.ok(if (on) "شغّلت الدوران التلقائي" else "أوقفت الدوران التلقائي")
+    }.getOrElse { ActionResult.fail("تعذّر تغيير الدوران: ${it.message}") }
+
+    private fun setScreenTimeout(seconds: Int): ActionResult = runCatching {
+        val value = seconds.coerceIn(15, 1800) * 1000
+        Settings.System.putInt(context.contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, value)
+        ActionResult.ok("ضبطت إطفاء الشاشة بعد ${value / 1000} ثانية")
+    }.getOrElse { ActionResult.fail("تعذّر ضبط مدة الشاشة: ${it.message}") }
+
+    /**
+     * ما يُشغَّل الآن. يقرأ جلسات الوسائط النشطة — وهي متاحة لنا لأننا
+     * مُصرّح لنا بقراءة الإشعارات، فلا نحتاج إذنًا إضافيًا.
+     */
+    private fun nowPlaying(): ActionResult = runCatching {
+        val manager = context.getSystemService(android.media.session.MediaSessionManager::class.java)
+            ?: return ActionResult.fail("تعذّر الوصول إلى جلسات الوسائط.")
+        val sessions = manager.getActiveSessions(
+            ComponentName(context, RafeeqNotificationListener::class.java),
+        )
+        if (sessions.isEmpty()) return ActionResult.ok("لا شيء يُشغَّل الآن.")
+
+        val lines = sessions.mapNotNull { session ->
+            val meta = session.metadata
+            val title = meta?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
+            val artist = meta?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST)
+                ?: meta?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
+            val playing = session.playbackState?.state ==
+                android.media.session.PlaybackState.STATE_PLAYING
+            val app = appLabel(session.packageName)
+            if (title.isNullOrBlank()) null
+            else buildString {
+                append(if (playing) "▶︎ " else "⏸ ")
+                append(title)
+                if (!artist.isNullOrBlank()) append(" — $artist")
+                append(" ($app)")
+            }
+        }
+        if (lines.isEmpty()) ActionResult.ok("لا شيء يُشغَّل الآن.")
+        else ActionResult.ok(lines.first(), lines.joinToString("\n"))
+    }.getOrElse { ActionResult.fail("تعذّرت قراءة ما يُشغَّل: ${it.message}") }
+
+    private fun appLabel(packageName: String): String = runCatching {
+        val pm = context.packageManager
+        pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
+    }.getOrDefault(packageName)
+
+    /**
+     * لوحات الإعدادات السريعة (أندرويد ١٠+): تظهر فوق التطبيق الحالي.
+     * هذه أقرب ما يمكن لتبديل الواي فاي والبيانات، وأندرويد يمنع تبديلها برمجيًا.
+     */
+    private fun openPanel(panel: String): ActionResult {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return openSettings(panel)
+        }
+        val action = when (panel.lowercase(Locale.ROOT)) {
+            "wifi", "واي فاي" -> Settings.Panel.ACTION_WIFI
+            "volume", "صوت" -> Settings.Panel.ACTION_VOLUME
+            "nfc" -> Settings.Panel.ACTION_NFC
+            else -> Settings.Panel.ACTION_INTERNET_CONNECTIVITY
+        }
+        return if (startActivity(Intent(action))) {
+            ActionResult.ok("فتحت لوحة ${panelLabel(panel)} — بدّلها بضغطة")
+        } else {
+            openSettings(panel)
+        }
+    }
+
+    private fun panelLabel(panel: String): String = when (panel.lowercase(Locale.ROOT)) {
+        "wifi" -> "الواي فاي"
+        "volume" -> "الصوت"
+        "nfc" -> "NFC"
+        else -> "الإنترنت"
+    }
+
+    private fun appInfo(name: String): ActionResult {
+        val pkg = resolveApp(name)?.packageName
+            ?: return ActionResult.fail("لم أجد تطبيقًا باسم «$name».")
+        val opened = startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg")),
+        )
+        return if (opened) ActionResult.ok("فتحت معلومات ${appLabel(pkg)}")
+        else ActionResult.fail("تعذّر فتح معلومات التطبيق.")
+    }
+
+    private fun uninstallApp(name: String): ActionResult {
+        val pkg = resolveApp(name)?.packageName
+            ?: return ActionResult.fail("لم أجد تطبيقًا باسم «$name».")
+        if (pkg == context.packageName) {
+            return ActionResult.fail("لن أحذف نفسي. احذف التطبيق يدويًا إن أردت.")
+        }
+        val opened = startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg")))
+        return if (opened) {
+            ActionResult.ok("طلبت حذف ${appLabel(pkg)} — أكّد من الشاشة")
+        } else ActionResult.fail("تعذّر بدء الحذف.")
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun readCallLog(count: Int): ActionResult = runCatching {
+        val projection = arrayOf(
+            android.provider.CallLog.Calls.CACHED_NAME,
+            android.provider.CallLog.Calls.NUMBER,
+            android.provider.CallLog.Calls.TYPE,
+            android.provider.CallLog.Calls.DATE,
+            android.provider.CallLog.Calls.DURATION,
+        )
+        val rows = mutableListOf<String>()
+        context.contentResolver.query(
+            android.provider.CallLog.Calls.CONTENT_URI,
+            projection, null, null,
+            "${android.provider.CallLog.Calls.DATE} DESC",
+        )?.use { cursor ->
+            val limit = count.coerceIn(1, 30)
+            while (cursor.moveToNext() && rows.size < limit) {
+                val who = cursor.getString(0)?.takeIf { it.isNotBlank() } ?: cursor.getString(1)
+                val kind = when (cursor.getInt(2)) {
+                    android.provider.CallLog.Calls.INCOMING_TYPE -> "واردة"
+                    android.provider.CallLog.Calls.OUTGOING_TYPE -> "صادرة"
+                    android.provider.CallLog.Calls.MISSED_TYPE -> "فائتة"
+                    else -> "أخرى"
+                }
+                val at = LocalDateTime.ofInstant(
+                    java.time.Instant.ofEpochMilli(cursor.getLong(3)),
+                    ZoneId.systemDefault(),
+                ).format(DateTimeFormatter.ofPattern("MM-dd HH:mm"))
+                val seconds = cursor.getLong(4)
+                rows += "$kind · $who · $at" + if (seconds > 0) " · ${seconds / 60}د" else ""
+            }
+        }
+        if (rows.isEmpty()) ActionResult.ok("سجلّ المكالمات فارغ.")
+        else ActionResult.ok("قرأت ${rows.size} مكالمة", rows.joinToString("\n"))
+    }.getOrElse { ActionResult.fail("تعذّرت قراءة سجلّ المكالمات: ${it.message}") }
+
+    private fun createContact(name: String, phone: String): ActionResult {
+        val intent = Intent(Intent.ACTION_INSERT).apply {
+            type = ContactsContract.Contacts.CONTENT_TYPE
+            putExtra(ContactsContract.Intents.Insert.NAME, name)
+            putExtra(ContactsContract.Intents.Insert.PHONE, phone)
+        }
+        return if (startActivity(intent)) ActionResult.ok("فتحت إضافة «$name» — احفظه")
+        else ActionResult.fail("تعذّر فتح إضافة جهة الاتصال.")
+    }
+
+    private fun openCamera(video: Boolean): ActionResult {
+        val action = if (video) MediaStore.INTENT_ACTION_VIDEO_CAMERA
+        else MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA
+        return if (startActivity(Intent(action))) {
+            ActionResult.ok(if (video) "فتحت كاميرا الفيديو" else "فتحت الكاميرا")
+        } else ActionResult.fail("تعذّر فتح الكاميرا.")
+    }
+
+    private suspend fun scrollToText(text: String, maxSwipes: Int): ActionResult {
+        val svc = service() ?: return ActionResult.needsCapability(Capability.ACCESSIBILITY)
+        repeat(maxSwipes.coerceIn(1, 12)) { attempt ->
+            if (svc.hasText(text)) {
+                return ActionResult.ok("وجدت «$text» بعد $attempt تمريرة")
+            }
+            svc.swipe("up")
+            delay(600)
+        }
+        return if (svc.hasText(text)) ActionResult.ok("وجدت «$text»")
+        else ActionResult.fail("لم أجد «$text» بعد $maxSwipes تمريرات.")
+    }
+
+    private suspend fun longPress(text: String): ActionResult {
+        val svc = service() ?: return ActionResult.needsCapability(Capability.ACCESSIBILITY)
+        val done = svc.longPressText(text)
+        delay(500)
+        return if (done) ActionResult.ok("ضغطت مطوّلًا على «$text»")
+        else ActionResult.fail("لم أجد «$text» على الشاشة.")
     }
 
     /** يفتح شاشة اختيار تطبيق المساعد الافتراضي. */

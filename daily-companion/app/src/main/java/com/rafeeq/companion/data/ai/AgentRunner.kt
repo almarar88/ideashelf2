@@ -45,6 +45,9 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
         /** المستخدم رفض تنفيذ أمر حسّاس. */
         data class ToolDenied(val call: ToolCall) : Event
 
+        /** النموذج يبحث في الإنترنت الآن. */
+        data class Searching(val query: String) : Event
+
         /** تقدير استهلاك الرموز لهذه الجولة — يُقرأ من ردّ الواجهة. */
         data class Usage(val input: Long, val output: Long, val cached: Long) : Event
 
@@ -57,6 +60,8 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
     internal data class Turn(
         val text: String,
         val toolCalls: List<ToolCall>,
+        /** كتل الرد كما وصلت — تُعاد للنموذج حرفيًا ليكمل من حيث وقف. */
+        val content: List<JsonObject>,
         val stopReason: String?,
         val refusal: String?,
         val inputTokens: Long = 0,
@@ -88,9 +93,15 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
             turns++
 
             val turn = try {
-                streamTurn(model, system, history, tools, effort) { delta ->
-                    emit(Event.Text(delta))
-                }
+                streamTurn(
+                    model = model,
+                    system = system,
+                    history = history,
+                    tools = tools,
+                    effort = effort,
+                    onDelta = { emit(Event.Text(it)) },
+                    onSearch = { emit(Event.Searching(it)) },
+                )
             } catch (error: Throwable) {
                 emit(Event.Failed(error.friendlyMessage()))
                 return
@@ -105,10 +116,13 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
                 return
             }
 
-            // نُعيد رد النموذج كاملًا إلى السجلّ (النص + طلبات الأدوات).
+            // نُعيد رد النموذج كاملًا إلى السجلّ (النص + طلبات الأدوات + كتل الخادم).
             history += buildAssistantMessage(turn)
 
             if (turn.toolCalls.isEmpty()) {
+                // أدوات الخادم (البحث) لها حدّ دورات داخلي؛ عند بلوغه يطلب الخادم
+                // متابعة بلا رسالة جديدة منّا — إرسال «أكمل» هنا يفسد الاستئناف.
+                if (turn.stopReason == "pause_turn") continue
                 emit(Event.Completed)
                 return
             }
@@ -143,6 +157,11 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
     internal fun buildAssistantMessage(turn: Turn): JsonObject = buildJsonObject {
         put("role", "assistant")
         putJsonArray("content") {
+            if (turn.content.isNotEmpty()) {
+                turn.content.forEach { add(it) }
+                return@putJsonArray
+            }
+            // مسار احتياطي حين لا تُلتقط الكتل الخام (رد نصّي بحت).
             if (turn.text.isNotBlank()) {
                 add(
                     buildJsonObject {
@@ -174,7 +193,30 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
                     buildJsonObject {
                         put("type", "tool_result")
                         put("tool_use_id", call.id)
-                        put("content", result.detail)
+                        val image = result.imageBase64
+                        if (image != null) {
+                            // نتيجة مصوّرة: نص قصير يشرح السياق ثم الصورة نفسها.
+                            putJsonArray("content") {
+                                add(
+                                    buildJsonObject {
+                                        put("type", "text")
+                                        put("text", result.detail)
+                                    },
+                                )
+                                add(
+                                    buildJsonObject {
+                                        put("type", "image")
+                                        putJsonObject("source") {
+                                            put("type", "base64")
+                                            put("media_type", "image/jpeg")
+                                            put("data", image)
+                                        }
+                                    },
+                                )
+                            }
+                        } else {
+                            put("content", result.detail)
+                        }
                         if (!result.ok) put("is_error", true)
                     },
                 )
@@ -191,6 +233,7 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
         tools: JsonArray,
         effort: String,
         onDelta: suspend (String) -> Unit,
+        onSearch: suspend (String) -> Unit = {},
     ): Turn = withContext(Dispatchers.IO) {
         val payload = buildJsonObject {
             put("model", model)
@@ -232,8 +275,8 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
 
             val text = StringBuilder()
             val toolCalls = mutableListOf<ToolCall>()
-            // كل كتلة محتوى لها فهرس، ونجمّع مدخلات الأداة على دفعات نصية.
-            val pendingTools = mutableMapOf<Int, PendingTool>()
+            // كل كتلة محتوى لها فهرس؛ نبنيها بالترتيب لنُعيدها للنموذج كما هي.
+            val blocks = sortedMapOf<Int, BlockBuilder>()
             var stopReason: String? = null
             var refusal: String? = null
             var currentEvent = ""
@@ -264,12 +307,7 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
                             "content_block_start" -> {
                                 val index = obj.int("index") ?: continue
                                 val block = obj["content_block"]?.jsonObject ?: continue
-                                if (block.string("type") == "tool_use") {
-                                    pendingTools[index] = PendingTool(
-                                        id = block.string("id").orEmpty(),
-                                        name = block.string("name").orEmpty(),
-                                    )
-                                }
+                                blocks[index] = BlockBuilder(block)
                             }
 
                             "content_block_delta" -> {
@@ -278,23 +316,32 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
                                 when (delta.string("type")) {
                                     "text_delta" -> delta.string("text")?.let {
                                         text.append(it)
+                                        blocks[index]?.text?.append(it)
                                         onDelta(it)
                                     }
                                     "input_json_delta" -> delta.string("partial_json")?.let {
-                                        pendingTools[index]?.json?.append(it)
+                                        blocks[index]?.json?.append(it)
                                     }
                                 }
                             }
 
                             "content_block_stop" -> {
                                 val index = obj.int("index") ?: continue
-                                pendingTools.remove(index)?.let { pending ->
-                                    val input = runCatching {
-                                        Net.json.parseToJsonElement(
-                                            pending.json.toString().ifBlank { "{}" },
-                                        ).jsonObject
-                                    }.getOrDefault(JsonObject(emptyMap()))
-                                    toolCalls += ToolCall(pending.id, pending.name, input)
+                                val builder = blocks[index] ?: continue
+                                builder.done = true
+                                when (builder.type) {
+                                    "tool_use" -> toolCalls += ToolCall(
+                                        id = builder.id,
+                                        name = builder.name,
+                                        input = builder.parsedInput(),
+                                    )
+                                    // بحث الخادم لا ينتظر منّا شيئًا، لكن إظهاره
+                                    // للمستخدم يشرح سبب التأخير بدل صمت غامض.
+                                    "server_tool_use" -> if (builder.name == ServerTools.WEB_SEARCH) {
+                                        onSearch(
+                                            builder.parsedInput().string("query").orEmpty(),
+                                        )
+                                    }
                                 }
                             }
 
@@ -325,6 +372,7 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
             Turn(
                 text = text.toString(),
                 toolCalls = toolCalls,
+                content = blocks.values.mapNotNull { it.build() },
                 stopReason = stopReason,
                 refusal = refusal,
                 inputTokens = inputTokens,
@@ -334,8 +382,49 @@ class AgentRunner(private val apiKeyProvider: () -> String) {
         }
     }
 
-    private class PendingTool(val id: String, val name: String) {
+    /**
+     * يجمع كتلة محتوى واحدة من أحداث البثّ.
+     *
+     * نُسقط كتل التفكير عمدًا: نصّها يصل فارغًا افتراضيًا، وإعادة كتلة فارغة
+     * إلى الواجهة ترفضها. غيرها يُعاد حرفيًا.
+     */
+    private class BlockBuilder(val start: JsonObject) {
+        val text = StringBuilder()
         val json = StringBuilder()
+        var done = false
+
+        val type: String = runCatching {
+            start["type"]?.jsonPrimitive?.content
+        }.getOrNull().orEmpty()
+
+        val id: String = runCatching {
+            start["id"]?.jsonPrimitive?.content
+        }.getOrNull().orEmpty()
+
+        val name: String = runCatching {
+            start["name"]?.jsonPrimitive?.content
+        }.getOrNull().orEmpty()
+
+        fun parsedInput(): JsonObject = runCatching {
+            Net.json.parseToJsonElement(json.toString().ifBlank { "{}" }).jsonObject
+        }.getOrDefault(JsonObject(emptyMap()))
+
+        fun build(): JsonObject? = when {
+            !done -> null
+            type == "thinking" || type == "redacted_thinking" -> null
+            type == "text" -> buildJsonObject {
+                put("type", "text")
+                put("text", text.toString())
+            }.takeIf { text.isNotBlank() }
+            type == "tool_use" || type == "server_tool_use" -> buildJsonObject {
+                put("type", type)
+                put("id", id)
+                put("name", name)
+                put("input", parsedInput())
+            }
+            type in ServerTools.serverResultBlocks -> start
+            else -> null
+        }
     }
 
     private fun JsonObject.string(key: String): String? = runCatching {

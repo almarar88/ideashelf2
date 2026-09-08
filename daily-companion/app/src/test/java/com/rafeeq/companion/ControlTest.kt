@@ -123,6 +123,7 @@ class ControlTest {
                     input = buildJsonObject { put("name", "واتساب") },
                 ),
             ),
+            content = emptyList(),
             stopReason = "tool_use",
             refusal = null,
         )
@@ -151,6 +152,7 @@ class ControlTest {
             toolCalls = listOf(
                 AgentRunner.ToolCall("toolu_2", "device_status", JsonObject(emptyMap())),
             ),
+            content = emptyList(),
             stopReason = "tool_use",
             refusal = null,
         )

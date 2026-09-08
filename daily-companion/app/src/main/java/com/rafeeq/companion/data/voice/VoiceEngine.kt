@@ -54,7 +54,7 @@ class VoiceEngine(private val context: Context) {
     // ------------------------------------------------------------ الاستماع
 
     fun startListening(
-        languageTag: String = "ar-SA",
+        languageTag: String = "ar-AE",
         onResult: (String) -> Unit,
         onFailure: (String) -> Unit,
     ) {
@@ -85,9 +85,17 @@ class VoiceEngine(private val context: Context) {
                 arrayListOf(languageTag, "en-US"),
             )
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1200L)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            // النموذج المحلي يتعثّر في اللهجات؛ نفضّل التعرّف المتصل حين يتوفّر.
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+            // صمت أطول قبل القطع: الجملة العربية المحكية تتخللها وقفات،
+            // والقطع المبكر كان يبتر نصف الأمر.
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
+            putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                1200L,
+            )
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1500L)
         }
 
         runCatching {
@@ -174,23 +182,75 @@ class VoiceEngine(private val context: Context) {
 
     // ------------------------------------------------------------ النطق
 
-    fun prepareTts(onReady: (Boolean) -> Unit = {}) {
-        if (ttsReady) { onReady(true); return }
+    /**
+     * يهيّئ النطق بلغة محدّدة.
+     *
+     * ملاحظة صادقة: محرّكات أندرويد العربية لا تملك صوتًا إماراتيًا مستقلًا
+     * في الغالب. نطلب ar-AE فإن لم يوجد ننزل إلى ar-SA ثم ar. اللهجة تظهر
+     * في **الكلمات** التي يكتبها المساعد، أما اللكنة فتبقى تابعة لمحرّك الجهاز.
+     */
+    fun prepareTts(languageTag: String = "ar-AE", onReady: (Boolean) -> Unit = {}) {
+        if (ttsReady) {
+            applyLanguage(languageTag)
+            onReady(true)
+            return
+        }
         tts = TextToSpeech(context) { status ->
             ttsReady = status == TextToSpeech.SUCCESS
             if (ttsReady) {
-                val result = runCatching {
-                    tts?.setLanguage(Locale("ar"))
-                }.getOrNull()
-                arabicAvailable = result != TextToSpeech.LANG_MISSING_DATA &&
-                    result != TextToSpeech.LANG_NOT_SUPPORTED
-                if (!arabicAvailable) runCatching { tts?.setLanguage(Locale.getDefault()) }
-                tts?.setSpeechRate(1.0f)
+                applyLanguage(languageTag)
+                tts?.setSpeechRate(speechRate)
                 tts?.setPitch(1.0f)
                 tts?.setOnUtteranceProgressListener(utteranceListener)
             }
             onReady(ttsReady)
         }
+    }
+
+    /** سرعة القراءة — أسرع قليلًا من الافتراضي يجعل الرد يبدو أرشق. */
+    var speechRate: Float = 1.05f
+        set(value) {
+            field = value.coerceIn(0.6f, 1.8f)
+            runCatching { tts?.setSpeechRate(field) }
+        }
+
+    private fun applyLanguage(languageTag: String) {
+        val engine = tts ?: return
+        val candidates = candidateLocales(languageTag)
+        var chosen: Locale? = null
+        for (locale in candidates) {
+            val result = runCatching { engine.setLanguage(locale) }.getOrNull() ?: continue
+            if (result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED) {
+                chosen = locale
+                break
+            }
+        }
+        arabicAvailable = chosen != null
+        if (chosen == null) {
+            runCatching { engine.setLanguage(Locale.getDefault()) }
+            return
+        }
+        // من بين أصوات نفس اللغة نختار الأعلى جودة وغير المحدود بالشبكة.
+        runCatching {
+            engine.voices
+                ?.filter { it.locale.language == chosen.language && !it.isNetworkConnectionRequired }
+                ?.maxByOrNull { voice ->
+                    val exact = if (voice.locale.country == chosen.country) 1000 else 0
+                    exact + voice.quality
+                }
+                ?.let { engine.voice = it }
+        }
+    }
+
+    /** ar-AE ← ar-SA ← ar: أول لغة متاحة تفوز. */
+    private fun candidateLocales(tag: String): List<Locale> {
+        val requested = runCatching { Locale.forLanguageTag(tag) }.getOrNull()
+        return listOfNotNull(
+            requested,
+            Locale("ar", "AE"),
+            Locale("ar", "SA"),
+            Locale("ar"),
+        ).distinctBy { it.toLanguageTag() }
     }
 
     private val utteranceListener = object : UtteranceProgressListener() {
@@ -199,40 +259,114 @@ class VoiceEngine(private val context: Context) {
         }
 
         override fun onDone(utteranceId: String?) {
-            _state.value = State.IDLE
-            onDoneSpeaking?.invoke()
+            // في النطق المتدفّق تتوالى عدة نطقات؛ الأخيرة وحدها تُنهي الدور.
+            if (utteranceId?.startsWith(FINAL_PREFIX) != false) {
+                _state.value = State.IDLE
+                onDoneSpeaking?.invoke()
+                onDoneSpeaking = null
+            }
         }
 
         @Deprecated("Deprecated in Java")
         override fun onError(utteranceId: String?) {
             _state.value = State.IDLE
             onDoneSpeaking?.invoke()
+            onDoneSpeaking = null
         }
+    }
+
+    // -------------------------------------------------- النطق المتدفّق
+
+    private val streamBuffer = StringBuilder()
+    private var streamStarted = false
+
+    /**
+     * يبدأ نطقًا متدفّقًا: يُقرأ الرد جملةً جملةً أثناء وصوله بدل انتظار اكتماله.
+     *
+     * هذا هو الفارق الأوضح في الإحساس بالسرعة — الانتظار حتى آخر حرف قبل
+     * بدء الكلام يجعل ردًا من ثلاث جمل يبدو أبطأ بثلاث مرات مما هو عليه.
+     */
+    fun beginStreamSpeech(languageTag: String = "ar-AE") {
+        streamBuffer.setLength(0)
+        streamStarted = false
+        onDoneSpeaking = null
+        runCatching { tts?.stop() }
+        prepareTts(languageTag)
+    }
+
+    /** يضيف جزءًا جديدًا من الرد، وينطق ما اكتمل منه من جمل. */
+    fun pushStreamSpeech(delta: String) {
+        streamBuffer.append(delta)
+        while (true) {
+            val cut = sentenceEnd(streamBuffer) ?: break
+            val sentence = streamBuffer.substring(0, cut)
+            streamBuffer.delete(0, cut)
+            enqueueChunk(sentence, final = false)
+        }
+    }
+
+    /** ينطق ما تبقّى ويستدعي [onDone] بعد آخر كلمة. */
+    fun endStreamSpeech(onDone: (() -> Unit)? = null) {
+        onDoneSpeaking = onDone
+        val rest = streamBuffer.toString()
+        streamBuffer.setLength(0)
+        if (!enqueueChunk(rest, final = true) && !streamStarted) {
+            // لا شيء يُنطق أصلًا.
+            onDoneSpeaking = null
+            onDone?.invoke()
+        }
+    }
+
+    /** يُرجع موضع نهاية أول جملة مكتملة، أو null إن لم تكتمل بعد. */
+    private fun sentenceEnd(text: CharSequence): Int? {
+        val minimum = 18
+        for (i in text.indices) {
+            if (i + 1 < minimum) continue
+            val c = text[i]
+            if (c == '.' || c == '؟' || c == '?' || c == '!' || c == '\n' || c == '؛') {
+                return i + 1
+            }
+        }
+        // جملة طويلة بلا علامة ترقيم: نقطعها عند فاصلة بعد طول معقول
+        // حتى لا يبقى المستخدم في صمت.
+        if (text.length > 160) {
+            val comma = text.indexOf('،', 60)
+            if (comma in 60..159) return comma + 1
+        }
+        return null
+    }
+
+    private fun enqueueChunk(raw: String, final: Boolean): Boolean {
+        val clean = stripForSpeech(raw)
+        if (clean.isBlank()) return false
+        val id = (if (final) FINAL_PREFIX else "part-") + System.nanoTime()
+        val mode = if (streamStarted) TextToSpeech.QUEUE_ADD else TextToSpeech.QUEUE_FLUSH
+        streamStarted = true
+        runCatching { tts?.speak(clean, mode, null, id) }
+        return true
     }
 
     /** يقرأ النص بصوت عالٍ. [onDone] تُستدعى عند الانتهاء. */
-    fun speak(text: String, onDone: (() -> Unit)? = null) {
+    fun speak(text: String, languageTag: String = "ar-AE", onDone: (() -> Unit)? = null) {
         val clean = stripForSpeech(text)
         if (clean.isBlank()) { onDone?.invoke(); return }
         onDoneSpeaking = onDone
+        streamStarted = false
 
         if (!ttsReady) {
-            prepareTts { ready ->
-                if (ready) enqueue(clean) else onDone?.invoke()
+            prepareTts(languageTag) { ready ->
+                if (ready) enqueueChunk(clean, final = true) else onDone?.invoke()
             }
         } else {
-            enqueue(clean)
+            enqueueChunk(clean, final = true)
         }
-    }
-
-    private fun enqueue(text: String) {
-        runCatching {
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "rafeeq-${System.nanoTime()}")
-        }.onFailure { onDoneSpeaking?.invoke() }
     }
 
     fun stopSpeaking() {
         runCatching { tts?.stop() }
+        streamBuffer.setLength(0)
+        streamStarted = false
+        onDoneSpeaking = null
         if (_state.value == State.SPEAKING) _state.value = State.IDLE
     }
 
@@ -243,6 +377,8 @@ class VoiceEngine(private val context: Context) {
     internal fun stripForSpeech(text: String): String = Companion.stripForSpeech(text)
 
     companion object {
+        private const val FINAL_PREFIX = "final-"
+
         internal fun stripForSpeech(text: String): String = text
         .replace(Regex("```[\\s\\S]*?```"), " ")
         .replace(Regex("`([^`]*)`"), "$1")

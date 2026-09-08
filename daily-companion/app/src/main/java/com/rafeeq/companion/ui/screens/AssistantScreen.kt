@@ -25,10 +25,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
@@ -37,6 +40,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -72,6 +77,10 @@ import com.rafeeq.companion.ui.components.EmptyState
 import com.rafeeq.companion.ui.components.ErrorBanner
 import com.rafeeq.companion.ui.components.GradientCard
 import com.rafeeq.companion.ui.components.PrimaryButton
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import coil3.compose.AsyncImage
 import com.rafeeq.companion.ui.components.RichText
 import com.rafeeq.companion.ui.theme.Gradients
 
@@ -97,8 +106,33 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
     }
 
     val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     var input by remember { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
+
+    // ---- إرفاق صورة: «شوف هذي» بدل وصفها بالكلام
+    var attachment by remember { mutableStateOf<android.net.Uri?>(null) }
+    var showAttachMenu by remember { mutableStateOf(false) }
+    var pendingCapture by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    val pickImage = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent(),
+    ) { uri -> if (uri != null) attachment = uri }
+
+    val takePhoto = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture(),
+    ) { saved -> if (saved) attachment = pendingCapture }
+
+    val cameraPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            pendingCapture = newCaptureUri(context)
+            pendingCapture?.let { takePhoto.launch(it) }
+        } else {
+            viewModel.showMessage("أحتاج إذن الكاميرا لألتقط الصورة.")
+        }
+    }
     val listState = rememberLazyListState()
 
     val voiceState by viewModel.voice.state.collectAsState()
@@ -203,7 +237,9 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                             onRegenerate = { viewModel.regenerateLast() },
                         )
                     }
-                    if (ai.streaming && messages.lastOrNull()?.content.isNullOrBlank()) {
+                    if (ai.streaming &&
+                        (messages.lastOrNull()?.content.isNullOrBlank() || ai.searching != null)
+                    ) {
                         item { TypingIndicator(ai) }
                     }
                 }
@@ -257,6 +293,31 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
             }
         }
 
+        // ------------------------------------------------ الصورة المرفقة
+        attachment?.let { uri ->
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AsyncImage(
+                    model = uri,
+                    contentDescription = "الصورة المرفقة",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(54.dp).clip(RoundedCornerShape(12.dp)),
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "صورة مرفقة — اكتب سؤالك عنها",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = { attachment = null }) {
+                    Icon(Icons.Filled.Close, contentDescription = "إزالة الصورة")
+                }
+            }
+        }
+
         // ------------------------------------------------ حقل الإدخال
         Row(
             modifier = Modifier
@@ -264,6 +325,40 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
+            Box {
+                IconButton(
+                    onClick = { showAttachMenu = true },
+                    modifier = Modifier.size(44.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.AddAPhoto,
+                        contentDescription = "إرفاق صورة",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                DropdownMenu(
+                    expanded = showAttachMenu,
+                    onDismissRequest = { showAttachMenu = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("من المعرض") },
+                        leadingIcon = { Icon(Icons.Filled.PhotoLibrary, null) },
+                        onClick = {
+                            showAttachMenu = false
+                            pickImage.launch("image/*")
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("التقاط صورة") },
+                        leadingIcon = { Icon(Icons.Filled.AddAPhoto, null) },
+                        onClick = {
+                            showAttachMenu = false
+                            cameraPermission.launch(Manifest.permission.CAMERA)
+                        },
+                    )
+                }
+            }
             Box(
                 modifier = Modifier
                     .size(52.dp)
@@ -307,7 +402,7 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                     .clip(CircleShape)
                     .background(
                         if (ai.streaming) Brush.linearGradient(Gradients.Ember)
-                        else if (input.isBlank()) Brush.linearGradient(
+                        else if (input.isBlank() && attachment == null) Brush.linearGradient(
                             listOf(
                                 MaterialTheme.colorScheme.surfaceContainerHighest,
                                 MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -315,12 +410,13 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                         )
                         else Brush.linearGradient(Gradients.Aurora),
                     )
-                    .clickable(enabled = ai.streaming || input.isNotBlank()) {
+                    .clickable(enabled = ai.streaming || input.isNotBlank() || attachment != null) {
                         if (ai.streaming) {
                             viewModel.stopStreaming()
                         } else {
-                            viewModel.sendMessage(input)
+                            viewModel.sendMessage(input, image = attachment)
                             input = ""
+                            attachment = null
                         }
                     },
                 contentAlignment = Alignment.Center,
@@ -328,7 +424,7 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                 Icon(
                     if (ai.streaming) Icons.Filled.Stop else Icons.Filled.Send,
                     contentDescription = if (ai.streaming) "إيقاف" else "إرسال",
-                    tint = if (input.isBlank() && !ai.streaming)
+                    tint = if (input.isBlank() && attachment == null && !ai.streaming)
                         MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF06121F),
                     modifier = Modifier.size(21.dp),
                 )
@@ -444,18 +540,34 @@ private fun MessageBubble(
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
     ) {
         if (isUser) {
-            Box(
-                modifier = Modifier
-                    .widthIn(max = 300.dp)
-                    .clip(RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp))
-                    .background(Brush.linearGradient(Gradients.Aurora))
-                    .padding(horizontal = 15.dp, vertical = 11.dp),
-            ) {
-                Text(
-                    message.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF06121F),
-                )
+            Column(horizontalAlignment = Alignment.End) {
+                message.imagePath?.let { path ->
+                    AsyncImage(
+                        model = java.io.File(path),
+                        contentDescription = "صورة أرسلتها",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .widthIn(max = 220.dp)
+                            .height(160.dp)
+                            .clip(RoundedCornerShape(18.dp)),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
+                if (message.content.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .widthIn(max = 300.dp)
+                            .clip(RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp))
+                            .background(Brush.linearGradient(Gradients.Aurora))
+                            .padding(horizontal = 15.dp, vertical = 11.dp),
+                    ) {
+                        Text(
+                            message.content,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF06121F),
+                        )
+                    }
+                }
             }
         } else {
             Column(horizontalAlignment = Alignment.Start) {
@@ -541,7 +653,11 @@ private fun TypingIndicator(ai: com.rafeeq.companion.ui.AiState) {
                 CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(9.dp))
                 Text(
-                    ai.runningTool?.let { "أنفّذ الأمر…" } ?: "يفكّر…",
+                    when {
+                        ai.searching != null -> "أبحث في الإنترنت…"
+                        ai.runningTool != null -> "أنفّذ الأمر…"
+                        else -> "يفكّر…"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -549,3 +665,10 @@ private fun TypingIndicator(ai: com.rafeeq.companion.ui.AiState) {
         }
     }
 }
+
+/** ملف مؤقت في ذاكرة التطبيق تكتب فيه الكاميرا الصورة الملتقطة. */
+private fun newCaptureUri(context: android.content.Context): android.net.Uri? = runCatching {
+    val dir = java.io.File(context.cacheDir, "captures").apply { mkdirs() }
+    val file = java.io.File(dir, "cap_${System.currentTimeMillis()}.jpg")
+    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+}.getOrNull()

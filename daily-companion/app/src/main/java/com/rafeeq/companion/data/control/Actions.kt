@@ -27,6 +27,7 @@ enum class Capability(val arabic: String, val why: String) {
     PHONE("الاتصال", "لإجراء المكالمات مباشرة"),
     SMS("الرسائل", "لإرسال وقراءة الرسائل النصية"),
     CAMERA("الكاميرا", "لتشغيل الكشّاف"),
+    CALL_LOG("سجلّ المكالمات", "ليخبرك من اتصل بك ومتى"),
 }
 
 /** نتيجة تنفيذ أمر واحد. */
@@ -36,9 +37,19 @@ data class ActionResult(
     val display: String,
     /** ما يُعاد إلى النموذج — قد يكون أطول وأكثر تفصيلًا. */
     val detail: String = display,
+    /**
+     * صورة تُرفق بنتيجة الأداة (JPEG بترميز base64).
+     *
+     * الواجهة تقبل الصور داخل نتيجة الأداة، وهذا ما يجعل «شوف الشاشة»
+     * ممكنًا: النموذج يرى اللقطة فعلًا بدل أن يقرأ شجرة عناصر ناقصة.
+     */
+    val imageBase64: String? = null,
 ) {
     companion object {
         fun ok(display: String, detail: String = display) = ActionResult(true, display, detail)
+
+        fun image(display: String, detail: String, base64: String) =
+            ActionResult(true, display, detail, base64)
         fun fail(reason: String) = ActionResult(false, reason, reason)
         fun needsCapability(capability: Capability) = ActionResult(
             false,
@@ -358,10 +369,14 @@ object ToolCatalog {
 
     val pressKey = ToolSpec(
         name = "press",
-        description = "يضغط أزرار النظام: الرجوع، الرئيسية، التطبيقات الأخيرة، " +
-            "شريط الإشعارات، أو قفل الشاشة.",
+        description = "يضغط أزرار النظام: الرجوع، الرئيسية، التطبيقات الأخيرة، شريط الإشعارات، " +
+            "الإعدادات السريعة، قائمة الطاقة، تقسيم الشاشة، أو قفل الشاشة.",
         schema = schema(
-            Triple("key", "string", "إحدى: back أو home أو recents أو notifications أو lock"),
+            Triple(
+                "key", "string",
+                "إحدى: back أو home أو recents أو notifications أو quick_settings " +
+                    "أو dismiss أو power أو split أو lock",
+            ),
         ),
         capability = Capability.ACCESSIBILITY,
     )
@@ -498,6 +513,125 @@ object ToolCatalog {
         capability = Capability.ACCESSIBILITY,
     )
 
+
+    // ---------------------------------------------------- رؤية وتحكّم أعمق
+
+    val lookAtScreen = ToolSpec(
+        name = "look_at_screen",
+        description = "يلتقط صورة الشاشة الحالية ويعرضها عليك لتراها بعينك. " +
+            "استعمله حين يسأل المستخدم عن شيء مرئي: «شو هذا؟»، «شنو مكتوب هني؟»، " +
+            "«ليش ما يشتغل؟»، أو حين تفشل read_screen في إظهار ما تحتاجه " +
+            "(صور، رسوم بيانية، تطبيقات ترسم واجهتها بنفسها مثل الألعاب والخرائط). " +
+            "يتطلّب أندرويد ١١ فأحدث.",
+        schema = emptySchema,
+        capability = Capability.ACCESSIBILITY,
+    )
+
+    val setDoNotDisturb = ToolSpec(
+        name = "set_do_not_disturb",
+        description = "يشغّل أو يوقف وضع عدم الإزعاج. استعمله عند «لا تزعجني»، " +
+            "«خلّني أركّز»، «وضع النوم»، أو عند بدء اجتماع.",
+        schema = schema(
+            Triple("mode", "string", "إحدى: on (يمنع كل شيء) أو priority (يسمح بالمهم) أو off"),
+        ),
+        capability = Capability.DND_ACCESS,
+    )
+
+    val setAutoRotate = ToolSpec(
+        name = "set_auto_rotate",
+        description = "يشغّل أو يوقف الدوران التلقائي للشاشة. استعمله عند «ثبّت الشاشة» " +
+            "أو حين يقرأ المستخدم مستلقيًا وتنقلب الشاشة عليه.",
+        schema = schema(Triple("on", "boolean", "true للتشغيل، false للإيقاف")),
+        capability = Capability.WRITE_SETTINGS,
+    )
+
+    val setScreenTimeout = ToolSpec(
+        name = "set_screen_timeout",
+        description = "يضبط مدة بقاء الشاشة مضاءة قبل إطفائها. مفيد عند القراءة أو الطبخ بوصفة.",
+        schema = schema(Triple("seconds", "integer", "مثل ١٥ أو ٣٠ أو ٦٠ أو ١٢٠ أو ٦٠٠")),
+        capability = Capability.WRITE_SETTINGS,
+    )
+
+    val nowPlaying = ToolSpec(
+        name = "now_playing",
+        description = "يخبرك ما الذي يُشغَّل الآن على الهاتف: اسم المقطع والفنان والتطبيق وحالة التشغيل.",
+        schema = emptySchema,
+        capability = Capability.NOTIFICATION_ACCESS,
+    )
+
+    val openPanel = ToolSpec(
+        name = "open_panel",
+        description = "يفتح لوحة إعدادات سريعة فوق التطبيق الحالي بدل الانتقال إلى الإعدادات: " +
+            "الإنترنت والواي فاي والبيانات والصوت والنِفِس. " +
+            "هذه أفضل طريقة متاحة للواي فاي وبيانات الجوّال لأن أندرويد يمنع تبديلها برمجيًا. " +
+            "يتطلّب أندرويد ١٠ فأحدث.",
+        schema = schema(
+            Triple("panel", "string", "إحدى: internet أو wifi أو volume أو nfc"),
+        ),
+    )
+
+    val appInfo = ToolSpec(
+        name = "app_info",
+        description = "يفتح صفحة معلومات تطبيق: الأذونات، التخزين، الإشعارات، وإيقافه إجباريًا. " +
+            "استعمله عند «التطبيق الفلاني معلّق» أو «امنع إشعارات كذا».",
+        schema = schema(Triple("name", "string", "اسم التطبيق")),
+    )
+
+    val uninstallApp = ToolSpec(
+        name = "uninstall_app",
+        description = "يبدأ إزالة تطبيق (يعرض أندرويد تأكيدًا للمستخدم قبل الحذف فعليًا).",
+        schema = schema(Triple("name", "string", "اسم التطبيق المراد حذفه")),
+        sensitive = true,
+    )
+
+    val readCallLog = ToolSpec(
+        name = "read_call_log",
+        description = "يقرأ آخر المكالمات: من اتصل، متى، ونوعها (واردة/صادرة/فائتة).",
+        schema = schema(
+            Triple("count", "integer", "عدد المكالمات المطلوبة (افتراضي ١٠)"),
+            required = listOf(),
+        ),
+        capability = Capability.CALL_LOG,
+    )
+
+    val createContact = ToolSpec(
+        name = "create_contact",
+        description = "يفتح شاشة إضافة جهة اتصال جديدة بالبيانات المعطاة.",
+        schema = schema(
+            Triple("name", "string", "الاسم"),
+            Triple("phone", "string", "رقم الهاتف"),
+            required = listOf("name", "phone"),
+        ),
+    )
+
+    val openCamera = ToolSpec(
+        name = "open_camera",
+        description = "يفتح الكاميرا. مرّر video=true لفتحها على وضع الفيديو.",
+        schema = schema(
+            Triple("video", "boolean", "true لفتح وضع الفيديو"),
+            required = listOf(),
+        ),
+    )
+
+    val scrollToText = ToolSpec(
+        name = "scroll_to_text",
+        description = "يمرّر الشاشة نزولًا حتى يظهر نصّ معيّن، ثم يخبرك إن وجده. " +
+            "استعمله قبل tap حين يكون الزر خارج الشاشة.",
+        schema = schema(
+            Triple("text", "string", "النص المراد الوصول إليه"),
+            Triple("max_swipes", "integer", "أقصى عدد تمريرات (افتراضي ٦)"),
+            required = listOf("text"),
+        ),
+        capability = Capability.ACCESSIBILITY,
+    )
+
+    val longPress = ToolSpec(
+        name = "long_press",
+        description = "ضغطة مطوّلة على نص ظاهر في الشاشة — لفتح قوائم السياق والخيارات.",
+        schema = schema(Triple("text", "string", "النص المراد الضغط عليه مطوّلًا")),
+        capability = Capability.ACCESSIBILITY,
+    )
+
     /** ترتيب الأدوات كما تُرسل إلى النموذج. */
     val all: List<ToolSpec> = listOf(
         openApp, listApps, openUrl, webSearch, navigate,
@@ -509,6 +643,9 @@ object ToolCatalog {
         addTask, readTasks, completeTask, deleteTask,
         addNote, readNotes, addHabit, logHabit, searchNews,
         mediaControl, readClipboard, writeClipboard, shareText, screenshot,
+        lookAtScreen, setDoNotDisturb, setAutoRotate, setScreenTimeout, nowPlaying,
+        openPanel, appInfo, uninstallApp, readCallLog, createContact, openCamera,
+        scrollToText, longPress,
     )
 
     /** الأدوات التي تعمل على بيانات التطبيق نفسه لا على النظام. */

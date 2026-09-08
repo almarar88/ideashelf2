@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.rafeeq.companion.core.Net
 import com.rafeeq.companion.data.ai.ClaudeClient
+import com.rafeeq.companion.data.ai.Dialect
 import com.rafeeq.companion.data.prayer.AsrMethod
 import com.rafeeq.companion.data.prayer.CalculationMethod
 import com.rafeeq.companion.data.prayer.HighLatitudeRule
@@ -58,7 +59,15 @@ data class AppSettings(
     val confirmSensitive: Boolean = false,
     val responseSpeed: ClaudeClient.ResponseSpeed = ClaudeClient.ResponseSpeed.FAST,
     val voiceReplies: Boolean = true,
-    val voiceLanguage: String = "ar-SA",
+    val voiceLanguage: String = "ar-AE",
+    /** لهجة المساعد في الكتابة والنطق. */
+    val dialect: Dialect = Dialect.EMIRATI,
+    /** البحث في الإنترنت عبر خوادم Anthropic حين يحتاج السؤال معلومة حديثة. */
+    val webSearch: Boolean = true,
+    /** في الوضع الصوتي: يبدأ الاستماع تلقائيًا بعد كل رد لمحادثة متصلة. */
+    val continuousVoice: Boolean = true,
+    /** ينطق الرد جملةً جملةً أثناء وصوله بدل انتظار اكتماله. */
+    val speakWhileTyping: Boolean = true,
     /** مضاعف حجم الخط في كل التطبيق: من ٠٫٨ إلى ١٫٤ */
     val fontScale: Float = 1.0f,
     val haptics: Boolean = true,
@@ -122,6 +131,10 @@ class SettingsRepository(private val context: Context) {
         val responseSpeed = stringPreferencesKey("response_speed")
         val voiceReplies = booleanPreferencesKey("voice_replies")
         val voiceLanguage = stringPreferencesKey("voice_language")
+        val dialect = stringPreferencesKey("dialect")
+        val webSearch = booleanPreferencesKey("web_search")
+        val continuousVoice = booleanPreferencesKey("continuous_voice")
+        val speakWhileTyping = booleanPreferencesKey("speak_while_typing")
         val fontScale = stringPreferencesKey("font_scale")
         val haptics = booleanPreferencesKey("haptics")
         val adhanSoundUri = stringPreferencesKey("adhan_sound_uri")
@@ -173,7 +186,11 @@ class SettingsRepository(private val context: Context) {
             confirmSensitive = p[Keys.confirmSensitive] ?: false,
             responseSpeed = ClaudeClient.ResponseSpeed.from(p[Keys.responseSpeed]),
             voiceReplies = p[Keys.voiceReplies] ?: true,
-            voiceLanguage = p[Keys.voiceLanguage] ?: "ar-SA",
+            voiceLanguage = p[Keys.voiceLanguage] ?: Dialect.from(p[Keys.dialect]).bcp47,
+            dialect = Dialect.from(p[Keys.dialect]),
+            webSearch = p[Keys.webSearch] ?: true,
+            continuousVoice = p[Keys.continuousVoice] ?: true,
+            speakWhileTyping = p[Keys.speakWhileTyping] ?: true,
             fontScale = p[Keys.fontScale]?.toFloatOrNull()?.coerceIn(0.8f, 1.4f) ?: 1.0f,
             haptics = p[Keys.haptics] ?: true,
             adhanSoundUri = p[Keys.adhanSoundUri].orEmpty(),
@@ -236,6 +253,16 @@ class SettingsRepository(private val context: Context) {
         edit { it[Keys.responseSpeed] = value.name }
     suspend fun setVoiceReplies(value: Boolean) = edit { it[Keys.voiceReplies] = value }
     suspend fun setVoiceLanguage(value: String) = edit { it[Keys.voiceLanguage] = value }
+
+    /** تغيير اللهجة يغيّر لغة النطق والتعرّف معها، وإلا بقي الصوت على لهجة أخرى. */
+    suspend fun setDialect(value: Dialect) = edit {
+        it[Keys.dialect] = value.key
+        it[Keys.voiceLanguage] = value.bcp47
+    }
+
+    suspend fun setWebSearch(value: Boolean) = edit { it[Keys.webSearch] = value }
+    suspend fun setContinuousVoice(value: Boolean) = edit { it[Keys.continuousVoice] = value }
+    suspend fun setSpeakWhileTyping(value: Boolean) = edit { it[Keys.speakWhileTyping] = value }
     suspend fun setFontScale(value: Float) =
         edit { it[Keys.fontScale] = value.coerceIn(0.8f, 1.4f).toString() }
     suspend fun setHaptics(value: Boolean) = edit { it[Keys.haptics] = value }

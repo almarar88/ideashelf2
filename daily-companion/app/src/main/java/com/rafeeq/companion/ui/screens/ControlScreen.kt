@@ -290,6 +290,7 @@ private fun permissionsFor(capability: Capability): Array<String> = when (capabi
         Manifest.permission.WRITE_CALENDAR,
     )
     Capability.CAMERA -> arrayOf(Manifest.permission.CAMERA)
+    Capability.CALL_LOG -> arrayOf(Manifest.permission.READ_CALL_LOG)
     else -> emptyArray()
 }
 
