@@ -43,6 +43,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.rafeeq.companion.data.control.Capability
 import com.rafeeq.companion.data.control.ToolCatalog
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.safeBottomSpace
 import com.rafeeq.companion.ui.components.GlassCard
 import com.rafeeq.companion.ui.components.GradientCard
 import com.rafeeq.companion.ui.components.PrimaryButton
@@ -79,7 +80,7 @@ fun ControlScreen(viewModel: AppViewModel) {
     val totalCount = Capability.entries.count { it != Capability.NONE }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 30.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = safeBottomSpace()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {

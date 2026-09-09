@@ -66,6 +66,7 @@ import com.rafeeq.companion.data.Task
 import com.rafeeq.companion.data.prayer.Prayer
 import com.rafeeq.companion.data.weather.WeatherCodes
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.floatingNavSpace
 import com.rafeeq.companion.ui.theme.Ink
 import com.rafeeq.companion.ui.components.pastelInkAt
 import com.rafeeq.companion.ui.components.pastelAt
@@ -133,7 +134,7 @@ fun HomeScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 108.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = floatingNavSpace()),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
 

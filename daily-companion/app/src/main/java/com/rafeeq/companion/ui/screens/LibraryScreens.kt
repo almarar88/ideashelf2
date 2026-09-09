@@ -42,6 +42,8 @@ import coil3.compose.AsyncImage
 import com.rafeeq.companion.core.Dates
 import com.rafeeq.companion.data.Article
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.safeBottomSpace
+import com.rafeeq.companion.ui.components.floatingNavSpace
 import com.rafeeq.companion.ui.components.EmptyState
 import com.rafeeq.companion.ui.components.GlassCard
 import com.rafeeq.companion.ui.components.HabitBars
@@ -106,7 +108,7 @@ fun SavedScreen(viewModel: AppViewModel, onOpenArticle: (Article) -> Unit) {
         Spacer(Modifier.height(10.dp))
 
         LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = floatingNavSpace()),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(filtered, key = { it.article.link }) { item ->
@@ -249,7 +251,7 @@ fun SearchScreen(
         }
 
         LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = floatingNavSpace()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (taskHits.isNotEmpty()) {
@@ -374,7 +376,7 @@ fun StatsScreen(viewModel: AppViewModel) {
     val rate = if (tasks.isEmpty()) 0f else done.toFloat() / tasks.size
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 30.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = safeBottomSpace()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {

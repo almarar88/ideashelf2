@@ -12,8 +12,8 @@ android {
         applicationId = "com.rafeeq.companion"
         minSdk = 26
         targetSdk = 37
-        versionCode = 7
-        versionName = "2.4.0"
+        versionCode = 8
+        versionName = "2.4.1"
     }
 
     signingConfigs {

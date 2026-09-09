@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import com.rafeeq.companion.ui.components.floatingNavSpace
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -107,7 +108,7 @@ private fun DhikrList(items: List<Dhikr>) {
     val context = LocalContext.current
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = floatingNavSpace()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(items.size) { index ->

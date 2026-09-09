@@ -49,6 +49,7 @@ import coil3.compose.AsyncImage
 import com.rafeeq.companion.core.Dates
 import com.rafeeq.companion.data.Article
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.floatingNavSpace
 import com.rafeeq.companion.ui.components.Chip
 import com.rafeeq.companion.ui.components.EmptyState
 import com.rafeeq.companion.ui.components.ErrorBanner
@@ -168,7 +169,7 @@ fun NewsScreen(
                 }
 
                 else -> LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = floatingNavSpace()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     if (news.failedSources.isNotEmpty()) {

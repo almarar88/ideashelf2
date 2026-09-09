@@ -6,6 +6,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -755,4 +759,58 @@ private fun monthLabelAr(date: java.time.LocalDate): String {
         "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
     )
     return "${months[date.monthValue - 1]} ${date.year}"
+}
+
+// ------------------------------------------------------ مساحة الشريط العائم
+
+/** ارتفاع كبسولة التنقّل نفسها: حشوة + دائرة + حشوة. */
+val NavPillHeight = 62.dp
+
+/** المسافة بين الكبسولة وحافة الشاشة. */
+val NavPillMargin = 14.dp
+
+/**
+ * الحساب نفسه، معزولًا عن Compose ليمكن اختباره.
+ *
+ * [inset] هو ارتفاع أزرار النظام: صفر على أجهزة الإيماءات، و‎48dp‎ تقريبًا
+ * على أجهزة الأزرار الثلاثة — وإهماله هو ما جعل الشريط يغطّي حقل الكتابة.
+ */
+fun navSpaceFor(
+    inset: androidx.compose.ui.unit.Dp,
+    extra: androidx.compose.ui.unit.Dp = 12.dp,
+): androidx.compose.ui.unit.Dp = inset + NavPillHeight + NavPillMargin + extra
+
+/**
+ * المساحة التي يجب حجزها أسفل أي شاشة كي لا يغطّيها الشريط العائم.
+ *
+ * تُحسب ولا تُخمَّن: القيمة الثابتة تكفي على جهاز بإيماءات وتفشل على جهاز
+ * بأزرار تنقّل (٤٨dp إضافية) — وهذا بالضبط ما كان يغطّي حقل الكتابة.
+ */
+@Composable
+fun floatingNavSpace(extra: androidx.compose.ui.unit.Dp = 12.dp): androidx.compose.ui.unit.Dp {
+    val inset = WindowInsets.navigationBars
+        .asPaddingValues()
+        .calculateBottomPadding()
+    return navSpaceFor(inset, extra)
+}
+
+/**
+ * مساحة أمان أسفل الشاشات التي لا شريط عائم فيها.
+ *
+ * المحتوى يمتدّ خلف أزرار النظام بعد أن صار الشريط عائمًا، فآخر عنصر
+ * في القائمة كان يقع تحتها. هذه تُعيد له مكانه.
+ */
+@Composable
+fun safeBottomSpace(
+    extra: androidx.compose.ui.unit.Dp = 24.dp,
+): androidx.compose.ui.unit.Dp {
+    val inset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    return inset + extra
+}
+
+/** هل لوحة المفاتيح ظاهرة الآن؟ نُخفي الشريط العائم حينها. */
+@Composable
+fun keyboardVisible(): Boolean {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    return WindowInsets.ime.getBottom(density) > 0
 }

@@ -70,6 +70,7 @@ import com.rafeeq.companion.data.prayer.CalculationMethod
 import com.rafeeq.companion.data.prayer.HighLatitudeRule
 import com.rafeeq.companion.data.prayer.Prayer
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.safeBottomSpace
 import com.rafeeq.companion.ui.components.GlassCard
 import com.rafeeq.companion.ui.components.PickerDialog
 import com.rafeeq.companion.ui.components.PrimaryButton
@@ -131,7 +132,7 @@ fun SettingsScreen(
     }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 30.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = safeBottomSpace()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {

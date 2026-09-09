@@ -42,6 +42,7 @@ import com.rafeeq.companion.data.DayForecast
 import com.rafeeq.companion.data.HourForecast
 import com.rafeeq.companion.data.weather.WeatherCodes
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.floatingNavSpace
 import com.rafeeq.companion.ui.components.EmptyState
 import com.rafeeq.companion.ui.components.ErrorBanner
 import com.rafeeq.companion.ui.components.GlassCard
@@ -100,7 +101,7 @@ fun WeatherScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
     }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 108.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = floatingNavSpace()),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {

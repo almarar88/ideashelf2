@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.floatingNavSpace
 import com.rafeeq.companion.ui.components.GlassCard
 import com.rafeeq.companion.ui.components.PrimaryButton
 import com.rafeeq.companion.ui.components.RafeeqTextField
@@ -76,7 +77,7 @@ fun ShortcutsScreen(viewModel: AppViewModel) {
         Spacer(Modifier.height(12.dp))
 
         LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = floatingNavSpace()),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(shortcuts, key = { it.id }) { shortcut ->

@@ -55,6 +55,8 @@ import com.rafeeq.companion.core.Dates
 import com.rafeeq.companion.data.prayer.Prayer
 import com.rafeeq.companion.data.prayer.PrayerTimes
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.safeBottomSpace
+import com.rafeeq.companion.ui.components.floatingNavSpace
 import com.rafeeq.companion.ui.components.EmptyState
 import com.rafeeq.companion.ui.components.GlassCard
 import com.rafeeq.companion.ui.components.GradientCard
@@ -107,7 +109,7 @@ fun PrayerScreen(
     }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 108.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = floatingNavSpace()),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
@@ -436,7 +438,7 @@ private fun MonthTimetableSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 26.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = safeBottomSpace())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { monthOffset-- }) {
                     Icon(Icons.Filled.ChevronRight, contentDescription = "الشهر السابق")

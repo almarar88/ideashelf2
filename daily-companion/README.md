@@ -260,7 +260,7 @@ Canvas وتتفاعل مع مستوى صوتك الحقيقي.
 
 ## التثبيت
 
-حمّل `alcode-ai-2.4.0.apk` من مجلد [`dist/`](../dist) في هذا المستودع، وانقله إلى هاتفك ثم افتحه.
+حمّل `alcode-ai-2.4.1.apk` من مجلد [`dist/`](../dist) في هذا المستودع، وانقله إلى هاتفك ثم افتحه.
 
 سيطلب منك أندرويد السماح بالتثبيت من هذا المصدر — هذا طبيعي لأي تطبيق خارج المتجر.
 اذهب إلى **الإعدادات ← التطبيقات ← وصول خاص ← تثبيت تطبيقات غير معروفة**، وفعّلها
@@ -292,7 +292,7 @@ Canvas وتتفاعل مع مستوى صوتك الحقيقي.
 cd daily-companion
 echo "sdk.dir=/path/to/Android/sdk" > local.properties
 
-./gradlew testDebugUnitTest      # ١٠٤ اختبار وحدة
+./gradlew testDebugUnitTest      # ١٠٨ اختبار وحدة
 ./gradlew assembleRelease        # ينتج app/build/outputs/apk/release/
 ```
 

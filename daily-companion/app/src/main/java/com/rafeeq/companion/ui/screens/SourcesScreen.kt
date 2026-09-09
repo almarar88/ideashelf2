@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rafeeq.companion.data.news.NewsCategories
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.safeBottomSpace
 import com.rafeeq.companion.ui.components.Chip
 import com.rafeeq.companion.ui.components.GlassCard
 import com.rafeeq.companion.ui.components.RafeeqTextField
@@ -60,7 +61,7 @@ fun SourcesScreen(viewModel: AppViewModel) {
     var newTopic by remember { mutableStateOf("") }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 30.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = safeBottomSpace()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {

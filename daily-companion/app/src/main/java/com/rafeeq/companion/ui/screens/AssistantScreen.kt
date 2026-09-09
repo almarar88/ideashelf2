@@ -73,6 +73,10 @@ import com.rafeeq.companion.data.voice.VoiceEngine
 import com.rafeeq.companion.ui.components.VoiceWave
 import com.rafeeq.companion.data.ai.Assistant
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.safeBottomSpace
+import com.rafeeq.companion.ui.components.keyboardVisible
+import com.rafeeq.companion.ui.components.floatingNavSpace
+import androidx.compose.foundation.layout.fillMaxSize
 import com.rafeeq.companion.ui.components.CircleButton
 import com.rafeeq.companion.ui.components.EmptyState
 import com.rafeeq.companion.ui.components.ErrorBanner
@@ -218,8 +222,9 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
         Box(Modifier.weight(1f)) {
             if (messages.isEmpty()) {
                 Column(
-                    Modifier.fillMaxWidth(),
+                    Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
                     EmptyState(
                         emoji = "✨",
@@ -327,11 +332,15 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
         }
 
         // ------------------------------------------------ حقل الإدخال
-        // مساحة سفلية إضافية لأن شريط التنقّل صار يطفو فوق المحتوى.
+        // نحجز أسفل الحقل ما يشغله الشريط العائم فعلًا (بما فيه أزرار النظام)،
+        // ونطويه عند فتح لوحة المفاتيح لأن الشريط يختفي حينها.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 86.dp),
+                .padding(
+                    start = 12.dp, end = 12.dp, top = 8.dp,
+                    bottom = if (keyboardVisible()) 10.dp else floatingNavSpace(),
+                ),
             verticalAlignment = Alignment.Bottom,
         ) {
             Box {
@@ -446,7 +455,7 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
     if (showHistory) {
         ModalBottomSheet(onDismissRequest = { showHistory = false }) {
             Column(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 30.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = safeBottomSpace()),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(

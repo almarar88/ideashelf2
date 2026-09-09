@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rafeeq.companion.core.Dates
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.floatingNavSpace
 import com.rafeeq.companion.ui.components.Chip
 import com.rafeeq.companion.ui.components.GlassCard
 import com.rafeeq.companion.ui.components.PrimaryButton
@@ -65,7 +66,7 @@ fun MemoryScreen(viewModel: AppViewModel) {
     var showAddRoutine by remember { mutableStateOf(false) }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 108.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = floatingNavSpace()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {

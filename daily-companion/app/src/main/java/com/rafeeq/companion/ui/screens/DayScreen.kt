@@ -54,6 +54,7 @@ import com.rafeeq.companion.data.Note
 import com.rafeeq.companion.data.Recurrence
 import com.rafeeq.companion.data.Task
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.floatingNavSpace
 import com.rafeeq.companion.ui.components.pastelInkAt
 import com.rafeeq.companion.ui.components.pastelAt
 import com.rafeeq.companion.ui.components.WeekStrip
@@ -247,7 +248,7 @@ private fun TasksTab(
     }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = floatingNavSpace()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (open.isNotEmpty()) {
@@ -500,7 +501,7 @@ private fun HabitsTab(
     }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = floatingNavSpace()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(habits, key = { it.id }) { habit ->
@@ -688,7 +689,7 @@ private fun NotesTab(
         .sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updatedAt })
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = floatingNavSpace()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // البحث يظهر فقط حين تتراكم الملاحظات؛ قبل ذلك هو ضجيج.

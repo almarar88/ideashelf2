@@ -58,6 +58,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.rafeeq.companion.ui.components.ScreenTopBar
+import com.rafeeq.companion.ui.components.safeBottomSpace
+import com.rafeeq.companion.ui.components.floatingNavSpace
+import com.rafeeq.companion.ui.components.keyboardVisible
 import com.rafeeq.companion.ui.screens.AssistantScreen
 import com.rafeeq.companion.ui.screens.AzkarScreen
 import com.rafeeq.companion.ui.screens.SavedScreen
@@ -168,7 +171,9 @@ fun RafeeqNavigation(
         }.onFailure { viewModel.showMessage("تعذّر فتح المساعد الصوتي.") }
     }
 
-    val showBottomBar = currentRoute in tabs.map { it.route }
+    // لوحة المفاتيح مفتوحة تعني أن المستخدم يكتب؛ الشريط العائم حينها
+    // يزاحم حقل الكتابة بلا فائدة، فنخفيه.
+    val showBottomBar = currentRoute in tabs.map { it.route } && !keyboardVisible()
     val isSubScreen = currentRoute == Routes.SETTINGS ||
         currentRoute == Routes.SOURCES ||
         currentRoute == Routes.CONTROL ||
@@ -180,7 +185,15 @@ fun RafeeqNavigation(
         currentRoute == Routes.MEMORY
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHost) },
+        // الرسالة كانت تظهر خلف الشريط العائم وأزرار النظام، فنرفعها فوقهما.
+        snackbarHost = {
+            SnackbarHost(
+                snackbarHost,
+                modifier = Modifier.padding(
+                    bottom = if (showBottomBar) floatingNavSpace(0.dp) else safeBottomSpace(8.dp),
+                ),
+            )
+        },
         containerColor = MaterialTheme.colorScheme.background,
     ) { _ ->
         // الشريط يطفو فوق المحتوى بدل أن يحجز صفًا أسفل الشاشة،
