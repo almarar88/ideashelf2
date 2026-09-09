@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -45,15 +46,21 @@ import androidx.compose.ui.unit.dp
 fun GlassCard(
     modifier: Modifier = Modifier,
     padding: PaddingValues = PaddingValues(18.dp),
-    shape: RoundedCornerShape = RoundedCornerShape(24.dp),
+    shape: RoundedCornerShape = RoundedCornerShape(26.dp),
     onClick: (() -> Unit)? = null,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
+    // لم تعد "زجاجية": في لوحة الرمل الدافئ البطاقة بيضاء صريحة بظلّ خفيف
+    // بلا حدّ. تغيير هذا الموضع وحده يُحدّث كل شاشات التطبيق.
     val base = Modifier
         .fillMaxWidth()
+        .shadow(
+            5.dp, shape,
+            ambientColor = com.rafeeq.companion.ui.theme.Ink.copy(alpha = 0.05f),
+            spotColor = com.rafeeq.companion.ui.theme.Ink.copy(alpha = 0.07f),
+        )
         .clip(shape)
-        .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.65f))
-        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), shape)
+        .background(MaterialTheme.colorScheme.surface)
 
     Column(
         modifier = modifier
@@ -99,7 +106,7 @@ fun SectionTitle(
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
         )
@@ -107,7 +114,7 @@ fun SectionTitle(
             Text(
                 text = action,
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                color = com.rafeeq.companion.ui.theme.Amber,
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
                     .clickable { onAction() }

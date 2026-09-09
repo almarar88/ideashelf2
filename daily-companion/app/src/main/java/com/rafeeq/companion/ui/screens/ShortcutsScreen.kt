@@ -76,7 +76,7 @@ fun ShortcutsScreen(viewModel: AppViewModel) {
         Spacer(Modifier.height(12.dp))
 
         LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 28.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(shortcuts, key = { it.id }) { shortcut ->

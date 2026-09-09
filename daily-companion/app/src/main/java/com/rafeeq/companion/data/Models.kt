@@ -203,6 +203,43 @@ data class Shortcut(
     val createdAt: Long = System.currentTimeMillis(),
 )
 
+/**
+ * حقيقة يتذكّرها المساعد عنك بين المحادثات.
+ *
+ * بلا هذا يبدأ من الصفر كل مرة: تخبره أنك تصوم الاثنين والخميس فينساها،
+ * وتخبره باسم مديرك فينساه. الذاكرة هي ما يحوّله من أداة إلى رفيق.
+ * المستخدم يراها كلها ويحذف منها ما شاء — لا شيء مخفي عنه.
+ */
+@Serializable
+data class Memory(
+    val id: String = UUID.randomUUID().toString(),
+    val text: String,
+    /** تصنيف قصير: تفضيل، عمل، صحة، عائلة… يساعد على العرض والحذف الانتقائي. */
+    val category: String = "عام",
+    val createdAt: Long = System.currentTimeMillis(),
+    /** أضافها المساعد بنفسه أم كتبها المستخدم يدويًا. */
+    val bySelf: Boolean = true,
+)
+
+/**
+ * روتين: اختصار يعمل تلقائيًا في وقت محدّد من أيام محدّدة.
+ *
+ * الفرق بينه وبين الاختصار أن الاختصار ينتظر ضغطة، والروتين لا ينتظر.
+ */
+@Serializable
+data class Routine(
+    val id: String = UUID.randomUUID().toString(),
+    val label: String,
+    val prompt: String,
+    /** HH:mm */
+    val time: String,
+    /** أيام الأسبوع ١=الاثنين … ٧=الأحد، فارغة تعني كل يوم. */
+    val days: Set<Int> = emptySet(),
+    val enabled: Boolean = true,
+    val lastRunAt: Long? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
 /** تقدير استهلاك المحادثة — يُقرأ من ردّ الواجهة البرمجية. */
 @Serializable
 data class UsageStats(

@@ -19,21 +19,21 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
-private val Color0F = Color(0xFF04070F)
+private val Color0F = Color(0xFF141210)
 
 private val DarkScheme = darkColorScheme(
     primary = Cyan,
     onPrimary = Color0F,
-    primaryContainer = Color(0xFF0E3B4A),
-    onPrimaryContainer = Cyan,
+    primaryContainer = Color(0xFF23413A),
+    onPrimaryContainer = PastelMint,
     secondary = Violet,
     onSecondary = Color0F,
-    secondaryContainer = Color(0xFF2E1D5B),
-    onSecondaryContainer = Violet,
+    secondaryContainer = Color(0xFF2B2C4A),
+    onSecondaryContainer = PastelLavender,
     tertiary = Amber,
     onTertiary = Color0F,
-    tertiaryContainer = Color(0xFF4A3208),
-    onTertiaryContainer = Amber,
+    tertiaryContainer = Color(0xFF463818),
+    onTertiaryContainer = PastelButter,
     background = NightBackground,
     onBackground = NightOnSurface,
     surface = NightSurface,
@@ -42,9 +42,9 @@ private val DarkScheme = darkColorScheme(
     onSurfaceVariant = NightOnSurfaceMuted,
     surfaceContainer = NightSurface,
     surfaceContainerHigh = NightSurfaceHigh,
-    surfaceContainerHighest = Color(0xFF1B2745),
+    surfaceContainerHighest = Color(0xFF302B26),
     outline = NightOutline,
-    outlineVariant = Color(0xFF1B2745),
+    outlineVariant = Color(0xFF302B26),
     error = Rose,
     onError = Color0F,
 )
@@ -52,37 +52,37 @@ private val DarkScheme = darkColorScheme(
 private val LightScheme = lightColorScheme(
     primary = CyanDeep,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFCFF6FE),
-    onPrimaryContainer = Color(0xFF00404E),
+    primaryContainer = PastelMint,
+    onPrimaryContainer = PastelMintInk,
     secondary = VioletDeep,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE9DDFF),
-    onSecondaryContainer = Color(0xFF260E5C),
+    secondaryContainer = PastelLavender,
+    onSecondaryContainer = PastelLavenderInk,
     tertiary = AmberDeep,
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFFFEBC2),
-    onTertiaryContainer = Color(0xFF3D2600),
+    tertiaryContainer = PastelButter,
+    onTertiaryContainer = PastelButterInk,
     background = DayBackground,
     onBackground = DayOnSurface,
     surface = DaySurface,
     onSurface = DayOnSurface,
     surfaceVariant = DaySurfaceHigh,
     onSurfaceVariant = DayOnSurfaceMuted,
-    surfaceContainer = DaySurface,
+    surfaceContainer = SandSurfaceSoft,
     surfaceContainerHigh = DaySurfaceHigh,
-    surfaceContainerHighest = Color(0xFFE3EAF6),
+    surfaceContainerHighest = Color(0xFFE9E2DA),
     outline = DayOutline,
-    outlineVariant = Color(0xFFE3EAF6),
+    outlineVariant = Color(0xFFE9E2DA),
     error = RoseDeep,
     onError = Color.White,
 )
 
 val RafeeqShapes = Shapes(
-    extraSmall = RoundedCornerShape(10.dp),
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(20.dp),
-    large = RoundedCornerShape(28.dp),
-    extraLarge = RoundedCornerShape(36.dp),
+    extraSmall = RoundedCornerShape(14.dp),
+    small = RoundedCornerShape(18.dp),
+    medium = RoundedCornerShape(24.dp),
+    large = RoundedCornerShape(30.dp),
+    extraLarge = RoundedCornerShape(40.dp),
 )
 
 /** أوضاع المظهر المتاحة للمستخدم. */

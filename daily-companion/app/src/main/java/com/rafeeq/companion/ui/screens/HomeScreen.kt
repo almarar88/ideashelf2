@@ -66,6 +66,15 @@ import com.rafeeq.companion.data.Task
 import com.rafeeq.companion.data.prayer.Prayer
 import com.rafeeq.companion.data.weather.WeatherCodes
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.theme.Ink
+import com.rafeeq.companion.ui.components.pastelInkAt
+import com.rafeeq.companion.ui.components.pastelAt
+import com.rafeeq.companion.ui.components.decorAt
+import com.rafeeq.companion.ui.components.SectionRow
+import com.rafeeq.companion.ui.components.FeatureCard
+import com.rafeeq.companion.ui.components.CountChip
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.foundation.lazy.itemsIndexed
 import com.rafeeq.companion.ui.components.GlassCard
 import com.rafeeq.companion.ui.components.GradientCard
 import com.rafeeq.companion.ui.components.ProgressRing
@@ -124,83 +133,150 @@ fun HomeScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 30.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 108.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
 
         // ---------------------------------------------------- الترويسة
         item {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = buildString {
-                            append(Dates.greeting(now.hour))
+                        buildString {
+                            append("أهلًا")
                             if (settings.userName.isNotBlank()) append("، ${settings.userName}")
                         },
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                     )
-                    Row {
-                        Text(
-                            text = Dates.longHijriAr(today, settings.hijriOffset),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = "  ·  ${Dates.longGregorianAr(today)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    Text(
+                        Dates.longHijriAr(today, settings.hijriOffset),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                IconButton(onClick = onOpenSearch) {
-                    Icon(Icons.Filled.Search, contentDescription = "بحث")
-                }
-                IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Filled.Settings, contentDescription = "الإعدادات")
+                Box(
+                    Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(pastelAt(now.dayOfMonth))
+                        .clickable { onOpenSettings() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        settings.userName.trim().take(1).ifBlank { "A" },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Ink,
+                    )
                 }
             }
         }
 
-        // ---------------------------------------------------- البطاقة الرئيسية
+        // ---------------------------------------------------- العنوان العريض
         item {
-            HeroCard(
-                colors = heroColors,
-                now = now,
-                use24h = settings.use24hClock,
-                placeLabel = settings.place?.label,
-                weatherEmoji = weather.bundle?.let {
-                    WeatherCodes.describe(it.now.weatherCode, it.now.isDay).emoji
-                },
-                weatherText = weather.bundle?.let {
-                    "${it.now.temperature.toInt()}° · ${WeatherCodes.describe(it.now.weatherCode, it.now.isDay).text}"
-                },
-                nextPrayerName = nextPrayer?.first?.arabic,
-                nextPrayerAt = nextPrayer?.let { Dates.formatTime(it.second, settings.use24hClock) },
-                remaining = nextPrayer?.let { Duration.between(now, it.second) },
-                progress = nextPrayer?.let { (_, time) ->
-                    val previous = todayPrayers?.current(now)?.second ?: time.minusHours(5)
-                    val total = Duration.between(previous, time).seconds.coerceAtLeast(1)
-                    1f - Duration.between(now, time).seconds.toFloat() / total.toFloat()
-                } ?: 0f,
-                onWeatherClick = onOpenWeather,
-                onPrayerClick = onOpenPrayer,
-                onPlaceClick = onOpenSettings,
+            Text(
+                Dates.greeting(now.hour) + "!",
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 2.dp, bottom = 4.dp),
             )
         }
 
-        // ---------------------------------------------------- شريط المساعد الصوتي
+        // ---------------------------------------------------- البحث
         item {
-            VoiceBar(
-                enabled = settings.hasApiKey,
-                onVoice = onOpenVoice,
-                onChat = onOpenAssistant,
-                onSetup = onOpenSettings,
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable { onOpenSearch() }
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = "بحث",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "ابحث في يومك…",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    Icons.Filled.Tune,
+                    contentDescription = "تصفية",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+        }
+
+        // ---------------------------------------------------- شرائح الأقسام
+        item {
+            val chips = listOf(
+                Triple("الصلاة", 5, onOpenPrayer),
+                Triple("الأخبار", news.articles.size, onOpenNews),
+                Triple("مهامي", openTasks.size, onOpenDay),
+                Triple("الطقس", weather.bundle?.daily?.size ?: 0, onOpenWeather),
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                itemsIndexed(chips) { index, (label, count, action) ->
+                    CountChip(
+                        label = label,
+                        count = count.takeIf { it > 0 },
+                        selected = true,
+                        color = pastelAt(index + 3),
+                        ink = pastelInkAt(index + 3),
+                        onClick = action,
+                    )
+                }
+            }
+        }
+
+        // ---------------------------------------------------- بطاقة البطل
+        item {
+            val remaining = nextPrayer?.let { Duration.between(now, it.second) }
+            FeatureCard(
+                title = nextPrayer?.first?.arabic?.let { "$it بعد ${Dates.humanDuration(remaining!!)}" }
+                    ?: "أوقات الصلاة",
+                subtitle = nextPrayer?.let {
+                    Dates.formatTime(it.second, settings.use24hClock) +
+                        (settings.place?.label?.let { place -> "  ·  $place" } ?: "")
+                } ?: "حدّد موقعك ليُحسب وقتك بدقّة",
+                actionLabel = "افتح المواقيت",
+                background = pastelAt(now.hour / 4),
+                decoration = decorAt(now.hour / 4),
+                avatars = listOf("🕌", "📿", "🌙"),
+                extraAvatars = 0,
+                onAction = onOpenPrayer,
+            )
+        }
+
+        // ---------------------------------------------------- بطاقة المساعد
+        item {
+            FeatureCard(
+                title = "اسألني أي شي",
+                subtitle = if (settings.hasApiKey) {
+                    "أبحث في الإنترنت، أشوف شاشتك، وأنفّذ أوامرك على الهاتف"
+                } else {
+                    "أضِف مفتاح Anthropic من الإعدادات لتشغيلي"
+                },
+                actionLabel = if (settings.hasApiKey) "تحدّث معي" else "فعّلني",
+                background = pastelAt(now.hour / 4 + 3),
+                decoration = decorAt(now.hour / 4 + 2),
+                avatars = listOf("✨", "🎙️", "👁️"),
+                extraAvatars = 0,
+                onAction = { if (settings.hasApiKey) onOpenVoice() else onOpenSettings() },
             )
         }
 
@@ -210,7 +286,7 @@ fun HomeScreen(
                 QuickAction("رتّب يومي", "🗓️", Violet, "رتّب لي يومي بالاعتماد على مهامي وأوقات الصلاة."),
                 QuickAction("لخّص أخباري", "📰", Sky, "لخّص لي أهم أخبار اليوم في خمس نقاط."),
                 QuickAction("حالة هاتفي", "🔋", Emerald, "كيف حالة هاتفي الآن؟"),
-                QuickAction("ماذا ألبس؟", "🧥", Amber, "بناءً على طقس اليوم، بماذا تنصحني أن ألبس؟"),
+                QuickAction("شو ألبس؟", "🧥", Amber, "بناءً على طقس اليوم، بماذا تنصحني أن ألبس؟"),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 actions.forEach { action ->

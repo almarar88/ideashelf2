@@ -19,7 +19,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class BackupBundle(
-    val version: Int = 1,
+    val version: Int = 2,
     val createdAt: Long = System.currentTimeMillis(),
     val tasks: List<Task> = emptyList(),
     val habits: List<Habit> = emptyList(),
@@ -29,6 +29,8 @@ data class BackupBundle(
     val topics: List<Topic> = emptyList(),
     val conversations: List<Conversation> = emptyList(),
     val shortcuts: List<Shortcut> = emptyList(),
+    val memories: List<Memory> = emptyList(),
+    val routines: List<Routine> = emptyList(),
     val place: Place? = null,
     val userName: String = "",
     val persona: String = "",
@@ -49,6 +51,8 @@ class BackupManager(private val context: Context, private val repos: Repos) {
                     topics = repos.topics.load(),
                     conversations = repos.conversations.load(),
                     shortcuts = repos.shortcuts.load(),
+                    memories = repos.memories.load(),
+                    routines = repos.routines.load(),
                     place = settings.place,
                     userName = settings.userName,
                     persona = settings.aiPersona,
@@ -75,7 +79,7 @@ class BackupManager(private val context: Context, private val repos: Repos) {
                 } ?: error("تعذّر قراءة الملف.")
 
                 val bundle = Net.json.decodeFromString(BackupBundle.serializer(), text)
-                if (bundle.version > 1) {
+                if (bundle.version > 2) {
                     error("هذا الملف من إصدار أحدث من التطبيق.")
                 }
 
@@ -103,6 +107,8 @@ class BackupManager(private val context: Context, private val repos: Repos) {
                 merge(repos.topics, bundle.topics) { it.id }
                 merge(repos.conversations, bundle.conversations) { it.id }
                 merge(repos.shortcuts, bundle.shortcuts) { it.id }
+                merge(repos.memories, bundle.memories) { it.id }
+                merge(repos.routines, bundle.routines) { it.id }
 
                 bundle.place?.let { repos.settings.setPlace(it) }
                 if (bundle.userName.isNotBlank()) repos.settings.setUserName(bundle.userName)

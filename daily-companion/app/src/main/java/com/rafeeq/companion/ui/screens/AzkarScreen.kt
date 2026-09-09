@@ -107,7 +107,7 @@ private fun DhikrList(items: List<Dhikr>) {
     val context = LocalContext.current
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 28.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(items.size) { index ->

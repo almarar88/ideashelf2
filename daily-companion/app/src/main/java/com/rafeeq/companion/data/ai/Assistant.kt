@@ -32,6 +32,8 @@ object Assistant {
         val headlines: List<Article>,
         val persona: String,
         val use24h: Boolean,
+        /** ما يتذكّره عنك — يُحقن في كل محادثة ليبني عليه بدل أن يبدأ من الصفر. */
+        val memories: List<String> = emptyList(),
     )
 
     private const val BASE_PERSONA = """أنت "Alcode Ai" — مساعد شخصي يومي ذكي، تتحدث العربية الفصحى المبسّطة بطبيعية.
@@ -140,6 +142,11 @@ object Assistant {
 
         if (context.headlines.isNotEmpty()) {
             appendLine("عناوين: " + context.headlines.take(5).joinToString(" | ") { it.title })
+        }
+
+        // الذاكرة تأتي أخيرًا وبحدّ أعلى: أهمّ ما فيها أن تُقرأ، لا أن تطول.
+        if (context.memories.isNotEmpty()) {
+            appendLine("تعرف عنه: " + context.memories.take(12).joinToString(" · "))
         }
         append("</حالة_اليوم>")
     }

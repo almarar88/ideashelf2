@@ -265,6 +265,16 @@ class AlarmReceiver : BroadcastReceiver() {
                 }
             }
 
+            RoutineScheduler.KIND_ROUTINE -> {
+                val label = intent.getStringExtra(RoutineScheduler.EXTRA_ROUTINE_LABEL).orEmpty()
+                val prompt = intent.getStringExtra(RoutineScheduler.EXTRA_ROUTINE_PROMPT).orEmpty()
+                // ننفّذ الأمر فعلًا في الخلفية، ثم نُشعر بالنتيجة —
+                // إشعار «حان وقت الروتين» بلا تنفيذ يجعل الميزة بلا معنى.
+                if (prompt.isNotBlank()) {
+                    RoutineRunner.run(context, label, prompt, goAsync())
+                }
+            }
+
             PrayerScheduler.KIND_BRIEF -> {
                 val today = LocalDate.now()
                 // نبني سطرًا مفيدًا من البيانات المخزّنة بدل «الموجز جاهز».
@@ -289,6 +299,17 @@ class AlarmReceiver : BroadcastReceiver() {
         }
         // نعيد الجدولة بعد كل تنبيه لضمان استمرارية السلسلة.
         runCatching { PrayerScheduler.rescheduleAll(context) }
+        if (kind == RoutineScheduler.KIND_ROUTINE) {
+            runCatching {
+                val app = context.applicationContext as? com.rafeeq.companion.RafeeqApp
+                    ?: return@runCatching
+                kotlinx.coroutines.runBlocking {
+                    RoutineScheduler.reschedule(
+                        context, app.repos.routines.load(), java.time.ZoneId.systemDefault(),
+                    )
+                }
+            }
+        }
         if (kind == HabitScheduler.KIND_HABIT) {
             // تذكير العادة يومي، فنعيد جدولته لليوم التالي فور إطلاقه.
             runCatching {
@@ -314,6 +335,7 @@ class BootReceiver : BroadcastReceiver() {
                 val zone = java.time.ZoneId.systemDefault()
                 TaskScheduler.reschedule(context, app.repos.tasks.load(), zone)
                 HabitScheduler.reschedule(context, app.repos.habits.load(), zone)
+                RoutineScheduler.reschedule(context, app.repos.routines.load(), zone)
             }
         }
     }

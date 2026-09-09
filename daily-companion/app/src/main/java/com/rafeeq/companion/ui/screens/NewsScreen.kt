@@ -168,7 +168,7 @@ fun NewsScreen(
                 }
 
                 else -> LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     if (news.failedSources.isNotEmpty()) {

@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Brightness4
@@ -91,6 +92,7 @@ fun SettingsScreen(
     onOpenControl: () -> Unit = {},
     onOpenStats: () -> Unit = {},
     onOpenShortcuts: () -> Unit = {},
+    onOpenMemory: () -> Unit = {},
     onOpenSaved: () -> Unit = {},
 ) {
     val settings by viewModel.settings.collectAsState()
@@ -365,6 +367,13 @@ fun SettingsScreen(
                     icon = Icons.Filled.Bolt,
                     tint = Violet,
                 ) { onOpenShortcuts() }
+
+                SettingRow(
+                    title = "ذاكرة المساعد والروتينات",
+                    subtitle = "ما يتذكّره عنك، وما ينفّذه وحده في وقته",
+                    icon = Icons.Filled.Psychology,
+                    tint = Violet,
+                ) { onOpenMemory() }
 
                 SettingRow(
                     title = "إحصاءاتي",

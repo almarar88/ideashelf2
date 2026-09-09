@@ -28,6 +28,7 @@ enum class Capability(val arabic: String, val why: String) {
     SMS("الرسائل", "لإرسال وقراءة الرسائل النصية"),
     CAMERA("الكاميرا", "لتشغيل الكشّاف"),
     CALL_LOG("سجلّ المكالمات", "ليخبرك من اتصل بك ومتى"),
+    USAGE_STATS("وقت الشاشة", "ليخبرك كم استخدمت كل تطبيق وأين يذهب وقتك"),
 }
 
 /** نتيجة تنفيذ أمر واحد. */
@@ -632,6 +633,96 @@ object ToolCatalog {
         capability = Capability.ACCESSIBILITY,
     )
 
+
+    // ------------------------------------------------------ الذاكرة والروتين
+
+    val rememberFact = ToolSpec(
+        name = "remember_fact",
+        description = "يحفظ معلومة عن المستخدم لتبقى معك في كل محادثة قادمة: تفضيلاته، " +
+            "عمله، عائلته، صحته، مواعيده الثابتة، أسلوبه المفضّل. " +
+            "احفظ ما يفيدك لاحقًا فعلًا ولا تحفظ تفاصيل عابرة. " +
+            "لا تحفظ كلمات مرور ولا أرقام بطاقات ولا أي سرّ مالي مهما طُلب منك.",
+        schema = schema(
+            Triple("text", "string", "المعلومة بجملة واحدة واضحة"),
+            Triple("category", "string", "تصنيف قصير: تفضيل، عمل، عائلة، صحة، مواعيد، عام"),
+            required = listOf("text"),
+        ),
+    )
+
+    val recallFacts = ToolSpec(
+        name = "recall_facts",
+        description = "يقرأ ما حفظته سابقًا عن المستخدم. استعمله حين يسأل «شو تعرف عني؟» " +
+            "أو حين تحتاج تفصيلًا شخصيًا لا تجده في حالة اليوم.",
+        schema = schema(
+            Triple("query", "string", "كلمة للتصفية، أو اتركها فارغة لقراءة الكل"),
+            required = listOf(),
+        ),
+    )
+
+    val forgetFact = ToolSpec(
+        name = "forget_fact",
+        description = "يحذف معلومة محفوظة حين يطلب المستخدم نسيان شيء عنه.",
+        schema = schema(Triple("query", "string", "جزء من نصّ المعلومة المراد حذفها")),
+    )
+
+    val addRoutine = ToolSpec(
+        name = "add_routine",
+        description = "ينشئ روتينًا يعمل تلقائيًا في وقت محدّد كل يوم أو في أيام معيّنة: " +
+            "«كل يوم ٧ صباحًا اقرأ لي مهامي»، «كل جمعة ٥ مساءً ذكّرني بالمشتريات». " +
+            "الفرق عن التذكير أن الروتين ينفّذ أمرًا كاملًا لا مجرّد تنبيه.",
+        schema = schema(
+            Triple("label", "string", "اسم قصير للروتين"),
+            Triple("prompt", "string", "الأمر الكامل الذي يُنفَّذ في وقته"),
+            Triple("time", "string", "الوقت بصيغة HH:mm"),
+            Triple("days", "string", "أيام مفصولة بفواصل: mon,tue,wed,thu,fri,sat,sun — أو اتركها فارغة لكل يوم"),
+            required = listOf("label", "prompt", "time"),
+        ),
+    )
+
+    val readRoutines = ToolSpec(
+        name = "read_routines",
+        description = "يعرض الروتينات المجدولة وأوقاتها وحالتها.",
+        schema = emptySchema,
+    )
+
+    val deleteRoutine = ToolSpec(
+        name = "delete_routine",
+        description = "يحذف روتينًا مجدولًا باسمه.",
+        schema = schema(Triple("query", "string", "اسم الروتين أو جزء منه")),
+    )
+
+    // ------------------------------------------------------ رسائل ومكالمات
+
+    val readSms = ToolSpec(
+        name = "read_sms",
+        description = "يقرأ آخر الرسائل النصية الواردة: المرسل والنص والوقت. " +
+            "مفيد لقراءة رموز التحقّق وإشعارات البنك وتلخيص ما فاتك.",
+        schema = schema(
+            Triple("count", "integer", "عدد الرسائل المطلوبة (افتراضي ١٠)"),
+            Triple("from", "string", "تصفية باسم أو رقم المرسل"),
+            required = listOf(),
+        ),
+        capability = Capability.SMS,
+    )
+
+    val dial = ToolSpec(
+        name = "dial",
+        description = "يفتح لوحة الاتصال برقم جاهز بلا إجراء المكالمة — المستخدم يضغط زر الاتصال. " +
+            "استعمله حين لا يكون إذن الاتصال ممنوحًا أو حين يكون الرقم غير مؤكّد.",
+        schema = schema(Triple("number", "string", "الرقم المراد طلبه")),
+    )
+
+    val appUsage = ToolSpec(
+        name = "app_usage",
+        description = "يقرأ مدة استخدام التطبيقات (وقت الشاشة) لليوم أو لعدة أيام. " +
+            "يجيب عن «كم استخدمت انستقرام اليوم؟» و«وين راح وقتي؟».",
+        schema = schema(
+            Triple("days", "integer", "عدد الأيام للخلف (افتراضي ١ أي اليوم)"),
+            required = listOf(),
+        ),
+        capability = Capability.USAGE_STATS,
+    )
+
     /** ترتيب الأدوات كما تُرسل إلى النموذج. */
     val all: List<ToolSpec> = listOf(
         openApp, listApps, openUrl, webSearch, navigate,
@@ -646,12 +737,17 @@ object ToolCatalog {
         lookAtScreen, setDoNotDisturb, setAutoRotate, setScreenTimeout, nowPlaying,
         openPanel, appInfo, uninstallApp, readCallLog, createContact, openCamera,
         scrollToText, longPress,
+        rememberFact, recallFacts, forgetFact,
+        addRoutine, readRoutines, deleteRoutine,
+        readSms, dial, appUsage,
     )
 
     /** الأدوات التي تعمل على بيانات التطبيق نفسه لا على النظام. */
     val appDataToolNames: Set<String> = setOf(
         "add_task", "read_tasks", "complete_task", "delete_task",
         "add_note", "read_notes", "add_habit", "log_habit", "search_news",
+        "remember_fact", "recall_facts", "forget_fact",
+        "add_routine", "read_routines", "delete_routine",
     )
 
     fun byName(name: String): ToolSpec? = all.firstOrNull { it.name == name }

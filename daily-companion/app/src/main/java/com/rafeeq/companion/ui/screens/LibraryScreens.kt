@@ -106,7 +106,7 @@ fun SavedScreen(viewModel: AppViewModel, onOpenArticle: (Article) -> Unit) {
         Spacer(Modifier.height(10.dp))
 
         LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 28.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(filtered, key = { it.article.link }) { item ->
@@ -249,7 +249,7 @@ fun SearchScreen(
         }
 
         LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 28.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (taskHits.isNotEmpty()) {

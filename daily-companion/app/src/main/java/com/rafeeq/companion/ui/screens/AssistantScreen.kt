@@ -73,6 +73,7 @@ import com.rafeeq.companion.data.voice.VoiceEngine
 import com.rafeeq.companion.ui.components.VoiceWave
 import com.rafeeq.companion.data.ai.Assistant
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.CircleButton
 import com.rafeeq.companion.ui.components.EmptyState
 import com.rafeeq.companion.ui.components.ErrorBanner
 import com.rafeeq.companion.ui.components.GradientCard
@@ -162,27 +163,34 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
 
     Column(Modifier.fillMaxWidth().imePadding()) {
 
+        // رأس على نمط التصميم: زرّان دائريان أبيضان، ثم عنوان أسود عريض.
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.weight(1f)) {
-                Text("المساعد", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text(
-                    conversation?.title ?: "يعرف يومك: طقسك، صلواتك، مهامك وأخبارك",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            IconButton(onClick = { showHistory = true }) {
-                Icon(Icons.Filled.History, contentDescription = "المحادثات السابقة")
-            }
-            IconButton(onClick = { viewModel.newConversation() }) {
-                Icon(Icons.Filled.Add, contentDescription = "محادثة جديدة")
-            }
+            CircleButton(Icons.Filled.History, "المحادثات السابقة") { showHistory = true }
+            Spacer(Modifier.weight(1f))
+            CircleButton(Icons.Filled.Add, "محادثة جديدة") { viewModel.newConversation() }
         }
+
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+            Text(
+                conversation?.title?.takeIf { it != "محادثة جديدة" } ?: "شو في بالك؟",
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "يعرف يومك · يبحث في الإنترنت · يشوف شاشتك · ينفّذ على هاتفك",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
 
         if (!settings.hasApiKey) {
             Column(Modifier.padding(16.dp)) {
@@ -319,10 +327,11 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
         }
 
         // ------------------------------------------------ حقل الإدخال
+        // مساحة سفلية إضافية لأن شريط التنقّل صار يطفو فوق المحتوى.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 86.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
             Box {

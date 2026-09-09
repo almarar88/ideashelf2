@@ -5,7 +5,9 @@ import com.rafeeq.companion.data.Conversation
 import com.rafeeq.companion.data.DailyBrief
 import com.rafeeq.companion.data.Habit
 import com.rafeeq.companion.data.NewsSource
+import com.rafeeq.companion.data.Memory
 import com.rafeeq.companion.data.Note
+import com.rafeeq.companion.data.Routine
 import com.rafeeq.companion.data.SavedArticle
 import com.rafeeq.companion.data.SettingsRepository
 import com.rafeeq.companion.data.Task
@@ -53,6 +55,8 @@ class Repos(app: Application) {
     val topics = JsonListStore(app, "topics.json", Topic.serializer())
     val conversations = JsonListStore(app, "conversations.json", Conversation.serializer())
     val shortcuts = JsonListStore(app, "shortcuts.json", Shortcut.serializer(), DefaultShortcuts.all)
+    val memories = JsonListStore(app, "memories.json", Memory.serializer())
+    val routines = JsonListStore(app, "routines.json", Routine.serializer())
     val brief = JsonValueStore(app, "daily_brief.json", DailyBrief.serializer())
     val usage = JsonValueStore(app, "usage.json", UsageStats.serializer())
 

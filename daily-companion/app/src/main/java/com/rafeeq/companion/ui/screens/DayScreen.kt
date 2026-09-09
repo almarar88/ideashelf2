@@ -54,6 +54,12 @@ import com.rafeeq.companion.data.Note
 import com.rafeeq.companion.data.Recurrence
 import com.rafeeq.companion.data.Task
 import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.ui.components.pastelInkAt
+import com.rafeeq.companion.ui.components.pastelAt
+import com.rafeeq.companion.ui.components.WeekStrip
+import com.rafeeq.companion.ui.components.ProgressCard
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyRow
 import com.rafeeq.companion.ui.components.Chip
 import com.rafeeq.companion.ui.components.EmptyState
 import com.rafeeq.companion.ui.components.GlassCard
@@ -91,17 +97,18 @@ fun DayScreen(viewModel: AppViewModel) {
     var showSmartAdd by remember { mutableStateOf(false) }
 
     val today = LocalDate.now(viewModel.zoneId())
+    var selectedDay by remember { mutableStateOf(today) }
 
     Column(Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("يومي", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("يومي", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
                 Text(
-                    Dates.longGregorianAr(today),
-                    style = MaterialTheme.typography.labelSmall,
+                    Dates.longGregorianAr(selectedDay),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -127,7 +134,44 @@ fun DayScreen(viewModel: AppViewModel) {
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
+
+        // شريط الأسبوع: الشهر بين سهمين واليوم المختار في كبسولة سوداء.
+        GlassCard(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            padding = PaddingValues(horizontal = 14.dp, vertical = 16.dp),
+        ) {
+            WeekStrip(selected = selectedDay, today = today) { selectedDay = it }
+        }
+
+        // تقدّم العادات اليوم — بطاقات باستيلية أفقية كما في التصميم.
+        if (habits.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            SectionTitle("تقدّمك", modifier = Modifier.padding(horizontal = 20.dp))
+            Spacer(Modifier.height(8.dp))
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                itemsIndexed(habits.take(6)) { index, habit ->
+                    val key = selectedDay.toString()
+                    val count = habit.log[key] ?: 0
+                    val percent = ((count.toFloat() / habit.targetPerDay.coerceAtLeast(1)) * 100)
+                        .toInt().coerceIn(0, 100)
+                    ProgressCard(
+                        title = habit.title,
+                        subtitle = "$count من ${habit.targetPerDay} اليوم",
+                        percent = percent,
+                        background = pastelAt(index),
+                        barColor = pastelInkAt(index),
+                        icon = Icons.Filled.CheckCircle,
+                        onMore = { viewModel.incrementHabit(habit, selectedDay) },
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -203,7 +247,7 @@ private fun TasksTab(
     }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 28.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (open.isNotEmpty()) {
@@ -456,7 +500,7 @@ private fun HabitsTab(
     }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 28.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(habits, key = { it.id }) { habit ->
@@ -644,7 +688,7 @@ private fun NotesTab(
         .sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updatedAt })
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 28.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 108.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // البحث يظهر فقط حين تتراكم الملاحظات؛ قبل ذلك هو ضجيج.

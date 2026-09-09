@@ -14,7 +14,9 @@ import com.rafeeq.companion.data.Conversation
 import com.rafeeq.companion.data.DailyBrief
 import com.rafeeq.companion.data.Habit
 import com.rafeeq.companion.data.NewsSource
+import com.rafeeq.companion.data.Memory
 import com.rafeeq.companion.data.Note
+import com.rafeeq.companion.data.Routine
 import com.rafeeq.companion.data.Place
 import com.rafeeq.companion.data.SavedArticle
 import com.rafeeq.companion.data.Recurrence
@@ -46,6 +48,7 @@ import com.rafeeq.companion.data.prayer.Prayer
 import com.rafeeq.companion.data.prayer.PrayerTimes
 import com.rafeeq.companion.notify.PrayerScheduler
 import com.rafeeq.companion.notify.HabitScheduler
+import com.rafeeq.companion.notify.RoutineScheduler
 import com.rafeeq.companion.notify.TaskScheduler
 import com.rafeeq.companion.ui.theme.ThemeMode
 import kotlinx.coroutines.CompletableDeferred
@@ -132,6 +135,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val conversations: StateFlow<List<Conversation>> = repos.conversations.items
     val brief: StateFlow<DailyBrief?> = repos.brief.value
     val shortcuts: StateFlow<List<Shortcut>> = repos.shortcuts.items
+    val memories: StateFlow<List<Memory>> = repos.memories.items
+    val routines: StateFlow<List<Routine>> = repos.routines.items
     val usage: StateFlow<UsageStats?> = repos.usage.value
 
     /**
@@ -143,9 +148,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         tasks = repos.tasks,
         notes = repos.notes,
         habits = repos.habits,
+        memories = repos.memories,
+        routines = repos.routines,
         articleTitles = { _news.value.articles.map { Triple(it.title, it.link, it.sourceName) } },
         zone = { zoneId() },
         onTasksChanged = { rescheduleTaskReminders() },
+        onRoutinesChanged = { rescheduleRoutines() },
     )
 
     private val _news = MutableStateFlow(NewsState())
@@ -230,6 +238,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             rescheduleAlarms()
             rescheduleTaskReminders()
             rescheduleHabitReminders()
+            rescheduleRoutines()
         }
         refreshCapabilities()
     }
@@ -423,6 +432,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { TaskScheduler.reschedule(getApplication(), tasks.value, zoneId()) }
     }
 
+    /** الروتينات المجدولة — تُعاد جدولتها بعد أي إضافة أو حذف. */
+    fun rescheduleRoutines() {
+        runCatching { RoutineScheduler.reschedule(getApplication(), routines.value, zoneId()) }
+    }
+
     /** تذكير العادات اليومية — يُعاد بناؤه بعد أي تغيير في القائمة. */
     fun rescheduleHabitReminders() {
         runCatching { HabitScheduler.reschedule(getApplication(), habits.value, zoneId()) }
@@ -544,6 +558,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             headlines = _news.value.articles.take(10),
             persona = s.aiPersona,
             use24h = s.use24hClock,
+            memories = memories.value.takeLast(12).map { it.text },
         )
     }
 
@@ -716,6 +731,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteShortcut(id: String) = viewModelScope.launch {
         repos.shortcuts.update { list -> list.filterNot { it.id == id } }
+    }
+
+    // ------------------------------------------------------ الذاكرة والروتين
+
+    fun addMemory(text: String, category: String) = viewModelScope.launch {
+        if (text.isBlank()) return@launch
+        repos.memories.update {
+            it + Memory(text = text.trim(), category = category, bySelf = false)
+        }
+    }
+
+    fun deleteMemory(id: String) = viewModelScope.launch {
+        repos.memories.update { list -> list.filterNot { it.id == id } }
+    }
+
+    fun clearMemories() = viewModelScope.launch { repos.memories.update { emptyList() } }
+
+    fun addRoutine(label: String, prompt: String, time: String, days: Set<Int>) =
+        viewModelScope.launch {
+            if (label.isBlank() || prompt.isBlank()) return@launch
+            repos.routines.update {
+                it + Routine(label = label.trim(), prompt = prompt.trim(), time = time, days = days)
+            }
+            rescheduleRoutines()
+        }
+
+    fun setRoutineEnabled(id: String, enabled: Boolean) = viewModelScope.launch {
+        repos.routines.update { list ->
+            list.map { if (it.id == id) it.copy(enabled = enabled) else it }
+        }
+        rescheduleRoutines()
+    }
+
+    fun deleteRoutine(id: String) = viewModelScope.launch {
+        repos.routines.update { list -> list.filterNot { it.id == id } }
+        rescheduleRoutines()
     }
 
     // ------------------------------------------------------------ إعادة التوليد
@@ -1099,6 +1150,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 showMessage("استُعيد $it عنصرًا")
                 rescheduleTaskReminders()
                 rescheduleHabitReminders()
+                rescheduleRoutines()
                 rescheduleAlarms()
             }
             .onFailure { showMessage("تعذّر الاستعادة: ${it.message}") }

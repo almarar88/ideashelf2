@@ -43,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -56,6 +57,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.rafeeq.companion.ui.components.ScreenTopBar
 import com.rafeeq.companion.ui.screens.AssistantScreen
 import com.rafeeq.companion.ui.screens.AzkarScreen
 import com.rafeeq.companion.ui.screens.SavedScreen
@@ -65,6 +67,7 @@ import com.rafeeq.companion.ui.screens.StatsScreen
 import com.rafeeq.companion.ui.screens.ControlScreen
 import com.rafeeq.companion.ui.screens.DayScreen
 import com.rafeeq.companion.ui.screens.HomeScreen
+import com.rafeeq.companion.ui.screens.MemoryScreen
 import com.rafeeq.companion.ui.screens.NewsScreen
 import com.rafeeq.companion.ui.screens.OnboardingScreen
 import com.rafeeq.companion.ui.screens.PrayerScreen
@@ -73,6 +76,7 @@ import com.rafeeq.companion.ui.screens.SourcesScreen
 import com.rafeeq.companion.ui.screens.WeatherScreen
 import com.rafeeq.companion.VoiceAssistantActivity
 import com.rafeeq.companion.ui.theme.Gradients
+import com.rafeeq.companion.ui.theme.Ink
 
 object Routes {
     const val ONBOARDING = "onboarding"
@@ -90,6 +94,7 @@ object Routes {
     const val SEARCH = "search"
     const val STATS = "stats"
     const val SHORTCUTS = "shortcuts"
+    const val MEMORY = "memory"
 }
 
 private data class Tab(
@@ -171,41 +176,26 @@ fun RafeeqNavigation(
         currentRoute == Routes.SAVED ||
         currentRoute == Routes.SEARCH ||
         currentRoute == Routes.STATS ||
-        currentRoute == Routes.SHORTCUTS
+        currentRoute == Routes.SHORTCUTS ||
+        currentRoute == Routes.MEMORY
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHost) },
         containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            if (showBottomBar) {
-                BottomBar(
-                    currentRoute = currentRoute,
-                    onSelect = { route ->
-                        navController.navigate(route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                )
-            }
-        },
-    ) { padding ->
+    ) { _ ->
+        // الشريط يطفو فوق المحتوى بدل أن يحجز صفًا أسفل الشاشة،
+        // فتبقى البطاقات ممتدة حتى الحافة كما في التصميم المرجعي.
+        Box(Modifier.fillMaxSize()) {
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(bottom = padding.calculateBottomPadding())
                 .statusBarsPadding(),
         ) {
             if (isSubScreen) {
-                Row(
-                    Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Filled.ArrowForward, contentDescription = "رجوع")
-                    }
-                }
+                ScreenTopBar(
+                    onBack = { navController.popBackStack() },
+                    backIcon = Icons.Filled.ArrowForward,
+                )
             }
 
             NavHost(
@@ -275,6 +265,7 @@ fun RafeeqNavigation(
                         onOpenControl = { navController.navigate(Routes.CONTROL) },
                         onOpenStats = { navController.navigate(Routes.STATS) },
                         onOpenShortcuts = { navController.navigate(Routes.SHORTCUTS) },
+                        onOpenMemory = { navController.navigate(Routes.MEMORY) },
                         onOpenSaved = { navController.navigate(Routes.SAVED) },
                     )
                 }
@@ -299,73 +290,80 @@ fun RafeeqNavigation(
                 composable(Routes.STATS) { StatsScreen(viewModel) }
 
                 composable(Routes.SHORTCUTS) { ShortcutsScreen(viewModel) }
+
+                composable(Routes.MEMORY) { MemoryScreen(viewModel) }
             }
+        }
+
+        if (showBottomBar) {
+            Box(Modifier.align(Alignment.BottomCenter)) {
+                BottomBar(
+                    currentRoute = currentRoute,
+                    onSelect = { route ->
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
+        }
         }
     }
 }
 
 @Composable
 private fun BottomBar(currentRoute: String?, onSelect: (String) -> Unit) {
+    // شريط عائم على شكل كبسولة: دائرة سوداء للعنصر النشط ودوائر بيضاء لبقيّته،
+    // كما في التصميم — لا خلفية ممتدة ولا نصوص تحت الأيقونات.
     Box(
         Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
             .navigationBarsPadding()
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(bottom = 14.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(26.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f))
-                .padding(horizontal = 5.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+                .shadow(
+                    14.dp, RoundedCornerShape(34.dp),
+                    ambientColor = Ink.copy(alpha = 0.12f),
+                    spotColor = Ink.copy(alpha = 0.16f),
+                )
+                .clip(RoundedCornerShape(34.dp))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
+                .padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             tabs.forEach { tab ->
                 val selected = currentRoute == tab.route
-                val scale by animateFloatAsState(
-                    targetValue = if (selected) 1f else 0.92f,
+                val size by animateFloatAsState(
+                    targetValue = if (selected) 50f else 46f,
                     animationSpec = tween(220),
-                    label = "tabScale",
+                    label = "tabSize",
                 )
-                Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(18.dp))
+                Box(
+                    Modifier
+                        .size(size.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (selected) Ink
+                            else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        )
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                        ) { onSelect(tab.route) }
-                        .padding(horizontal = 7.dp, vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                        ) { onSelect(tab.route) },
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(
-                        Modifier
-                            .size(width = 40.dp, height = 28.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (selected) Brush.horizontalGradient(Gradients.Aurora)
-                                else Brush.horizontalGradient(
-                                    listOf(Color.Transparent, Color.Transparent),
-                                ),
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            tab.icon,
-                            contentDescription = tab.label,
-                            tint = if (selected) Color(0xFF06121F)
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(if (selected) 18.dp else 20.dp),
-                        )
-                    }
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        tab.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selected) MaterialTheme.colorScheme.onSurface
+                    Icon(
+                        tab.icon,
+                        contentDescription = tab.label,
+                        tint = if (selected) Color.White
                         else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }

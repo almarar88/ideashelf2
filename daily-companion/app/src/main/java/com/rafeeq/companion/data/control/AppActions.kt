@@ -2,7 +2,9 @@ package com.rafeeq.companion.data.control
 
 import com.rafeeq.companion.data.Habit
 import com.rafeeq.companion.data.JsonListStore
+import com.rafeeq.companion.data.Memory
 import com.rafeeq.companion.data.Note
+import com.rafeeq.companion.data.Routine
 import com.rafeeq.companion.data.Recurrence
 import com.rafeeq.companion.data.Task
 import kotlinx.serialization.json.JsonObject
@@ -21,9 +23,12 @@ class AppActions(
     private val tasks: JsonListStore<Task>,
     private val notes: JsonListStore<Note>,
     private val habits: JsonListStore<Habit>,
+    private val memories: JsonListStore<Memory>,
+    private val routines: JsonListStore<Routine>,
     private val articleTitles: () -> List<Triple<String, String, String>>,
     private val zone: () -> ZoneId,
     private val onTasksChanged: () -> Unit = {},
+    private val onRoutinesChanged: () -> Unit = {},
 ) {
 
     fun handles(name: String): Boolean = name in ToolCatalog.appDataToolNames
@@ -39,6 +44,12 @@ class AppActions(
             "add_habit" -> addHabit(input.str("title"), input.intOrNull("times_per_day") ?: 1)
             "log_habit" -> logHabit(input.str("title"))
             "search_news" -> searchNews(input.str("query"))
+            "remember_fact" -> rememberFact(input.str("text"), input.strOrNull("category"))
+            "recall_facts" -> recallFacts(input.strOrNull("query"))
+            "forget_fact" -> forgetFact(input.str("query"))
+            "add_routine" -> addRoutine(input)
+            "read_routines" -> readRoutines()
+            "delete_routine" -> deleteRoutine(input.str("query"))
             else -> ActionResult.fail("أمر غير مدعوم: $name")
         }
     }.getOrElse { ActionResult.fail("تعذّر تنفيذ «$name»: ${it.message}") }
@@ -200,6 +211,108 @@ class AppActions(
     }
 
     // ------------------------------------------------------------ مساعدات
+
+
+    // ------------------------------------------------------------ الذاكرة
+
+    /** كلمات لا تُحفظ مهما طُلب: تسريبها من ملف نصّي عادي خطر لا يستحق. */
+    private val forbidden = listOf(
+        "كلمة المرور", "كلمه المرور", "الرقم السري", "password", "pin",
+        "cvv", "رمز التحقق", "otp", "رقم البطاقة", "رقم البطاقه", "iban",
+    )
+
+    private suspend fun rememberFact(text: String, category: String?): ActionResult {
+        val clean = text.trim()
+        if (clean.length < 3) return ActionResult.fail("المعلومة قصيرة جدًا.")
+        if (forbidden.any { normalize(clean).contains(normalize(it)) }) {
+            return ActionResult.fail(
+                "لن أحفظ كلمات المرور والأرقام السرية. اطلب من المستخدم استخدام مدير كلمات مرور.",
+            )
+        }
+
+        val existing = memories.load()
+        // تكرار المعلومة نفسها يضخّم السياق بلا فائدة.
+        if (existing.any { normalize(it.text) == normalize(clean) }) {
+            return ActionResult.ok("محفوظة عندي أصلًا.")
+        }
+
+        val memory = Memory(text = clean, category = category?.trim().orEmpty().ifBlank { "عام" })
+        memories.update { list -> (list + memory).takeLast(120) }
+        return ActionResult.ok("🧠 حفظت: $clean")
+    }
+
+    private suspend fun recallFacts(query: String?): ActionResult {
+        val all = memories.load()
+        if (all.isEmpty()) return ActionResult.ok("ما عندي شي محفوظ عن المستخدم بعد.")
+        val matched = if (query.isNullOrBlank()) all
+        else all.filter { normalize(it.text).contains(normalize(query)) }
+
+        if (matched.isEmpty()) return ActionResult.ok("ما لقيت شي عن «$query».")
+        return ActionResult.ok(
+            display = "قرأت ${matched.size} معلومة محفوظة",
+            detail = matched.joinToString("\n") { "• [${it.category}] ${it.text}" },
+        )
+    }
+
+    private suspend fun forgetFact(query: String): ActionResult {
+        val all = memories.load()
+        val target = all.firstOrNull { normalize(it.text).contains(normalize(query)) }
+            ?: return ActionResult.fail("ما لقيت معلومة تطابق «$query».")
+        memories.update { list -> list.filterNot { it.id == target.id } }
+        return ActionResult.ok("نسيت: ${target.text}")
+    }
+
+    // ------------------------------------------------------------ الروتين
+
+    private val dayKeys = mapOf(
+        "mon" to 1, "tue" to 2, "wed" to 3, "thu" to 4, "fri" to 5, "sat" to 6, "sun" to 7,
+        "الاثنين" to 1, "الثلاثاء" to 2, "الاربعاء" to 3, "الخميس" to 4,
+        "الجمعه" to 5, "السبت" to 6, "الاحد" to 7,
+    )
+
+    private suspend fun addRoutine(input: JsonObject): ActionResult {
+        val label = input.str("label").trim()
+        val prompt = input.str("prompt").trim()
+        val time = input.str("time").trim()
+        if (!validTime(time)) return ActionResult.fail("الوقت «$time» غير صالح. استعمل HH:mm.")
+
+        val days = input.strOrNull("days").orEmpty()
+            .split(",", "،", " ")
+            .mapNotNull { dayKeys[normalize(it)] }
+            .toSet()
+
+        val routine = Routine(label = label, prompt = prompt, time = time, days = days)
+        routines.update { it + routine }
+        onRoutinesChanged()
+
+        val when_ = if (days.isEmpty()) "كل يوم" else "أيام محدّدة"
+        return ActionResult.ok("⏰ جدولت «$label» $when_ الساعة $time")
+    }
+
+    private suspend fun readRoutines(): ActionResult {
+        val all = routines.load()
+        if (all.isEmpty()) return ActionResult.ok("ما في روتينات مجدولة.")
+        val lines = all.map { routine ->
+            val days = if (routine.days.isEmpty()) "كل يوم"
+            else routine.days.sorted().joinToString("، ") { dayNameAr(it) }
+            val state = if (routine.enabled) "" else " (موقوف)"
+            "• ${routine.label} — ${routine.time} · $days$state"
+        }
+        return ActionResult.ok("عندك ${all.size} روتين", lines.joinToString("\n"))
+    }
+
+    private suspend fun deleteRoutine(query: String): ActionResult {
+        val target = routines.load().firstOrNull { normalize(it.label).contains(normalize(query)) }
+            ?: return ActionResult.fail("ما لقيت روتينًا باسم «$query».")
+        routines.update { list -> list.filterNot { it.id == target.id } }
+        onRoutinesChanged()
+        return ActionResult.ok("حذفت روتين «${target.label}»")
+    }
+
+    private fun dayNameAr(value: Int): String = when (value) {
+        1 -> "الاثنين"; 2 -> "الثلاثاء"; 3 -> "الأربعاء"; 4 -> "الخميس"
+        5 -> "الجمعة"; 6 -> "السبت"; else -> "الأحد"
+    }
 
     private fun normalize(value: String) = value.trim().lowercase(Locale.ROOT)
         .replace("أ", "ا").replace("إ", "ا").replace("آ", "ا")
