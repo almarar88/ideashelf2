@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: "/calendar", label: "التقويم", icon: "📅" },
   { href: "/market", label: "السوق (بيع وشراء)", icon: "🛒" },
   { href: "/auctions", label: "المزادات", icon: "🔨" },
+  { href: "/os", label: "نوفا — نظام التشغيل الذكي", icon: "◈" },
 ];
 
 export function Sidebar({ userName }: { userName: string }) {
