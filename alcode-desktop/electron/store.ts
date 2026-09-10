@@ -165,6 +165,8 @@ export const stores = {
   notes: new JsonStore<Note[]>('notes.json', []),
   reminders: new JsonStore<Reminder[]>('reminders.json', []),
   conversations: new JsonStore<any[]>('conversations.json', []),
+  /** آخر يوم أُرسل فيه ملخّص الصباح — على القرص ليصمد بين التشغيلات. */
+  brief: new JsonStore<{ on: string }>('brief.json', { on: '' }),
   usage: new JsonStore<{ input: number; output: number; cached: number; requests: number }>(
     'usage.json', { input: 0, output: 0, cached: 0, requests: 0 },
   ),

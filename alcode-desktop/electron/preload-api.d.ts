@@ -62,6 +62,7 @@ export interface AlcodeBridge {
     openLog(): Promise<boolean>
   }
   quick: {
+    resize(height: number): void
     hide(): void
     expand(): void
     onFocus(handler: () => void): () => void

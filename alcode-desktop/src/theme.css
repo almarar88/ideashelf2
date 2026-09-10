@@ -66,6 +66,12 @@
   --olive: #33301D;
 }
 
+/* الشريط السريع: النافذة شفّافة، فلا خلفية للجسم ولا تمرير. */
+:root[data-route='quick'],
+:root[data-route='quick'] body {
+  background: transparent;
+}
+
 * { box-sizing: border-box; }
 
 html, body, #root { height: 100%; margin: 0; }

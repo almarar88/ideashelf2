@@ -10,6 +10,7 @@ export default function Quick() {
   const agent = useAgent(true)
   const [input, setInput] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const shellRef = useRef<HTMLDivElement>(null)
   const scrollRef = useAutoScroll(agent.messages.map((m) => m.content).join('|'))
 
   useEffect(() => {
@@ -29,6 +30,24 @@ export default function Quick() {
     return () => window.removeEventListener('keydown', onKey)
   }, [agent.confirmRequest])
 
+  /**
+   * النافذة تتبع ارتفاع محتواها.
+   *
+   * كانت ثابتة ٤٦٠ بكسل: حين لا محادثة، ثلاثة أرباعها شفّاف — يبدو فارغًا
+   * لكنه يلتقط نقرات الفأرة، فيصير حاجزًا غير مرئي فوق سطح المكتب.
+   */
+  useEffect(() => {
+    const element = shellRef.current
+    if (!element) return
+    const report = () => window.alcode.quick.resize(
+      Math.ceil(element.getBoundingClientRect().height),
+    )
+    report()
+    const observer = new ResizeObserver(report)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
   const submit = () => {
     const text = input.trim()
     if (!text) return
@@ -40,9 +59,12 @@ export default function Quick() {
 
   return (
     <div
+      ref={shellRef}
       style={{
-        height: '100vh', display: 'flex', flexDirection: 'column',
+        display: 'flex', flexDirection: 'column',
         padding: 10, gap: 10,
+        // بلا ارتفاع ثابت: القياس أعلاه يبلّغ النافذة بما يحتاجه المحتوى فعلًا.
+        maxHeight: '100vh',
       }}
     >
       <div
@@ -78,7 +100,7 @@ export default function Quick() {
         <div
           ref={scrollRef}
           className="card"
-          style={{ flex: 1, overflowY: 'auto', padding: 16, borderRadius: 22 }}
+          style={{ maxHeight: 420, overflowY: 'auto', padding: 16, borderRadius: 22 }}
         >
           {agent.messages.map((message) => (
             <Bubble key={message.id} message={message} />
@@ -90,11 +112,21 @@ export default function Quick() {
         </div>
       )}
 
-      <div className="row small muted" style={{ justifyContent: 'center', gap: 14 }}>
-        <span>Esc للإخفاء</span>
-        <button className="small muted" onClick={() => window.alcode.quick.expand()}>
-          فتح النافذة الكاملة ↗
-        </button>
+      {/* التلميحات على خلفية شفّافة فوق خلفية سطح مكتب مجهولة اللون:
+          بلا وعاء معتم قد تكون غير مقروءة تمامًا. */}
+      <div className="row" style={{ justifyContent: 'center' }}>
+        <div
+          className="row small"
+          style={{
+            gap: 14, background: 'var(--surface)', color: 'var(--muted)',
+            borderRadius: 999, padding: '5px 14px', boxShadow: 'var(--shadow)',
+          }}
+        >
+          <span><kbd>Esc</kbd> للإخفاء</span>
+          <button className="small muted" onClick={() => window.alcode.quick.expand()}>
+            فتح النافذة الكاملة ↗
+          </button>
+        </div>
       </div>
 
       {agent.confirmRequest && (

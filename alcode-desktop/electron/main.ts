@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { AgentEvent, ToolCall, complete, friendly, runAgent, webSearchTool } from './claude'
 import { contextBlock, systemPrompt } from './prompt'
-import { defaultSettings, Settings, stores } from './store'
+import { defaultSettings, Habit, Settings, stores, Task } from './store'
 import { allTools, toolByName, toolGroups, toolsForApi } from './tools'
 import { isWindows } from './ps'
 import { activeSources, contextSummary, getDay, getNews, getWeather, prayersFor } from './daily'
@@ -36,8 +36,18 @@ const isDev = !app.isPackaged
  * نافذة وبلا أيقونة يفتح منها. نستعمل الملف الموجود فعلًا ونتحقّق منه.
  */
 function appIcon(): Electron.NativeImage | undefined {
-  const image = nativeImage.createFromPath(join(__dirname, '../build/icon.png'))
-  return image.isEmpty() ? undefined : image
+  // في النسخة المحزومة تُفكّ الأيقونة خارج الأرشيف (asarUnpack)، فنجرّب
+  // المسارين: المفكوك أولًا ثم الداخلي عند التشغيل من المصدر.
+  const candidates = [
+    join(__dirname, '../build/icon.png').replace('app.asar', 'app.asar.unpacked'),
+    join(__dirname, '../build/icon.png'),
+  ]
+  for (const path of candidates) {
+    const image = nativeImage.createFromPath(path)
+    if (!image.isEmpty()) return image
+  }
+  log('لم يُعثر على أيقونة التطبيق في أي مسار متوقّع')
+  return undefined
 }
 
 let mainWindow: BrowserWindow | null = null
@@ -294,10 +304,11 @@ function startPrayerLoop() {
     if (!day) return
 
     const stamp = now.getTime()
+    const today = now.toDateString()
     for (const prayer of PRAYERS) {
       if (!prayer.obligatory) continue
       const at = day.times[prayer.key]
-      const key = `${now.toDateString()}:${prayer.key}`
+      const key = `${today}:${prayer.key}`
       if (announced.has(key)) continue
       // نافذة دقيقة واحدة: مرّ الوقت ولم يمضِ عليه أكثر من ٦٠ ثانية.
       if (at > stamp || stamp - at > 60_000) continue
@@ -310,15 +321,23 @@ function startPrayerLoop() {
       }
       mainWindow?.webContents.send('prayer:fired', prayer.key)
     }
-    // لا نُبقي مفاتيح الأمس: مجموعة تكبر بلا حدّ عبر الأسابيع.
-    if (announced.size > 40) announced.clear()
+    // مفاتيح الأمس تُحذف، ومفاتيح اليوم تبقى. المسح الكامل كان يسمح بإعادة
+    // التنبيه للصلاة نفسها ما دامت داخل نافذة الدقيقة.
+    if (announced.size > 12) {
+      for (const key of [...announced]) {
+        if (!key.startsWith(today)) announced.delete(key)
+      }
+    }
   }, 30_000)
 }
 
 // ---------------------------------------------------- ملخّص الصباح
 
-/** آخر يوم أُرسل فيه الملخّص، حتى لا يتكرّر في اليوم نفسه. */
-let briefedOn = ''
+/*
+ * آخر يوم أُرسل فيه الملخّص يُخزَّن على القرص (`stores.brief`) لا في الذاكرة:
+ * متغيّر في الذاكرة يضيع مع كل إغلاق، فمن يعيد تشغيل التطبيق بعد ملخّص
+ * الصباح كان يستقبله من جديد.
+ */
 
 /**
  * إشعار واحد في الصباح: التاريخ، الصلاة القادمة، الطقس، والمهام.
@@ -332,13 +351,13 @@ function startBriefLoop() {
 
     const now = new Date()
     const today = now.toDateString()
-    if (briefedOn === today) return
+    if ((await stores.brief.load()).on === today) return
 
     const [hour, minute] = settings.morningBriefAt.split(':').map(Number)
     if (!Number.isFinite(hour) || !Number.isFinite(minute)) return
     if (now.getHours() * 60 + now.getMinutes() < hour * 60 + minute) return
 
-    briefedOn = today
+    await stores.brief.save({ on: today })
     const summary = await contextSummary().catch(() => '')
     if (!summary || !Notification.isSupported()) return
 
@@ -621,12 +640,27 @@ function registerIpc() {
   ipcMain.handle('daily:tasks', async () => stores.tasks.load())
   ipcMain.handle('daily:habits', async () => stores.habits.load())
 
+  /**
+   * الحفظ دمج لا استبدال.
+   *
+   * الاستبدال كان يمحو كل حقل لم يرسله المُنادي: الشاشة الرئيسية تُعلّم المهمة
+   * منجزة وترسل العنوان والموعد فقط، فتضيع الملاحظة والأولوية والتكرار بصمت.
+   * الدمج يحفظ المرسَل ويُبقي الباقي، والحقل الذي يريد المستخدم مسحه يُرسَل
+   * صراحةً بقيمة فارغة فيُمسح.
+   */
   ipcMain.handle('daily:saveTask', async (_event, task: any) => {
+    if (!task?.id) return false
     await stores.tasks.update((list) => {
       const index = list.findIndex((t) => t.id === task.id)
-      if (index < 0) return [task, ...list]
+      if (index < 0) {
+        return [{
+          note: '', dueDate: null, dueTime: null, priority: 1,
+          done: false, createdAt: Date.now(), repeat: null,
+          ...task,
+        } as Task, ...list]
+      }
       const next = [...list]
-      next[index] = task
+      next[index] = { ...next[index], ...task }
       return next
     })
     return true
@@ -638,11 +672,18 @@ function registerIpc() {
   })
 
   ipcMain.handle('daily:saveHabit', async (_event, habit: any) => {
+    if (!habit?.id) return false
     await stores.habits.update((list) => {
       const index = list.findIndex((h) => h.id === habit.id)
-      if (index < 0) return [...list, habit]
+      if (index < 0) {
+        return [...list, {
+          emoji: '', targetPerDay: 1, log: {}, createdAt: Date.now(), ...habit,
+        } as Habit]
+      }
+      // الدمج هنا أهمّ: `log` يحمل تاريخ العادة كله، وإرسال جزئي واحد
+      // بلا هذا الحقل كان يمحو السلسلة من أوّلها.
       const next = [...list]
-      next[index] = habit
+      next[index] = { ...next[index], ...habit }
       return next
     })
     return true
@@ -678,6 +719,21 @@ function registerIpc() {
   })
 
   ipcMain.on('quick:hide', () => quickWindow?.hide())
+
+  /**
+   * النافذة تتبع محتواها. الحدّ الأدنى يمنع اختفاءها والأعلى يمنع تجاوز الشاشة،
+   * والمقاس يبقى ثابت العرض حتى لا يقفز الشريط تحت المؤشّر.
+   */
+  ipcMain.on('quick:resize', (_event, height: number) => {
+    if (!quickWindow || quickWindow.isDestroyed()) return
+    const wanted = Math.round(Number(height) || 0)
+    if (!Number.isFinite(wanted) || wanted <= 0) return
+    const { height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
+    const clamped = Math.min(Math.max(wanted, 96), Math.max(200, screenHeight - 200))
+    const bounds = quickWindow.getBounds()
+    if (bounds.height === clamped) return
+    quickWindow.setBounds({ ...bounds, height: clamped })
+  })
   ipcMain.on('quick:expand', () => {
     quickWindow?.hide()
     showMain()

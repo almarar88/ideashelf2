@@ -41,8 +41,11 @@ export async function locateViaWindows(): Promise<LocateResult> {
   }
 
   // ننتظر حتى ٢٠ ثانية: أول قراءة قد تحتاج تشغيل الخدمة وتثبيت الإشارة.
+  // كل شيء داخل try: بلا هذا يتسرّب أثر خطأ .NET خامًا إلى واجهة عربية
+  // حين لا تتوفّر System.Device (مثلًا لو نُفّذ تحت PowerShell 7 لا 5.1).
   const script = `
 $ErrorActionPreference = 'Stop'
+try {
 Add-Type -AssemblyName System.Device
 $watcher = New-Object System.Device.Location.GeoCoordinateWatcher
 $watcher.Start()
@@ -72,6 +75,10 @@ Write-Output (ConvertTo-Json @{
   longitude = $location.Longitude
   accuracy = $location.HorizontalAccuracy
 })
+} catch {
+  Write-Output (ConvertTo-Json @{ status = 'unavailable' })
+  exit 0
+}
 `
 
   const result = await runPs(script, {}, 30_000)

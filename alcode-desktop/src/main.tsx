@@ -79,6 +79,13 @@ function MissingBridge() {
 const isQuick = window.location.hash.startsWith('#/quick')
 const hasBridge = typeof window.alcode === 'object' && window.alcode !== null
 
+/*
+ * الشريط السريع نافذة شفّافة بلا إطار، ومحتواه شريط في أعلاها فقط. لكن
+ * خلفية body الرملية كانت تُلوّن النافذة كلها، فيظهر على الشاشة مستطيل معتم
+ * ٧٢٠×٤٦٠ والشريط في طرفه. نُعلِم الجذر بالمسار لتُشطب الخلفية في هذه الحالة.
+ */
+if (isQuick) document.documentElement.dataset.route = 'quick'
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Guard>

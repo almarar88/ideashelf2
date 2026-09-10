@@ -75,6 +75,7 @@ const api = {
     openLog: () => ipcRenderer.invoke('diag:openLog'),
   },
   quick: {
+    resize: (height: number) => ipcRenderer.send('quick:resize', height),
     hide: () => ipcRenderer.send('quick:hide'),
     expand: () => ipcRenderer.send('quick:expand'),
     onFocus: (handler: () => void) => {

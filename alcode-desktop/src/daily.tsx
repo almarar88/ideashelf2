@@ -274,7 +274,9 @@ export function HomeTab({ onGo, onAsk, userName }: {
                 <div key={task.id} className="row" style={{ gap: 10, padding: '7px 10px' }}>
                   <button
                     onClick={async () => {
-                      await window.alcode.daily.saveTask({ ...task, done: true })
+                      // المعرّف والحالة فقط: الحفظ دمج، وإرسال حقول العرض
+                      // (مثل dueDate الفارغ بدل null) يغيّر أنواع المخزَّن بلا داعٍ.
+                      await window.alcode.daily.saveTask({ id: task.id, done: true })
                       void load()
                     }}
                     title="أنجزتها"
