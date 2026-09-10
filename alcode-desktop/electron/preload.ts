@@ -70,6 +70,16 @@ const api = {
     deleteHabit: (id: string) => ipcRenderer.invoke('daily:deleteHabit', id),
     openExternal: (url: string) => ipcRenderer.invoke('daily:openExternal', url),
   },
+  chat: {
+    list: () => ipcRenderer.invoke('chat:list'),
+    load: (id: string) => ipcRenderer.invoke('chat:load', id),
+    save: (conversation: unknown) => ipcRenderer.invoke('chat:save', conversation),
+    remove: (id: string) => ipcRenderer.invoke('chat:delete', id),
+    clear: () => ipcRenderer.invoke('chat:clear'),
+  },
+  update: {
+    check: (force = false) => ipcRenderer.invoke('update:check', force),
+  },
   license: {
     state: () => ipcRenderer.invoke('license:state'),
     activate: (key: string) => ipcRenderer.invoke('license:activate', key),

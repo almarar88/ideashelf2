@@ -136,3 +136,41 @@ test('بناء بلا مفتاح عامّ يعمل بلا قيد', () => {
   assert.equal(state.source, 'unlicensed-build')
   assert.equal(state.valid, true)
 })
+
+// ----------------------------------------------------------- التحديثات
+
+/**
+ * مقارنة النسخ. الخطأ هنا صامت ومكلف في الاتجاهين: إمّا يُخطر المستخدم بتحديث
+ * لا وجود له في كل تشغيل، أو لا يُخطره أبدًا فيبقى على نسخة معطوبة.
+ */
+function loadUpdate() {
+  const dir = mkdtempSync(join(tmpdir(), 'alc-upd-'))
+  const source = readFileSync('electron/update.ts', 'utf8')
+    .replace("import { app } from 'electron'", 'const app = { getVersion: () => "0.0.0" }')
+    .replace("import { log } from './startup'", 'const log = (..._a: unknown[]) => {}')
+  const file = join(dir, 'update.ts')
+  writeFileSync(file, source)
+  execFileSync(process.execPath, [tsc, file, '--outDir', dir, '--module', 'commonjs',
+    '--target', 'es2022', '--moduleResolution', 'node', '--skipLibCheck'], { stdio: 'pipe' })
+  return requireHere(join(dir, 'update.js'))
+}
+
+const upd = loadUpdate()
+
+test('مقارنة النسخ ترتّب صحيحًا', () => {
+  const { compareVersions: cmp } = upd
+  assert.equal(cmp('1.3.0', '1.2.1'), 1)
+  assert.equal(cmp('1.2.1', '1.3.0'), -1)
+  assert.equal(cmp('1.3.0', '1.3.0'), 0)
+
+  // الفخّ الكلاسيكي: مقارنة نصّية تجعل «1.10.0» أقدم من «1.9.0».
+  assert.equal(cmp('1.10.0', '1.9.0'), 1)
+  assert.equal(cmp('2.0.0', '1.99.99'), 1)
+
+  // بادئة v وأطوال مختلفة وقيَم تالفة لا تكسر الترتيب.
+  assert.equal(cmp('v1.4.0', '1.3.9'), 1)
+  assert.equal(cmp('1.3', '1.3.0'), 0)
+  assert.equal(cmp('1.3.1', '1.3'), 1)
+  assert.equal(cmp('', '1.0.0'), -1)
+  assert.equal(cmp('كلام', '0.0.0'), 0)
+})

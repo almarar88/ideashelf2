@@ -8,7 +8,7 @@ import { ChatMessage, ConfirmRequest, ToolRun } from './types'
  * نصوص مقروءة، والثاني كتل محتوى تشمل استدعاءات الأدوات ونتائجها. خلطهما
  * يكسر إعادة الإرسال في الأدوار التالية.
  */
-export function useAgent(fromQuick = false) {
+export function useAgent(fromQuick = false, persist = false) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streaming, setStreaming] = useState(false)
   const [status, setStatus] = useState('')
@@ -19,6 +19,10 @@ export function useAgent(fromQuick = false) {
   const buffer = useRef('')
   const runs = useRef<ToolRun[]>([])
   const activeId = useRef('')
+
+  // هوية المحادثة الجارية — تُنشأ عند أول رسالة وتثبت حتى «محادثة جديدة».
+  const conversationId = useRef('')
+  const createdAt = useRef(0)
 
   useEffect(() => {
     const offEvent = window.alcode.agent.onEvent((event: any) => {
@@ -93,6 +97,11 @@ export function useAgent(fromQuick = false) {
     buffer.current = ''
     runs.current = []
 
+    if (!conversationId.current) {
+      conversationId.current = crypto.randomUUID()
+      createdAt.current = Date.now()
+    }
+
     setMessages((current) => [...current, userMessage, placeholder])
     setStreaming(true)
     setStatus('يفكّر…')
@@ -119,7 +128,21 @@ export function useAgent(fromQuick = false) {
           ? { ...m, content: message, error: true } : m)),
       )
     }
-  }, [fromQuick, streaming])
+
+    // الحفظ بعد اكتمال الدور لا مع كل رمز: الكتابة على القرص مع كل حرف
+    // تُثقل الجهاز بلا فائدة، والدور المكتمل هو أصغر وحدة تستحقّ الحفظ.
+    if (persist && result.ok) {
+      setMessages((current) => {
+        void window.alcode.chat.save({
+          id: conversationId.current,
+          createdAt: createdAt.current,
+          messages: current,
+          apiHistory: apiHistory.current,
+        })
+        return current
+      })
+    }
+  }, [fromQuick, streaming, persist])
 
   const stop = useCallback(() => {
     window.alcode.agent.stop()
@@ -129,7 +152,20 @@ export function useAgent(fromQuick = false) {
 
   const reset = useCallback(() => {
     apiHistory.current = []
+    conversationId.current = ''
+    createdAt.current = 0
     setMessages([])
+    setError('')
+  }, [])
+
+  /** يستأنف محادثة محفوظة بحالتها الكاملة — عرضًا وسجلًّا برمجيًّا. */
+  const resume = useCallback(async (id: string) => {
+    const saved = await window.alcode.chat.load(id)
+    if (!saved) return
+    conversationId.current = saved.id
+    createdAt.current = saved.createdAt
+    apiHistory.current = saved.apiHistory ?? []
+    setMessages(saved.messages ?? [])
     setError('')
   }, [])
 
@@ -142,6 +178,7 @@ export function useAgent(fromQuick = false) {
   return {
     messages, streaming, status, error,
     confirmRequest, answerConfirm,
-    send, stop, reset,
+    send, stop, reset, resume,
+    conversationId: conversationId.current,
   }
 }

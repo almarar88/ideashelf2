@@ -62,5 +62,6 @@ export interface AppSettings {
   topics: string[]
   newsRefreshMinutes: number
   prayerAlerts: boolean
+  onboarded: boolean
   morningBriefAt: string
 }

@@ -65,6 +65,19 @@ export interface AlcodeBridge {
     deleteHabit(id: string): Promise<boolean>
     openExternal(url: string): Promise<boolean>
   }
+  chat: {
+    list(): Promise<{ id: string; title: string; createdAt: number; updatedAt: number; count: number }[]>
+    load(id: string): Promise<any | null>
+    save(conversation: unknown): Promise<boolean>
+    remove(id: string): Promise<boolean>
+    clear(): Promise<boolean>
+  }
+  update: {
+    check(force?: boolean): Promise<{
+      available: boolean; current: string; latest: string
+      url: string; notes: string; checkedAt: number; error: string
+    }>
+  }
   license: {
     state(): Promise<LicenseState>
     activate(key: string): Promise<{ ok: boolean; message: string; state: LicenseState }>

@@ -3,6 +3,7 @@ import { Bubble, ConfirmDialog, Section, Thinking, useAutoScroll } from './compo
 import { useAgent } from './useAgent'
 import { AppSettings, Place } from './types'
 import type { LicenseState } from '../electron/preload-api'
+import Onboarding from './Onboarding'
 import {
   DayTab, HomeTab, NewsTab, PrayerTab, TimeZoneContext, Use24hContext, WeatherTab,
 } from './daily'
@@ -37,9 +38,12 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [toolCount, setToolCount] = useState(0)
   const [license, setLicense] = useState<LicenseState | null>(null)
+  const [history, setHistory] = useState<any[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [update, setUpdate] = useState<any>(null)
   const [platform, setPlatform] = useState<{ windows: boolean; version: string } | null>(null)
 
-  const agent = useAgent(false)
+  const agent = useAgent(false, true)
   const scrollRef = useAutoScroll(agent.messages.map((m) => m.content).join('|'))
   const [input, setInput] = useState('')
 
@@ -51,12 +55,21 @@ export default function App() {
     setLicense(await window.alcode.license.state())
   }, [])
 
+  const refreshHistory = useCallback(async () => {
+    setHistory(await window.alcode.chat.list())
+  }, [])
+
   useEffect(() => {
     void refreshSettings()
     void refreshLicense()
+    void refreshHistory()
+    // الفحص عند الإقلاع بلا إلحاح: نتيجته لا تُعرض إلا إن كان ثمّة جديد.
+    void window.alcode.update.check().then((info) => {
+      if (info.available) setUpdate(info)
+    })
     void window.alcode.tools.count().then(setToolCount)
     void window.alcode.platform().then(setPlatform)
-  }, [refreshSettings, refreshLicense])
+  }, [refreshSettings, refreshLicense, refreshHistory])
 
   // المظهر يتبع الإعداد، و"النظام" يتبع تفضيل ويندوز نفسه.
   useEffect(() => {
@@ -142,6 +155,20 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [agent])
 
+  // التهيئة تُعرض قبل كل شيء في أول تشغيل، ولا تُعرض ثانيةً بعد إنهائها.
+  if (settings && !settings.onboarded) {
+    return (
+      <Onboarding
+        settings={settings}
+        onPatch={patchSettings}
+        onDone={async () => {
+          await patchSettings({ onboarded: true })
+          await refreshHistory()
+        }}
+      />
+    )
+  }
+
   return (
     <div style={{ height: '100vh', display: 'flex' }}>
       {/* ------------------------------------------------ الشريط الجانبي */}
@@ -215,8 +242,43 @@ export default function App() {
                   {platform && !platform.windows && ' · (أدوات ويندوز معطّلة خارج ويندوز)'}
                 </p>
               </div>
-              <button className="pill" onClick={agent.reset}>محادثة جديدة</button>
+              <div className="row" style={{ gap: 8 }}>
+                <button
+                  className={showHistory ? 'pill active' : 'pill'}
+                  onClick={async () => { await refreshHistory(); setShowHistory((v) => !v) }}
+                  title="المحادثات السابقة"
+                >
+                  🕘 السجل
+                </button>
+                <button
+                  className="pill"
+                  onClick={() => { agent.reset(); void refreshHistory() }}
+                  title="محادثة جديدة (Ctrl+N)"
+                >
+                  محادثة جديدة
+                </button>
+              </div>
             </header>
+
+            {update && <UpdateBanner info={update} onDismiss={() => setUpdate(null)} />}
+
+            {showHistory && (
+              <ChatHistory
+                items={history}
+                onOpen={async (id) => {
+                  await agent.resume(id)
+                  setShowHistory(false)
+                }}
+                onDelete={async (id) => {
+                  await window.alcode.chat.remove(id)
+                  await refreshHistory()
+                }}
+                onClear={async () => {
+                  await window.alcode.chat.clear()
+                  await refreshHistory()
+                }}
+              />
+            )}
 
             {license && <LicenseBanner license={license} onGo={() => setTab('settings')} />}
 
@@ -1366,6 +1428,8 @@ function Diagnostics() {
     path: string; tail: string; version: string; electron: string; platform: string
   } | null>(null)
   const [open, setOpen] = useState(false)
+  const [updateState, setUpdateState] = useState('')
+  const [latest, setLatest] = useState<any>(null)
 
   const load = useCallback(async () => setInfo(await window.alcode.diag.log()), [])
 
@@ -1386,6 +1450,23 @@ function Diagnostics() {
           أين وقف بالضبط.
         </p>
         <div className="row wrap" style={{ gap: 8 }}>
+          <button
+            className="chip"
+            onClick={async () => {
+              setUpdateState('أفحص…')
+              const result = await window.alcode.update.check(true)
+              setUpdateState(
+                result.error
+                  ? `⚠️ تعذّر الفحص: ${result.error}`
+                  : result.available
+                    ? `⬆️ تتوفّر ${result.latest}`
+                    : '✅ نسختك هي الأحدث',
+              )
+              setLatest(result.available ? result : null)
+            }}
+          >
+            افحص التحديثات
+          </button>
           <button className="chip" onClick={() => setOpen((value) => !value)}>
             {open ? 'إخفاء السجل' : 'اعرض السجل'}
           </button>
@@ -1394,6 +1475,20 @@ function Diagnostics() {
           </button>
           <button className="chip" onClick={() => void load()}>تحديث</button>
         </div>
+        {updateState && (
+          <div className="row small" style={{ gap: 8 }}>
+            <span>{updateState}</span>
+            {latest && (
+              <button
+                className="pill"
+                onClick={() => window.alcode.daily.openExternal(latest.url)}
+              >
+                نزّلها
+              </button>
+            )}
+          </div>
+        )}
+
         {open && (
           <pre
             className="small"
@@ -1572,5 +1667,83 @@ function LicenseSection({ license, onChange }: {
         </div>
       </div>
     </Section>
+  )
+}
+
+// ------------------------------------------------- السجل والتحديثات
+
+function relativeDay(at: number): string {
+  const days = Math.floor((Date.now() - at) / 86_400_000)
+  if (days <= 0) return 'اليوم'
+  if (days === 1) return 'أمس'
+  if (days < 7) return `قبل ${days} أيام`
+  return new Date(at).toLocaleDateString('ar')
+}
+
+function ChatHistory({ items, onOpen, onDelete, onClear }: {
+  items: { id: string; title: string; updatedAt: number; count: number }[]
+  onOpen: (id: string) => void
+  onDelete: (id: string) => void
+  onClear: () => void
+}) {
+  return (
+    <div className="card" style={{ marginBottom: 12, padding: 10, maxHeight: 260, overflowY: 'auto' }}>
+      {items.length === 0 ? (
+        <p className="muted small" style={{ padding: 10, margin: 0 }}>
+          ما في محادثات محفوظة بعد. كل محادثة تُحفظ على جهازك تلقائيًا.
+        </p>
+      ) : (
+        <>
+          {items.map((item) => (
+            <div key={item.id} className="row" style={{ gap: 8, padding: '4px 2px' }}>
+              <button
+                className="row grow"
+                onClick={() => onOpen(item.id)}
+                style={{ gap: 10, padding: '8px 12px', borderRadius: 14, textAlign: 'start' }}
+              >
+                <span className="grow" style={{ fontWeight: 600 }}>{item.title}</span>
+                <span className="muted small">
+                  {relativeDay(item.updatedAt)} · {item.count} رسالة
+                </span>
+              </button>
+              <button className="chip" onClick={() => onDelete(item.id)} title="حذف">✕</button>
+            </div>
+          ))}
+          <div className="row" style={{ justifyContent: 'flex-end', marginTop: 6 }}>
+            <button className="chip" onClick={onClear}>امسح السجل كله</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * إخطار التحديث.
+ *
+ * يفتح صفحة التنزيل ولا ينزّل بنفسه: الملف غير موقّع رقميًا، وتنزيل ملف
+ * تنفيذي وتشغيله بلا علم المستخدم سلوك لا يليق بتطبيق يطلب ثقته.
+ */
+function UpdateBanner({ info, onDismiss }: {
+  info: { current: string; latest: string; url: string }
+  onDismiss: () => void
+}) {
+  return (
+    <div
+      className="row"
+      style={{
+        gap: 12, marginBottom: 12, padding: '10px 16px', borderRadius: 999,
+        background: 'var(--mint)', color: 'var(--mint-ink)',
+      }}
+    >
+      <span style={{ fontSize: 16 }}>⬆️</span>
+      <span className="grow small" style={{ fontWeight: 600 }}>
+        صدرت نسخة {info.latest} — لديك {info.current}.
+      </span>
+      <button className="pill" onClick={() => window.alcode.daily.openExternal(info.url)}>
+        نزّلها
+      </button>
+      <button className="chip" onClick={onDismiss}>لاحقًا</button>
+    </div>
   )
 }

@@ -126,6 +126,8 @@ export interface Settings {
   newsRefreshMinutes: number
   /** تنبيه عند كل صلاة. */
   prayerAlerts: boolean
+  /** هل أُنجزت تهيئة أول تشغيل؟ */
+  onboarded: boolean
   /** ملخّص الصباح كإشعار، بالساعة والدقيقة (HH:mm) أو فراغ لتعطيله. */
   morningBriefAt: string
 }
@@ -154,6 +156,7 @@ export const defaultSettings: Settings = {
   topics: [],
   newsRefreshMinutes: 30,
   prayerAlerts: true,
+  onboarded: false,
   morningBriefAt: '07:00',
 }
 

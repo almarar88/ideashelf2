@@ -16,6 +16,7 @@ import { locateViaIp, locateViaWindows, placeFromCoordinates } from './daily/loc
 import { validateFeed, topicSource } from './daily/news'
 import { longGregorianAr, longHijriAr } from './daily/dates'
 import { currentState, ensureFirstRun, licensingEnabled, verifyKey } from './license'
+import { checkForUpdate } from './update'
 import {
   installCrashGuards, log, markBootStarted, markBootSucceeded, previousBootFailed,
   readLogTail, reportFatal, startupLogPath,
@@ -372,6 +373,41 @@ function startBriefLoop() {
   }, 60_000)
 }
 
+// ----------------------------------------------------------- المحادثات
+
+const MAX_CONVERSATIONS = 40
+
+/** عنوان المحادثة: أول ما كتبه المستخدم، مقصوصًا. */
+function titleOf(conversation: { title?: string; messages?: { role: string; content: string }[] }): string {
+  if (conversation.title) return String(conversation.title).slice(0, 80)
+  const first = (conversation.messages ?? []).find((message) => message.role === 'user')
+  const text = String(first?.content ?? '').trim().replace(/\s+/g, ' ')
+  return text ? text.slice(0, 60) : 'محادثة'
+}
+
+/**
+ * يستبدل كتل الصور بنصّ قبل الحفظ.
+ *
+ * لقطة شاشة واحدة في نتيجة أداة تُخزَّن base64 بحجم ميغابايت أو أكثر. حفظها
+ * كما هي يعني ملف محادثات بمئات الميغابايتات بعد أسبوع، وقراءةً بطيئة عند كل
+ * فتح. النصّ البديل يُبقي المحادثة مفهومة ومستأنَفة، ويفقد الصورة فقط.
+ */
+function stripHeavyBlocks(history: unknown[]): unknown[] {
+  const walk = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(walk)
+    if (!value || typeof value !== 'object') return value
+
+    const record = value as Record<string, unknown>
+    if (record.type === 'image') {
+      return { type: 'text', text: '[لقطة شاشة — لا تُحفظ مع المحادثة]' }
+    }
+    const copy: Record<string, unknown> = {}
+    for (const [key, item] of Object.entries(record)) copy[key] = walk(item)
+    return copy
+  }
+  return history.map(walk)
+}
+
 // ------------------------------------------------------------- الجلسة
 
 interface PendingConfirm {
@@ -592,6 +628,58 @@ function registerIpc() {
     await shell.openExternal('ms-settings:privacy-location')
     return true
   })
+
+  // ------------------------------------------------------- المحادثات
+
+  ipcMain.handle('chat:list', async () => {
+    const all = await stores.conversations.load()
+    // القائمة بلا متون: عرض عشرين محادثة لا يجب أن ينقل رسائلها كلها.
+    return all.map((one: any) => ({
+      id: one.id,
+      title: one.title,
+      createdAt: one.createdAt,
+      updatedAt: one.updatedAt,
+      count: (one.messages ?? []).length,
+    }))
+  })
+
+  ipcMain.handle('chat:load', async (_event, id: string) => {
+    const all = await stores.conversations.load()
+    return all.find((one: any) => one.id === id) ?? null
+  })
+
+  ipcMain.handle('chat:save', async (_event, conversation: any) => {
+    if (!conversation?.id || !(conversation.messages ?? []).length) return false
+    const now = Date.now()
+    const clean = {
+      id: String(conversation.id),
+      title: titleOf(conversation),
+      createdAt: Number(conversation.createdAt) || now,
+      updatedAt: now,
+      messages: conversation.messages,
+      apiHistory: stripHeavyBlocks(conversation.apiHistory ?? []),
+    }
+    await stores.conversations.update((list: any[]) => {
+      const rest = list.filter((one) => one.id !== clean.id)
+      return [clean, ...rest].slice(0, MAX_CONVERSATIONS)
+    })
+    return true
+  })
+
+  ipcMain.handle('chat:delete', async (_event, id: string) => {
+    await stores.conversations.update((list: any[]) => list.filter((one) => one.id !== id))
+    return true
+  })
+
+  ipcMain.handle('chat:clear', async () => {
+    await stores.conversations.save([])
+    return true
+  })
+
+  // --------------------------------------------------------- التحديثات
+
+  ipcMain.handle('update:check', async (_event, force: boolean) =>
+    checkForUpdate(force === true))
 
   ipcMain.handle('license:state', async () => currentState())
 
