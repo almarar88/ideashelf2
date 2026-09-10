@@ -8,6 +8,11 @@ import { contextBlock, systemPrompt } from './prompt'
 import { defaultSettings, Settings, stores } from './store'
 import { allTools, toolByName, toolGroups, toolsForApi } from './tools'
 import { isWindows } from './ps'
+import { activeSources, contextSummary, getDay, getNews, getWeather, prayersFor } from './daily'
+import { METHODS, PRAYERS } from './daily/prayer'
+import { searchPlaces } from './daily/weather'
+import { validateFeed, topicSource } from './daily/news'
+import { longGregorianAr, longHijriAr } from './daily/dates'
 
 /**
  * العملية الرئيسية: النافذة، شريط المهام، الاختصار العام، وجسر الأوامر.
@@ -232,7 +237,13 @@ async function buildContext(settings: Settings): Promise<string> {
     .filter((r) => !r.done)
     .slice(0, 5)
     .map((r) => `${r.text} (${new Date(r.at).toLocaleString('ar', { hour12: false })})`)
-  return contextBlock({ userName: settings.userName, memories, reminders })
+
+  // حالة اليوم (صلاة، طقس، مهام، عناوين) تُحقن مع كل رسالة، كما في نسخة الهاتف:
+  // بدونها يسأل المساعد عن أشياء يعرفها التطبيق أصلًا.
+  const daily = await contextSummary().catch(() => '')
+
+  return contextBlock({ userName: settings.userName, memories, reminders }) +
+    (daily ? `\n<يومك>\n${daily}\n</يومك>` : '')
 }
 
 let quitting = false
@@ -300,6 +311,147 @@ function registerIpc() {
 
   ipcMain.handle('data:deleteReminder', async (_event, id: string) => {
     await stores.reminders.update((list) => list.filter((r) => r.id !== id))
+    return true
+  })
+
+  // ------------------------------------------------------ الرفيق اليومي
+
+  ipcMain.handle('daily:day', async () => getDay())
+
+  ipcMain.handle('daily:weather', async (_event, force: boolean) => getWeather(force === true))
+
+  ipcMain.handle('daily:news', async (_event, force: boolean) => getNews(force === true))
+
+  ipcMain.handle('daily:sources', async () => {
+    const settings = await stores.settings.load()
+    return activeSources(settings)
+  })
+
+  ipcMain.handle('daily:toggleSource', async (_event, id: string, enabled: boolean) => {
+    await stores.settings.update((current) => {
+      const disabled = new Set(current.disabledSources)
+      if (enabled) disabled.delete(id)
+      else disabled.add(id)
+      return { ...current, disabledSources: [...disabled] }
+    })
+    return true
+  })
+
+  ipcMain.handle('daily:addSource', async (_event, url: string, category: string) => {
+    try {
+      const probe = await validateFeed(url)
+      await stores.settings.update((current) => ({
+        ...current,
+        customSources: [...current.customSources, {
+          id: `custom:${Date.now()}`,
+          name: probe.name,
+          url,
+          category: category || 'الأهم',
+          enabled: true,
+          custom: true,
+        }],
+      }))
+      return { ok: true, name: probe.name, count: probe.count, error: '' }
+    } catch (error) {
+      return { ok: false, name: '', count: 0, error: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle('daily:removeSource', async (_event, id: string) => {
+    await stores.settings.update((current) => ({
+      ...current,
+      customSources: current.customSources.filter((s) => s.id !== id),
+    }))
+    return true
+  })
+
+  ipcMain.handle('daily:addTopic', async (_event, query: string) => {
+    const trimmed = String(query ?? '').trim()
+    if (!trimmed) return false
+    await stores.settings.update((current) => ({
+      ...current,
+      topics: [...new Set([...current.topics, trimmed])],
+    }))
+    void topicSource(trimmed)
+    return true
+  })
+
+  ipcMain.handle('daily:removeTopic', async (_event, query: string) => {
+    await stores.settings.update((current) => ({
+      ...current,
+      topics: current.topics.filter((t) => t !== query),
+    }))
+    return true
+  })
+
+  ipcMain.handle('daily:methods', async () =>
+    METHODS.map((method) => ({ id: method.id, arabic: method.arabic })))
+
+  ipcMain.handle('daily:searchPlaces', async (_event, query: string) => {
+    try {
+      return await searchPlaces(String(query ?? ''))
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('daily:prayerMonth', async (_event, year: number, month: number) => {
+    const settings = await stores.settings.load()
+    if (!settings.place) return []
+    const days = new Date(year, month, 0).getDate()
+    const rows = []
+    for (let day = 1; day <= days; day++) {
+      const date = new Date(year, month - 1, day)
+      const prayers = prayersFor(settings, date)
+      if (!prayers) continue
+      rows.push({
+        day,
+        gregorian: longGregorianAr(date),
+        hijri: longHijriAr(date, settings.hijriOffset),
+        times: PRAYERS.map((p) => ({ key: p.key, arabic: p.arabic, at: prayers.times[p.key] })),
+      })
+    }
+    return rows
+  })
+
+  ipcMain.handle('daily:tasks', async () => stores.tasks.load())
+  ipcMain.handle('daily:habits', async () => stores.habits.load())
+
+  ipcMain.handle('daily:saveTask', async (_event, task: any) => {
+    await stores.tasks.update((list) => {
+      const index = list.findIndex((t) => t.id === task.id)
+      if (index < 0) return [task, ...list]
+      const next = [...list]
+      next[index] = task
+      return next
+    })
+    return true
+  })
+
+  ipcMain.handle('daily:deleteTask', async (_event, id: string) => {
+    await stores.tasks.update((list) => list.filter((t) => t.id !== id))
+    return true
+  })
+
+  ipcMain.handle('daily:saveHabit', async (_event, habit: any) => {
+    await stores.habits.update((list) => {
+      const index = list.findIndex((h) => h.id === habit.id)
+      if (index < 0) return [...list, habit]
+      const next = [...list]
+      next[index] = habit
+      return next
+    })
+    return true
+  })
+
+  ipcMain.handle('daily:deleteHabit', async (_event, id: string) => {
+    await stores.habits.update((list) => list.filter((h) => h.id !== id))
+    return true
+  })
+
+  ipcMain.handle('daily:openExternal', async (_event, url: string) => {
+    if (!/^https?:\/\//i.test(String(url))) return false
+    await shell.openExternal(String(url))
     return true
   })
 

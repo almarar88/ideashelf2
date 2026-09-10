@@ -44,6 +44,30 @@ const api = {
       return () => ipcRenderer.removeListener('agent:confirm', listener)
     },
   },
+  daily: {
+    day: () => ipcRenderer.invoke('daily:day'),
+    weather: (force = false) => ipcRenderer.invoke('daily:weather', force),
+    news: (force = false) => ipcRenderer.invoke('daily:news', force),
+    sources: () => ipcRenderer.invoke('daily:sources'),
+    toggleSource: (id: string, enabled: boolean) =>
+      ipcRenderer.invoke('daily:toggleSource', id, enabled),
+    addSource: (url: string, category: string) =>
+      ipcRenderer.invoke('daily:addSource', url, category),
+    removeSource: (id: string) => ipcRenderer.invoke('daily:removeSource', id),
+    addTopic: (query: string) => ipcRenderer.invoke('daily:addTopic', query),
+    removeTopic: (query: string) => ipcRenderer.invoke('daily:removeTopic', query),
+    methods: () => ipcRenderer.invoke('daily:methods'),
+    searchPlaces: (query: string) => ipcRenderer.invoke('daily:searchPlaces', query),
+    prayerMonth: (year: number, month: number) =>
+      ipcRenderer.invoke('daily:prayerMonth', year, month),
+    tasks: () => ipcRenderer.invoke('daily:tasks'),
+    habits: () => ipcRenderer.invoke('daily:habits'),
+    saveTask: (task: unknown) => ipcRenderer.invoke('daily:saveTask', task),
+    deleteTask: (id: string) => ipcRenderer.invoke('daily:deleteTask', id),
+    saveHabit: (habit: unknown) => ipcRenderer.invoke('daily:saveHabit', habit),
+    deleteHabit: (id: string) => ipcRenderer.invoke('daily:deleteHabit', id),
+    openExternal: (url: string) => ipcRenderer.invoke('daily:openExternal', url),
+  },
   quick: {
     hide: () => ipcRenderer.send('quick:hide'),
     expand: () => ipcRenderer.send('quick:expand'),

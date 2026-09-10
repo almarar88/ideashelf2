@@ -1,4 +1,7 @@
 import { app } from 'electron'
+import { PrayerConfig, defaultPrayerConfig } from './daily/prayer'
+import { NewsSource } from './daily/news'
+import { Place } from './daily/weather'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 
@@ -71,6 +74,31 @@ export interface Reminder {
   done: boolean
 }
 
+export interface Task {
+  id: string
+  title: string
+  note: string
+  /** yyyy-MM-dd */
+  dueDate: string | null
+  /** HH:mm */
+  dueTime: string | null
+  priority: number
+  done: boolean
+  createdAt: number
+  /** daily | weekly | monthly */
+  repeat: string | null
+}
+
+export interface Habit {
+  id: string
+  title: string
+  emoji: string
+  targetPerDay: number
+  /** yyyy-MM-dd -> عدد المرات */
+  log: Record<string, number>
+  createdAt: number
+}
+
 export interface Settings {
   apiKey: string
   model: string
@@ -83,6 +111,19 @@ export interface Settings {
   theme: 'light' | 'dark' | 'system'
   userName: string
   persona: string
+
+  // ---- الرفيق اليومي
+  place: Place | null
+  prayer: PrayerConfig
+  hijriOffset: number
+  use24h: boolean
+  /** معرّفات المصادر المعطّلة — نخزّن الاستثناء لا القائمة كاملة. */
+  disabledSources: string[]
+  /** مصادر أضافها المستخدم بنفسه. */
+  customSources: NewsSource[]
+  /** مواضيع يتابعها بكلماته. */
+  topics: string[]
+  newsRefreshMinutes: number
 }
 
 export const defaultSettings: Settings = {
@@ -99,9 +140,20 @@ export const defaultSettings: Settings = {
   theme: 'system',
   userName: '',
   persona: '',
+
+  place: null,
+  prayer: defaultPrayerConfig,
+  hijriOffset: 0,
+  use24h: true,
+  disabledSources: [],
+  customSources: [],
+  topics: [],
+  newsRefreshMinutes: 30,
 }
 
 export const stores = {
+  tasks: new JsonStore<Task[]>('tasks.json', []),
+  habits: new JsonStore<Habit[]>('habits.json', []),
   settings: new JsonStore<Settings>('settings.json', defaultSettings),
   memories: new JsonStore<Memory[]>('memories.json', []),
   notes: new JsonStore<Note[]>('notes.json', []),

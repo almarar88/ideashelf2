@@ -1,0 +1,125 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { createRequire } from 'node:module'
+
+/** يترجم وحدة TypeScript ويحمّلها للاختبار. */
+function load(file) {
+  const dir = mkdtempSync(join(tmpdir(), 'alc-'))
+  execFileSync('npx', ['tsc', file, '--outDir', dir, '--module', 'commonjs',
+    '--target', 'es2022', '--moduleResolution', 'node', '--skipLibCheck'], { stdio: 'pipe' })
+  const require = createRequire(import.meta.url)
+  const name = file.split('/').pop().replace('.ts', '.js')
+  return require(join(dir, name))
+}
+
+const news = load('electron/daily/news.ts')
+const dates = load('electron/daily/dates.ts')
+
+// ------------------------------------------------------------ الأخبار
+
+const RSS = `<?xml version="1.0"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>مصدر تجريبي</title>
+    <item>
+      <title><![CDATA[عنوان فيه & رمز]]></title>
+      <link>https://example.com/a?utm=1</link>
+      <description>&lt;p&gt;وصف &amp;amp; مختصر&lt;/p&gt;</description>
+      <pubDate>Tue, 15 Jan 2026 08:00:00 GMT</pubDate>
+      <media:content url="https://example.com/a.jpg"/>
+    </item>
+    <item>
+      <title>خبر ثانٍ</title>
+      <link>https://example.com/b</link>
+      <pubDate>Tue, 15 Jan 2026 09:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`
+
+const ATOM = `<?xml version="1.0"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Atom Source</title>
+  <entry>
+    <title>Atom entry</title>
+    <link rel="alternate" href="https://example.org/x"/>
+    <summary>ملخّص</summary>
+    <updated>2026-01-15T10:00:00Z</updated>
+  </entry>
+</feed>`
+
+const source = { id: 's', name: 'مصدر', url: '', category: 'الأهم', enabled: true }
+
+test('يحلّل RSS مع CDATA والكيانات والصورة', () => {
+  const items = news.parseFeed(RSS, source)
+  assert.equal(items.length, 2)
+  assert.equal(items[0].title, 'عنوان فيه & رمز')
+  assert.equal(items[0].link, 'https://example.com/a?utm=1')
+  assert.equal(items[0].summary, 'وصف & مختصر', 'الوسوم والكيانات المزدوجة تُفكّ')
+  assert.equal(items[0].image, 'https://example.com/a.jpg')
+  assert.ok(items[0].publishedAt > 0)
+})
+
+test('يحلّل Atom حيث الرابط سمة لا محتوى وسم', () => {
+  const items = news.parseFeed(ATOM, source)
+  assert.equal(items.length, 1)
+  assert.equal(items[0].link, 'https://example.org/x')
+  assert.equal(items[0].title, 'Atom entry')
+})
+
+test('عنصر بلا عنوان أو رابط يُتجاهل بدل أن يُسقط الموجز', () => {
+  const broken = '<rss><channel><item><description>بلا عنوان</description></item></channel></rss>'
+  assert.equal(news.parseFeed(broken, source).length, 0)
+  assert.equal(news.parseFeed('ليس XML أصلًا', source).length, 0)
+})
+
+test('المصادر الافتراضية سليمة وبلا تكرار', () => {
+  const all = news.DEFAULT_SOURCES
+  assert.ok(all.length >= 18, `مصادر قليلة: ${all.length}`)
+  assert.equal(new Set(all.map((s) => s.id)).size, all.length, 'معرّف مكرّر')
+  for (const s of all) {
+    assert.ok(s.url.startsWith('https://'), `${s.name}: الرابط يجب أن يكون HTTPS`)
+    assert.ok(news.CATEGORIES.includes(s.category), `${s.name}: تصنيف غير معروف`)
+  }
+})
+
+test('الموضوع يتحوّل إلى بحث مُرمّز', () => {
+  const topic = news.topicSource('أسعار النفط')
+  assert.ok(topic.url.includes(encodeURIComponent('أسعار النفط')))
+  assert.ok(topic.url.startsWith('https://'))
+})
+
+// ----------------------------------------------------------- التواريخ
+
+test('التاريخ الهجري بتقويم أم القرى', () => {
+  // ١ يناير ٢٠٢٦ يوافق منتصف رجب ١٤٤٧ تقريبًا.
+  const hijri = dates.hijriParts(new Date(2026, 0, 1))
+  assert.equal(hijri.year, 1447)
+  assert.ok(hijri.month >= 1 && hijri.month <= 12)
+  assert.ok(hijri.day >= 1 && hijri.day <= 30)
+  assert.ok(dates.longHijriAr(new Date(2026, 0, 1)).includes('هـ'))
+})
+
+test('الإزاحة اليدوية تحرّك التاريخ الهجري يومًا', () => {
+  const base = dates.hijriParts(new Date(2026, 0, 15), 0)
+  const shifted = dates.hijriParts(new Date(2026, 0, 15), 1)
+  assert.notEqual(base.day, shifted.day)
+})
+
+test('صيغ الوقت والمدّة', () => {
+  assert.equal(dates.humanDuration(0), '0 د')
+  assert.equal(dates.humanDuration(45 * 60_000), '45 د')
+  assert.equal(dates.humanDuration(3 * 3_600_000), '3 س')
+  assert.equal(dates.humanDuration(3 * 3_600_000 + 12 * 60_000), '3 س 12 د')
+  assert.equal(dates.relativePast(Date.now() - 30_000), 'الآن')
+  assert.equal(dates.relativePast(0), '')
+})
+
+test('التحية تتبع الساعة', () => {
+  assert.equal(dates.greeting(7), 'صباح الخير')
+  assert.equal(dates.greeting(13), 'نهارك سعيد')
+  assert.equal(dates.greeting(22), 'مساء الخير')
+})

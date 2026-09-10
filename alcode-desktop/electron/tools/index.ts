@@ -1,5 +1,6 @@
 import { appTools } from './apps'
 import { automationTools } from './automation'
+import { dailyTools } from './daily'
 import { fileTools } from './files'
 import { inputTools } from './input'
 import { personalTools } from './personal'
@@ -18,6 +19,7 @@ export const allTools: ToolSpec[] = [
   ...fileTools,
   ...automationTools,
   ...personalTools,
+  ...dailyTools,
 ]
 
 export function toolByName(name: string): ToolSpec | undefined {

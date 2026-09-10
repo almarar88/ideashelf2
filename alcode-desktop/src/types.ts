@@ -21,6 +21,24 @@ export interface ConfirmRequest {
   details: string
 }
 
+export interface Place {
+  name: string
+  country: string
+  admin: string
+  latitude: number
+  longitude: number
+  timezone: string
+  elevation: number
+}
+
+export interface PrayerConfig {
+  methodId: string
+  asrFactor: 1 | 2
+  highLatitudeRule: 'MIDDLE_OF_NIGHT' | 'SEVENTH_OF_NIGHT' | 'ANGLE_BASED'
+  elevationMeters: number
+  offsets: Record<string, number>
+}
+
 export interface AppSettings {
   model: string
   effort: string
@@ -33,4 +51,14 @@ export interface AppSettings {
   userName: string
   persona: string
   hasApiKey: boolean
+
+  // ---- الرفيق اليومي
+  place: Place | null
+  prayer: PrayerConfig
+  hijriOffset: number
+  use24h: boolean
+  disabledSources: string[]
+  customSources: { id: string; name: string; url: string; category: string }[]
+  topics: string[]
+  newsRefreshMinutes: number
 }

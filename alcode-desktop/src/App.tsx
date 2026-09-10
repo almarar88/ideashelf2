@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Bubble, ConfirmDialog, Section, Thinking, useAutoScroll } from './components'
 import { useAgent } from './useAgent'
-import { AppSettings } from './types'
+import { AppSettings, Place } from './types'
+import { DayTab, HomeTab, NewsTab, PrayerTab, Use24hContext, WeatherTab } from './daily'
 
-type Tab = 'chat' | 'skills' | 'memory' | 'settings'
+type Tab =
+  | 'home' | 'chat' | 'day' | 'prayer' | 'weather' | 'news'
+  | 'skills' | 'memory' | 'settings'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
+  { id: 'home', label: 'الرئيسية', icon: '🏠' },
   { id: 'chat', label: 'المساعد', icon: '✨' },
+  { id: 'day', label: 'يومي', icon: '📋' },
+  { id: 'prayer', label: 'الصلاة', icon: '🕌' },
+  { id: 'weather', label: 'الطقس', icon: '⛅' },
+  { id: 'news', label: 'الأخبار', icon: '📰' },
   { id: 'skills', label: 'القدرات', icon: '🧩' },
   { id: 'memory', label: 'الذاكرة', icon: '🧠' },
   { id: 'settings', label: 'الإعدادات', icon: '⚙️' },
@@ -22,7 +30,7 @@ const SUGGESTIONS = [
 ]
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('chat')
+  const [tab, setTab] = useState<Tab>('home')
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [toolCount, setToolCount] = useState(0)
   const [platform, setPlatform] = useState<{ windows: boolean; version: string } | null>(null)
@@ -72,41 +80,52 @@ export default function App() {
       {/* ------------------------------------------------ الشريط الجانبي */}
       <aside
         style={{
-          width: 88, padding: '18px 0', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', gap: 10,
+          width: 92, padding: '16px 0', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', gap: 8,
         }}
       >
         <div
           style={{
-            width: 46, height: 46, borderRadius: '50%', background: 'var(--lavender)',
-            display: 'grid', placeItems: 'center', fontSize: 20, marginBottom: 8,
+            width: 42, height: 42, borderRadius: '50%', background: 'var(--lavender)',
+            display: 'grid', placeItems: 'center', fontSize: 19, flexShrink: 0,
           }}
         >
           ✦
         </div>
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setTab(item.id)}
-            title={item.label}
-            style={{
-              width: 52, height: 52, borderRadius: '50%',
-              background: tab === item.id ? 'var(--ink)' : 'var(--surface)',
-              color: tab === item.id ? 'var(--sand)' : 'var(--ink)',
-              boxShadow: tab === item.id ? 'none' : 'var(--shadow)',
-              fontSize: 19, transition: 'all 0.16s ease',
-            }}
-          >
-            {item.icon}
-          </button>
-        ))}
-        <div className="grow" />
+        {/* التبويبات تسع تسعة، والنافذة قد تُصغَّر إلى ٦٠٠ بكسل، فنجعل
+            الشريط نفسه قابلاً للتمرير بدل أن تُقصّ الأزرار الأخيرة. */}
+        <nav
+          className="col no-scrollbar"
+          style={{
+            flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex',
+            flexDirection: 'column', alignItems: 'center', gap: 4, padding: '4px 0',
+            width: '100%',
+          }}
+        >
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setTab(item.id)}
+              title={item.label}
+              style={{
+                width: 62, minHeight: 50, borderRadius: 18, flexShrink: 0,
+                background: tab === item.id ? 'var(--ink)' : 'transparent',
+                color: tab === item.id ? 'var(--sand)' : 'var(--ink)',
+                display: 'grid', placeItems: 'center', gap: 1,
+                transition: 'all 0.16s ease',
+              }}
+            >
+              <span style={{ fontSize: 17, lineHeight: 1 }}>{item.icon}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.85 }}>{item.label}</span>
+            </button>
+          ))}
+        </nav>
         {settings && !settings.hasApiKey && (
           <button
             className="pill"
             onClick={() => setTab('settings')}
             title="أضِف المفتاح"
-            style={{ background: 'var(--butter)', padding: 10 }}
+            style={{ background: 'var(--butter)', padding: 10, flexShrink: 0 }}
           >
             🔑
           </button>
@@ -115,6 +134,7 @@ export default function App() {
 
       {/* ------------------------------------------------------- المحتوى */}
       <main style={{ flex: 1, minWidth: 0, padding: '18px 22px 18px 0', overflow: 'hidden' }}>
+        <Use24hContext.Provider value={settings?.use24h ?? true}>
         {tab === 'chat' && (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <header className="row" style={{ marginBottom: 14 }}>
@@ -214,6 +234,11 @@ export default function App() {
           </div>
         )}
 
+        {tab === 'home' && <HomeTab onGo={(next) => setTab(next as Tab)} />}
+        {tab === 'day' && <DayTab />}
+        {tab === 'prayer' && <PrayerTab />}
+        {tab === 'weather' && <WeatherTab />}
+        {tab === 'news' && <NewsTab />}
         {tab === 'skills' && <SkillsTab />}
         {tab === 'memory' && <MemoryTab />}
         {tab === 'settings' && settings && (
@@ -224,6 +249,7 @@ export default function App() {
             version={platform?.version ?? ''}
           />
         )}
+        </Use24hContext.Provider>
       </main>
 
       {agent.confirmRequest && (
@@ -399,6 +425,30 @@ const DIALECTS = [
   { id: 'english', label: 'English' },
 ]
 
+const HIGH_LAT = [
+  { id: 'ANGLE_BASED' as const, label: 'حسب الزاوية' },
+  { id: 'MIDDLE_OF_NIGHT' as const, label: 'منتصف الليل' },
+  { id: 'SEVENTH_OF_NIGHT' as const, label: 'سُبع الليل' },
+]
+
+const PRAYER_KEYS = [
+  { id: 'FAJR', label: 'الفجر' },
+  { id: 'SUNRISE', label: 'الشروق' },
+  { id: 'DHUHR', label: 'الظهر' },
+  { id: 'ASR', label: 'العصر' },
+  { id: 'MAGHRIB', label: 'المغرب' },
+  { id: 'ISHA', label: 'العشاء' },
+]
+
+const CATEGORIES = [
+  { id: 'world', label: 'عالمي' },
+  { id: 'gulf', label: 'الخليج' },
+  { id: 'tech', label: 'تقنية' },
+  { id: 'business', label: 'اقتصاد' },
+  { id: 'sports', label: 'رياضة' },
+  { id: 'science', label: 'علوم' },
+]
+
 function SettingsTab({ settings, onPatch, onRefresh, version }: {
   settings: AppSettings
   onPatch: (patch: Partial<AppSettings>) => Promise<void>
@@ -409,8 +459,12 @@ function SettingsTab({ settings, onPatch, onRefresh, version }: {
   const [testing, setTesting] = useState(false)
   const [keyState, setKeyState] = useState('')
   const [usage, setUsage] = useState<any>(null)
+  const [methods, setMethods] = useState<{ id: string; arabic: string }[]>([])
 
-  useEffect(() => { void window.alcode.data.get('usage').then(setUsage) }, [])
+  useEffect(() => {
+    void window.alcode.data.get('usage').then(setUsage)
+    void window.alcode.daily.methods().then(setMethods)
+  }, [])
 
   const saveKey = async () => {
     if (!key.trim()) return
@@ -511,6 +565,105 @@ function SettingsTab({ settings, onPatch, onRefresh, version }: {
             onChange={(value) => void onPatch({ webSearch: value })}
           />
         </div>
+      </Section>
+
+      <Section title="الرفيق اليومي">
+        <div className="card col" style={{ gap: 18 }}>
+          <PlacePicker settings={settings} onPatch={onPatch} />
+
+          <Field label="طريقة حساب الصلاة">
+            <select
+              className="field"
+              value={settings.prayer.methodId}
+              onChange={(e) =>
+                void onPatch({ prayer: { ...settings.prayer, methodId: e.target.value } })}
+            >
+              {methods.map((method) => (
+                <option key={method.id} value={method.id}>{method.arabic}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="العصر">
+            <div className="row" style={{ gap: 8 }}>
+              {([1, 2] as const).map((factor) => (
+                <button
+                  key={factor}
+                  className={settings.prayer.asrFactor === factor ? 'pill active' : 'pill'}
+                  onClick={() => void onPatch({ prayer: { ...settings.prayer, asrFactor: factor } })}
+                >
+                  {factor === 1 ? 'الجمهور' : 'الحنفي'}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="خطوط العرض العالية">
+            <div className="row wrap" style={{ gap: 8 }}>
+              {HIGH_LAT.map((rule) => (
+                <button
+                  key={rule.id}
+                  className={settings.prayer.highLatitudeRule === rule.id ? 'pill active' : 'pill'}
+                  onClick={() =>
+                    void onPatch({ prayer: { ...settings.prayer, highLatitudeRule: rule.id } })}
+                >
+                  {rule.label}
+                </button>
+              ))}
+            </div>
+            <p className="muted small" style={{ margin: '6px 0 0' }}>
+              تُستخدم حين لا يكتمل الظلام ليلًا، كما في شمال أوروبا صيفًا.
+            </p>
+          </Field>
+
+          <Field label="تعديل الأوقات (دقائق)">
+            <div className="row wrap" style={{ gap: 10 }}>
+              {PRAYER_KEYS.map((prayer) => (
+                <div key={prayer.id} style={{ width: 96 }}>
+                  <div className="muted small" style={{ marginBottom: 4 }}>{prayer.label}</div>
+                  <input
+                    className="field"
+                    type="number"
+                    value={settings.prayer.offsets[prayer.id] ?? 0}
+                    onChange={(e) => {
+                      const offsets = { ...settings.prayer.offsets }
+                      const value = Number(e.target.value)
+                      if (!value) delete offsets[prayer.id]
+                      else offsets[prayer.id] = value
+                      void onPatch({ prayer: { ...settings.prayer, offsets } })
+                    }}
+                    style={{ direction: 'ltr', textAlign: 'center' }}
+                  />
+                </div>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="تقويم أم القرى">
+            <div className="row" style={{ gap: 8 }}>
+              {[-2, -1, 0, 1, 2].map((offset) => (
+                <button
+                  key={offset}
+                  className={settings.hijriOffset === offset ? 'pill active' : 'pill'}
+                  onClick={() => void onPatch({ hijriOffset: offset })}
+                >
+                  {offset === 0 ? 'بلا تعديل' : `${offset > 0 ? '+' : ''}${offset} يوم`}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Toggle
+            label="نظام ٢٤ ساعة"
+            hint="يطبَّق على أوقات الصلاة والطقس والتذكيرات"
+            value={settings.use24h}
+            onChange={(value) => void onPatch({ use24h: value })}
+          />
+        </div>
+      </Section>
+
+      <Section title="الأخبار">
+        <NewsSettings settings={settings} onPatch={onPatch} onRefresh={onRefresh} />
       </Section>
 
       <Section title="الأمان">
@@ -641,4 +794,249 @@ function Stat({ label, value }: { label: string; value: number }) {
       <div className="muted small">{label}</div>
     </div>
   )
+}
+
+// ------------------------------------------------- اختيار المدينة والأخبار
+
+function PlacePicker({ settings, onPatch }: {
+  settings: AppSettings
+  onPatch: (patch: Partial<AppSettings>) => Promise<void>
+}) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<Place[]>([])
+  const [searching, setSearching] = useState(false)
+
+  // بحث متأخّر: ما نطلب من الخادم على كل حرف، بل بعد سكون ثلث ثانية.
+  useEffect(() => {
+    const text = query.trim()
+    if (text.length < 2) { setResults([]); return }
+    let cancelled = false
+    setSearching(true)
+    const timer = setTimeout(async () => {
+      const found = await window.alcode.daily.searchPlaces(text)
+      if (!cancelled) { setResults(found); setSearching(false) }
+    }, 320)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [query])
+
+  const place = settings.place
+
+  return (
+    <Field label="مدينتك">
+      {place && (
+        <div
+          className="row"
+          style={{
+            gap: 10, background: 'var(--surface-high)', borderRadius: 16,
+            padding: '10px 14px', marginBottom: 10,
+          }}
+        >
+          <div className="grow">
+            <div style={{ fontWeight: 700 }}>{place.name}</div>
+            <div className="muted small">
+              {[place.admin, place.country].filter(Boolean).join(' · ')} · {place.timezone}
+            </div>
+          </div>
+          <button className="chip" onClick={() => void onPatch({ place: null })}>إزالة</button>
+        </div>
+      )}
+      <input
+        className="field"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={place ? 'ابحث لتغيير المدينة…' : 'اكتب اسم مدينتك… (دبي، الرياض، لندن)'}
+      />
+      {searching && <div className="muted small" style={{ marginTop: 6 }}>أبحث…</div>}
+      {results.length > 0 && (
+        <div className="col" style={{ gap: 4, marginTop: 8 }}>
+          {results.map((item) => (
+            <button
+              key={`${item.latitude},${item.longitude}`}
+              onClick={async () => {
+                await onPatch({ place: item })
+                setQuery('')
+                setResults([])
+              }}
+              style={{
+                textAlign: 'start', padding: '9px 14px', borderRadius: 14,
+                background: 'var(--surface-high)',
+              }}
+            >
+              <div style={{ fontWeight: 600 }}>{item.name}</div>
+              <div className="muted small">
+                {[item.admin, item.country].filter(Boolean).join(' · ')}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      {!place && (
+        <p className="muted small" style={{ margin: '8px 0 0' }}>
+          بدونها ما أقدر أعطيك صلاة ولا طقس — الحساب كله يتم على جهازك من
+          الإحداثيات، ولا يُرسل اسمك ولا مفتاحك لأي خدمة.
+        </p>
+      )}
+    </Field>
+  )
+}
+
+function NewsSettings({ settings, onPatch, onRefresh }: {
+  settings: AppSettings
+  onPatch: (patch: Partial<AppSettings>) => Promise<void>
+  onRefresh: () => Promise<void>
+}) {
+  const [sources, setSources] = useState<any[]>([])
+  const [url, setUrl] = useState('')
+  const [category, setCategory] = useState('world')
+  const [topic, setTopic] = useState('')
+  const [state, setState] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    setSources(await window.alcode.daily.sources())
+  }, [])
+
+  useEffect(() => { void load() }, [load])
+
+  const addSource = async () => {
+    const trimmed = url.trim()
+    if (!trimmed) return
+    setBusy(true)
+    setState('')
+    const result = await window.alcode.daily.addSource(trimmed, category)
+    setBusy(false)
+    setState(result.ok ? `✅ ${result.name} — ${result.count} خبر` : `⚠️ ${result.error}`)
+    if (result.ok) setUrl('')
+    await load()
+  }
+
+  const enabled = sources.filter((source) => source.enabled).length
+
+  return (
+    <div className="card col" style={{ gap: 18 }}>
+      <Field label={`المصادر (${enabled} من ${sources.length})`}>
+        <div className="col" style={{ gap: 4 }}>
+          {sources.map((source) => (
+            <div
+              key={source.id}
+              className="row"
+              style={{ gap: 10, padding: '7px 12px', borderRadius: 14 }}
+            >
+              <div className="grow">
+                <div style={{ fontWeight: 600 }}>{source.name}</div>
+                <div className="muted small" style={{ direction: 'ltr' }}>{source.url}</div>
+              </div>
+              <span className="chip">
+                {CATEGORIES.find((item) => item.id === source.category)?.label ?? source.category}
+              </span>
+              <button
+                className={source.enabled ? 'pill active' : 'pill'}
+                onClick={async () => {
+                  await window.alcode.daily.toggleSource(source.id, !source.enabled)
+                  await load()
+                }}
+              >
+                {source.enabled ? 'مفعّل' : 'موقوف'}
+              </button>
+              {source.custom && (
+                <button
+                  className="chip"
+                  onClick={async () => {
+                    await window.alcode.daily.removeSource(source.id)
+                    await load()
+                  }}
+                >
+                  حذف
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="أضِف مصدرًا (RSS)">
+        <div className="row wrap" style={{ gap: 8 }}>
+          <input
+            className="field grow"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://example.com/feed.xml"
+            style={{ direction: 'ltr' }}
+          />
+          <select
+            className="field"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            style={{ width: 130 }}
+          >
+            {CATEGORIES.map((item) => (
+              <option key={item.id} value={item.id}>{item.label}</option>
+            ))}
+          </select>
+          <button className="btn" onClick={addSource} disabled={busy || !url.trim()}>
+            {busy ? 'أتحقّق…' : 'إضافة'}
+          </button>
+        </div>
+        {state && <div className="small" style={{ marginTop: 8 }}>{state}</div>}
+      </Field>
+
+      <Field label={`مواضيع تتابعها (${settings.topics.length})`}>
+        <div className="row wrap" style={{ gap: 8, marginBottom: 8 }}>
+          {settings.topics.map((item) => (
+            <button
+              key={item}
+              className="chip"
+              title="اضغط للحذف"
+              onClick={async () => {
+                await window.alcode.daily.removeTopic(item)
+                await onRefresh()
+                await load()
+              }}
+            >
+              {item} ✕
+            </button>
+          ))}
+          {settings.topics.length === 0 && (
+            <span className="muted small">مثلًا: «الذكاء الاصطناعي» أو «أسعار الذهب».</span>
+          )}
+        </div>
+        <div className="row" style={{ gap: 8 }}>
+          <input
+            className="field grow"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void addTopic() }}
+            placeholder="اكتب موضوعًا واضغط Enter"
+          />
+          <button className="btn" onClick={() => void addTopic()} disabled={!topic.trim()}>
+            متابعة
+          </button>
+        </div>
+      </Field>
+
+      <Field label="تحديث الأخبار كل">
+        <div className="row wrap" style={{ gap: 8 }}>
+          {[15, 30, 60, 180].map((minutes) => (
+            <button
+              key={minutes}
+              className={settings.newsRefreshMinutes === minutes ? 'pill active' : 'pill'}
+              onClick={() => void onPatch({ newsRefreshMinutes: minutes })}
+            >
+              {minutes < 60 ? `${minutes} دقيقة` : `${minutes / 60} ساعة`}
+            </button>
+          ))}
+        </div>
+      </Field>
+    </div>
+  )
+
+  async function addTopic() {
+    const trimmed = topic.trim()
+    if (!trimmed || settings.topics.includes(trimmed)) return
+    // المعالج في العملية الرئيسية يحفظ الموضوع بنفسه، فنكتفي بإعادة القراءة.
+    await window.alcode.daily.addTopic(trimmed)
+    await onRefresh()
+    setTopic('')
+    await load()
+  }
 }

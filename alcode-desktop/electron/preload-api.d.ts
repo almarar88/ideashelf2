@@ -25,6 +25,27 @@ export interface AlcodeBridge {
     onEvent(handler: (event: any) => void): () => void
     onConfirm(handler: (request: any) => void): () => void
   }
+  daily: {
+    day(): Promise<any>
+    weather(force?: boolean): Promise<any>
+    news(force?: boolean): Promise<any[]>
+    sources(): Promise<any[]>
+    toggleSource(id: string, enabled: boolean): Promise<boolean>
+    addSource(url: string, category: string): Promise<{ ok: boolean; name: string; count: number; error: string }>
+    removeSource(id: string): Promise<boolean>
+    addTopic(query: string): Promise<boolean>
+    removeTopic(query: string): Promise<boolean>
+    methods(): Promise<{ id: string; arabic: string }[]>
+    searchPlaces(query: string): Promise<any[]>
+    prayerMonth(year: number, month: number): Promise<any[]>
+    tasks(): Promise<any[]>
+    habits(): Promise<any[]>
+    saveTask(task: unknown): Promise<boolean>
+    deleteTask(id: string): Promise<boolean>
+    saveHabit(habit: unknown): Promise<boolean>
+    deleteHabit(id: string): Promise<boolean>
+    openExternal(url: string): Promise<boolean>
+  }
   quick: {
     hide(): void
     expand(): void
