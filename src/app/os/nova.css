@@ -691,6 +691,79 @@
   box-shadow: 0 0 8px var(--warn);
 }
 
+/* ── قائمة السياق ─────────────────────────────────────────── */
+.ctx {
+  position: absolute;
+  z-index: 72;
+  min-width: 208px;
+  padding: 6px;
+  border-radius: 13px;
+  animation: intent-in 0.12s ease both;
+}
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  text-align: start;
+  font-size: 12.5px;
+}
+.ctx-item:hover {
+  background: color-mix(in oklab, var(--accent) 22%, transparent);
+}
+.ctx-item .k {
+  margin-inline-start: auto;
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-family: ui-monospace, monospace;
+}
+.ctx-sep {
+  height: 1px;
+  margin: 5px 4px;
+  background: rgb(var(--line) / 0.13);
+}
+
+/* ── مبدّل النوافذ ─────────────────────────────────────────── */
+.switcher {
+  position: absolute;
+  z-index: 74;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 18px;
+  animation: intent-in 0.12s ease both;
+}
+.switcher-item {
+  width: 104px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  text-align: center;
+  border: 2px solid transparent;
+  background: rgb(var(--panel) / 0.08);
+}
+.switcher-item.on {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+}
+.switcher-item .ic {
+  font-size: 20px;
+}
+.switcher-item .nm {
+  font-size: 11.5px;
+  margin-top: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── مركز الإشعارات ──────────────────────────────────────── */
 .notif-center {
   position: absolute;
@@ -774,6 +847,22 @@
   gap: 10px;
   user-select: text;
 }
+/* لوحان جنبًا إلى جنب داخل نافذة واحدة */
+.split-h {
+  flex-direction: row;
+  gap: 0;
+  padding: 0;
+}
+.split-h > .pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-inline-end: 1px solid rgb(var(--line) / 0.1);
+}
+.split-h > .pane:last-child {
+  border-inline-end: none;
+}
+
 .app-pad {
   padding: 12px;
 }
@@ -920,4 +1009,77 @@
 }
 .tl-row.bad {
   color: var(--danger);
+}
+
+/* ── الشاشات الضيّقة ──────────────────────────────────────────
+   نظام نوافذ عائمة لا معنى له على هاتف: تحت 700px تصبح كل نافذة
+   ملء المساحة، والتبديل بينها من الشريط السفلي. لا نُخفي شيئًا من
+   القدرات — نغيّر شكل عرضها فقط.
+   ─────────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .nwin,
+  .nwin.focused {
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    border-inline: none;
+  }
+  .nwin-grip {
+    display: none;
+  }
+  .snap-hint {
+    display: none;
+  }
+  .dock {
+    inset-inline: 6px;
+    left: auto;
+    transform: none;
+    border-radius: 14px;
+    overflow-x: auto;
+    justify-content: flex-start;
+    scrollbar-width: none;
+  }
+  .dock::-webkit-scrollbar {
+    display: none;
+  }
+  .dock-item {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+  }
+  .tip {
+    display: none;
+  }
+  .intent {
+    top: 6vh;
+    width: calc(100vw - 16px);
+  }
+  .notif-center,
+  .toast-wrap {
+    inset-inline: 8px;
+    width: auto;
+  }
+  .toast {
+    width: 100%;
+  }
+  .app {
+    padding: 10px;
+  }
+  /* التطبيقات ذات اللوحين تصبح لوحًا فوق لوح */
+  .split-h {
+    flex-direction: column !important;
+  }
+  .split-h > .pane {
+    width: 100% !important;
+    border-inline-end: none !important;
+    border-bottom: 1px solid rgb(var(--line) / 0.1);
+  }
+  .split-h > .pane:last-child {
+    border-bottom: none;
+  }
+  .switcher {
+    flex-wrap: wrap;
+    max-width: calc(100vw - 24px);
+  }
 }

@@ -20,6 +20,15 @@ export const APPS: AppDef[] = [
     keywords: ["اوراكل", "أوراكل", "محادثة", "مساعد", "شات", "oracle", "chat", "assistant"],
   },
   {
+    key: "pulse",
+    name: "المزرعة",
+    icon: "◉",
+    hint: "نبضة بياناتك الحقيقية لحظيًا",
+    w: 700,
+    h: 540,
+    keywords: ["مزرعه", "مزرعة", "نبضه", "نبضة", "نخيل", "لوحه", "احصاء", "farm", "pulse", "dashboard"],
+  },
+  {
     key: "files",
     name: "المحتوى",
     icon: "▤",

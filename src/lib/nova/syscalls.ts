@@ -88,6 +88,33 @@ export const SYSCALLS = {
     doc: "يبحث في الأسماء والوسوم والمحتوى ويفتح نافذة نتائج.",
     schema: z.object({ query: z.string().min(1).max(120) }),
   },
+  "farm.pulse": {
+    title: "أبصر المزرعة",
+    doc: "يفتح لوحة نبضة المزرعة الحقيقية (نخيل، عمال، مصاريف، مزادات) من قاعدة بيانات التطبيق.",
+    schema: z.object({ focus: z.enum(["all", "palms", "money", "workers", "market"]).optional() }),
+  },
+  "farm.report": {
+    title: "اكتب تقرير المزرعة",
+    doc: "يحوّل نبضة المزرعة الحالية إلى ملف تقرير في المحتوى.",
+    schema: z.object({ path: z.string().max(160).optional() }),
+  },
+  "nav.open": {
+    title: "افتح شاشة في التطبيق",
+    doc: "يفتح شاشة من تطبيق المزرعة في تبويب جديد. route واحد من: /dashboard, /farm, /palms, /workers, /expenses, /calendar, /market, /auctions, /disease-detection.",
+    schema: z.object({
+      route: z.enum([
+        "/dashboard",
+        "/farm",
+        "/palms",
+        "/workers",
+        "/expenses",
+        "/calendar",
+        "/market",
+        "/auctions",
+        "/disease-detection",
+      ]),
+    }),
+  },
   "theme.set": {
     title: "غيّر الهوية البصرية",
     doc: "يضبط الوضع (night/dawn)، لون التمييز بصيغة hex، الخلفية، الحركة، وشفافية الزجاج 0-1.",
@@ -174,6 +201,15 @@ export const SYSCALLS = {
       source: z.enum(["neural", "reflex"]),
     }),
   },
+  "agent.finish": {
+    title: "أنهِ وكيلًا بتقرير",
+    doc: "داخلي: يكتب ناتج الوكيل الحقيقي ويقفل مهمته.",
+    schema: z.object({
+      id: z.string(),
+      report: z.string().max(20000),
+      source: z.enum(["neural", "reflex"]),
+    }),
+  },
   "agent.step": {
     title: "خطوة وكيل",
     doc: "داخلي: يتقدّم بوكيل خطوة واحدة.",
@@ -219,7 +255,7 @@ export function sanitizePlan(calls: unknown): { calls: SyscallCall[]; rejected: 
 }
 
 /** نداءات تخدم النواة نفسها ولا تُعرض لطبقة الذكاء */
-const INTERNAL = new Set<string>(["app.install", "agent.step"]);
+const INTERNAL = new Set<string>(["app.install", "agent.step", "agent.finish"]);
 
 /** وصف الجدول لطبقة الذكاء — يُبنى آليًا حتى لا يتخلّف عن الكود أبدًا */
 export function syscallManual(): string {

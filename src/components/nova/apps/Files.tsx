@@ -21,8 +21,8 @@ export default function Files({ win }: { win: NovaWindow }) {
   }, [state.fs]);
 
   return (
-    <div className="app" style={{ flexDirection: "row", gap: 0, padding: 0 }}>
-      <div className="col" style={{ width: "46%", minWidth: 200, borderInlineEnd: "1px solid rgb(var(--line) / .1)" }}>
+    <div className="app split-h">
+      <div className="pane" style={{ width: "46%", minWidth: 200 }}>
         <div style={{ padding: 10 }}>
           <input
             className="field"
@@ -65,7 +65,7 @@ export default function Files({ win }: { win: NovaWindow }) {
         </div>
       </div>
 
-      <div className="col grow" style={{ minWidth: 0 }}>
+      <div className="pane grow">
         {!current ? (
           <div className="empty">اختر عنصرًا</div>
         ) : (

@@ -8,8 +8,8 @@ export default function Monitor() {
   const running = state.agents.filter((a) => a.state === "running");
 
   return (
-    <div className="app" style={{ flexDirection: "row", padding: 0 }}>
-      <div className="col grow scroll app-pad" style={{ borderInlineEnd: "1px solid rgb(var(--line) / .1)" }}>
+    <div className="app split-h">
+      <div className="pane grow scroll app-pad">
         <h4 style={{ marginBottom: 8 }}>الوكلاء ({running.length} يعمل)</h4>
         {state.agents.length === 0 && (
           <div className="faint" style={{ fontSize: 12.5 }}>
@@ -57,7 +57,7 @@ export default function Monitor() {
         </div>
       </div>
 
-      <div className="col scroll app-pad" style={{ width: "44%", minWidth: 210 }}>
+      <div className="pane scroll app-pad" style={{ width: "44%", minWidth: 210 }}>
         <h4 style={{ marginBottom: 8 }}>طبقة الذكاء</h4>
         <div className="kv">
           <span className="dim">المُخطِّط</span>

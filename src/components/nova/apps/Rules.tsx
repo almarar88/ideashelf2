@@ -23,7 +23,7 @@ const THENS: { label: string; call: { op: string; args?: Record<string, unknown>
 
 /** القواعد: أتمتة معلنة تنفّذها النواة عند أحداث النظام. */
 export default function Rules() {
-  const { state, run } = useNova();
+  const { state, run, fireEvent } = useNova();
   const [when, setWhen] = useState("boot");
   const [pick, setPick] = useState(0);
 
@@ -72,9 +72,10 @@ export default function Rules() {
         <button className="btn primary" style={{ marginTop: 11 }} onClick={create}>
           أضف القاعدة
         </button>
-        <div className="faint" style={{ fontSize: 11.5, marginTop: 8 }}>
-          الأحداث «في المساء» و«في الظهيرة» و«عند كتابة ملف» معرّفة في النواة وتُطلق حين تصلها
-          إشارتها؛ boot و agent-done تعملان الآن.
+        <div className="faint" style={{ fontSize: 11.5, marginTop: 8, lineHeight: 1.75 }}>
+          كل الأحداث فعّالة: الإقلاع، وانتهاء وكيل، وكتابة ملف، وساعة النظام تُطلق
+          «المساء» بعد السابعة و«الظهيرة» عند الثانية عشرة — مرة واحدة لكل يوم.
+          ولأن القواعد تنفّذ نداءات نظام، فإن ما تفعله يُسجّل ويمكن الرجوع عنه.
         </div>
       </div>
 
@@ -87,6 +88,9 @@ export default function Rules() {
                 {a.label}
               </span>
               <span className="chip">{a.hits} مرة</span>
+              <button className="btn tiny" onClick={() => fireEvent(a.when, { agent: "تجربة" })}>
+                جرّب الآن
+              </button>
               <button className="btn tiny" onClick={() => run({ op: "automation.toggle", args: { id: a.id } })}>
                 {a.enabled ? "إيقاف" : "تفعيل"}
               </button>

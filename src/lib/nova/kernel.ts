@@ -104,13 +104,28 @@ function appTitle(s: NovaState, app: string): { title: string; w: number; h: num
 export function execute(
   prev: NovaState,
   raw: SyscallCall,
-  origin: JournalEntry["origin"] = "user"
+  origin: JournalEntry["origin"] = "user",
+  /**
+   * هل يُسجّل هذا النداء في السجل؟
+   *
+   * القاعدة: **النداء الذي يدخل من الموزّع فقط يُسجّل.** كل ما تشتقّه النواة
+   * منه — نافذة يفتحها fs.write، أو قاعدة أتمتة يُطلقها — لا يُسجّل، لأن
+   * إعادة تشغيل نداء الأب تُنتجه من جديد. لولا هذه القاعدة لكان الفرع
+   * محسوبًا مرتين عند الإرجاع الزمني: مرة بنفسه ومرة ضمن أبيه — وهو ما كان
+   * يُنتج نافذة مكرّرة عند الرجوع.
+   */
+  record = true
 ): ExecResult {
   const checked = validateCall(raw);
   if (!checked.ok) {
     const s = clone(prev);
-    s.seq += 1;
-    s.journal = [...s.journal, { seq: s.seq, at: Date.now(), call: raw, origin, ok: false, note: checked.error }];
+    if (record) {
+      s.seq += 1;
+      s.journal = [
+        ...s.journal,
+        { seq: s.seq, at: Date.now(), call: raw, origin, ok: false, note: checked.error },
+      ];
+    }
     return { state: s, effects: [], ok: false, note: checked.error };
   }
 
@@ -318,23 +333,18 @@ export function execute(
         ];
       }
       note = `كُتب ${basename(p)}`;
-      // الكتابة تُسجّل أولًا ثم تُطلق ما بعدها، حتى يبقى ترتيب السجل مطابقًا
-      // لترتيب الحدوث — وهذا شرط أن تكون إعادة التشغيل مطابقة للأصل.
-      s.seq += 1;
-      s.journal = [...s.journal, { seq: s.seq, at: Date.now(), call, origin, ok: true, note }].slice(-400);
-      let after = s;
       if (args.open) {
-        const opened = execute(after, { op: "win.open", args: { app: "notes", props: { path: p } } }, "kernel");
-        after = opened.state;
+        const opened = execute(s, { op: "win.open", args: { app: "notes", props: { path: p } } }, "kernel", false);
+        Object.assign(s, opened.state);
         effects.push(...opened.effects);
       }
       // القواعد تُطلق على أحداث النظام، لكن لا على ما تكتبه هي: كسر التكرار شرط.
       if (origin !== "automation") {
-        const fired = fireAutomations(after, "file-written", { path: p });
-        after = fired.state;
+        const fired = fireAutomations(s, "file-written", { path: p }, (c) => c, false);
+        Object.assign(s, fired.state);
         effects.push(...fired.effects);
       }
-      return { state: after, effects, ok: true, note };
+      break;
     }
 
     case "fs.delete": {
@@ -350,8 +360,36 @@ export function execute(
 
     case "fs.search": {
       const q = String(args.query);
-      const r = execute(s, { op: "win.open", args: { app: "files", props: { query: q } } }, "kernel");
-      return { ...r, note: `بحث: ${q}` };
+      const opened = execute(s, { op: "win.open", args: { app: "files", props: { query: q } } }, "kernel", false);
+      Object.assign(s, opened.state);
+      note = `بحث: ${q}`;
+      break;
+    }
+
+    case "farm.pulse": {
+      const opened = execute(
+        s,
+        { op: "win.open", args: { app: "pulse", props: { focus: args.focus ?? "all" } } },
+        "kernel",
+        false
+      );
+      Object.assign(s, opened.state);
+      note = "نبضة المزرعة";
+      break;
+    }
+
+    case "farm.report": {
+      // التقرير يحتاج قراءة من الخادم، فالنواة تطلبه أثرًا وتبقى نقية
+      const path = normalize(String(args.path ?? "/تقارير/نبضة-المزرعة.md"));
+      effects.push({ kind: "farm-report", path });
+      note = "يُجهَّز تقرير المزرعة";
+      break;
+    }
+
+    case "nav.open": {
+      effects.push({ kind: "navigate", route: String(args.route) });
+      note = `فتح ${args.route}`;
+      break;
     }
 
     case "theme.set": {
@@ -404,28 +442,47 @@ export function execute(
       const next = a.steps.find((st) => !st.done);
       if (next) next.done = true;
       a.cpu = Math.max(2, a.cpu + (Math.random() > 0.5 ? 6 : -5));
-      if (a.steps.every((st) => st.done)) {
-        a.state = "done";
-        a.cpu = 0;
+      // آخر خطوة لا تُنهي الوكيل: النواة تطلب عملًا حقيقيًا من الخارج
+      // (قراءة الملفات، سؤال العصب) ثم يُقفل بـ agent.finish بتقرير فعلي.
+      effects.push(a.steps.every((st) => st.done) ? { kind: "agent-report", agentId: a.id } : { kind: "agent-tick", agentId: a.id });
+      break;
+    }
+
+    case "agent.finish": {
+      const a = s.agents.find((x) => x.id === String(args.id));
+      if (!a) {
+        ok = false;
+        note = "وكيل غير موجود";
+        break;
+      }
+      a.state = "done";
+      a.cpu = 0;
+      a.steps.forEach((st) => (st.done = true));
+      const path = normalize(`/الوكلاء/${a.name}.md`);
+      const body = String(args.report);
+      const existing = s.fs.find((f) => f.path === path);
+      if (existing) {
+        existing.content = body;
+        existing.updatedAt = Date.now();
+      } else {
         s.fs = [
           ...s.fs,
           {
             id: nid("f"),
-            path: normalize(`/الوكلاء/${a.name}-خلاصة.md`),
+            path,
             kind: "file",
-            content: `# خلاصة الوكيل: ${a.name}\n\nالهدف: ${a.goal}\n\n${a.steps
-              .map((st, i) => `${i + 1}. ${st.label} ✔`)
-              .join("\n")}\n\nانتهى في ${new Date().toLocaleString("ar")}`,
-            tags: ["وكيل", "خلاصة", a.name],
+            content: body,
+            tags: ["وكيل", "تقرير", a.name],
             mime: "text/markdown",
             updatedAt: Date.now(),
             author: "agent",
           },
         ];
-        const fired = fireAutomations(s, "agent-done", { agent: a.name });
-        return { state: fired.state, effects: [...effects, ...fired.effects], ok: true, note: `${a.name} أنجز` };
       }
-      effects.push({ kind: "agent-tick", agentId: a.id });
+      const fired = fireAutomations(s, "agent-done", { agent: a.name }, (c) => c, false);
+      Object.assign(s, fired.state);
+      effects.push(...fired.effects);
+      note = `${a.name} أنجز`;
       break;
     }
 
@@ -460,9 +517,12 @@ export function execute(
         source: (args.source as never) ?? "reflex",
       };
       s.composed = [app, ...s.composed.filter((c) => c.id !== app.id)].slice(0, 20);
-      const r = execute(s, { op: "win.open", args: { app: app.id } }, "kernel");
-      push(r.state, { title: `تطبيق «${app.name}» جاهز`, body: "ثُبّت في الشريط السفلي", level: "ok" });
-      return { ...r, effects: [...effects, ...r.effects], note: `ثُبّت ${app.name}` };
+      const opened = execute(s, { op: "win.open", args: { app: app.id } }, "kernel", false);
+      Object.assign(s, opened.state);
+      effects.push(...opened.effects);
+      push(s, { title: `تطبيق «${app.name}» جاهز`, body: "ثُبّت في الشريط السفلي", level: "ok" });
+      note = `ثُبّت ${app.name}`;
+      break;
     }
 
     case "automation.create": {
@@ -518,8 +578,9 @@ export function execute(
         fresh.user = s.user;
         return { state: fresh, effects: [{ kind: "sound", tone: "boot" }], ok: true, note: "إعادة تشغيل" };
       } else {
-        const r = execute(s, { op: "win.arrange", args: { mode: "focus" } }, "kernel");
-        return { ...r, note: "وضع التركيز" };
+        const arranged = execute(s, { op: "win.arrange", args: { mode: "focus" } }, "kernel", false);
+        Object.assign(s, arranged.state);
+        note = "وضع التركيز";
       }
       break;
     }
@@ -536,8 +597,10 @@ export function execute(
     }
   }
 
-  s.seq += 1;
-  s.journal = [...s.journal, { seq: s.seq, at: Date.now(), call, origin, ok, note }].slice(-400);
+  if (record) {
+    s.seq += 1;
+    s.journal = [...s.journal, { seq: s.seq, at: Date.now(), call, origin, ok, note }].slice(-400);
+  }
   return { state: s, effects, ok, note };
 }
 
@@ -545,13 +608,14 @@ export function execute(
 export function executePlan(
   state: NovaState,
   calls: SyscallCall[],
-  origin: JournalEntry["origin"]
+  origin: JournalEntry["origin"],
+  record = true
 ): { state: NovaState; effects: Effect[]; notes: string[] } {
   let cur = state;
   const effects: Effect[] = [];
   const notes: string[] = [];
   for (const c of calls) {
-    const r = execute(cur, c, origin);
+    const r = execute(cur, c, origin, record);
     cur = r.state;
     effects.push(...r.effects);
     if (r.note) notes.push(r.note);
@@ -563,7 +627,11 @@ export function executePlan(
 export function fireAutomations(
   state: NovaState,
   when: string,
-  ctx: Record<string, string> = {}
+  ctx: Record<string, string> = {},
+  /** مُحوّل اختياري: تستخدمه الواجهة لحقن ما لا تعرفه النواة (أبعاد سطح المكتب) */
+  transform: (call: SyscallCall) => SyscallCall = (c) => c,
+  /** القواعد المُطلَقة من داخل نداء لا تُسجّل: إعادة تشغيل الأب تُطلقها مجددًا */
+  record = true
 ): { state: NovaState; effects: Effect[] } {
   const matching = state.automations.filter((a) => a.enabled && a.when === when);
   if (matching.length === 0) return { state, effects: [] };
@@ -581,7 +649,7 @@ export function fireAutomations(
         ])
       ),
     }));
-    const r = executePlan(cur, calls, "automation");
+    const r = executePlan(cur, calls.map(transform), "automation", record);
     cur = r.state;
     effects.push(...r.effects);
   }

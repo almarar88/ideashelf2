@@ -20,6 +20,16 @@ const NovaOS = dynamic(() => import("./NovaOS"), {
   ),
 });
 
-export default function NovaClient({ neural, model }: { neural: boolean; model: string }) {
-  return <NovaOS neural={neural} model={model} />;
+export type Identity = { name: string; handle: string; role: string };
+
+export default function NovaClient({
+  neural,
+  model,
+  identity,
+}: {
+  neural: boolean;
+  model: string;
+  identity: Identity;
+}) {
+  return <NovaOS neural={neural} model={model} identity={identity} />;
 }

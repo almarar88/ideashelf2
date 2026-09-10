@@ -133,7 +133,13 @@ export type NovaState = {
 export type Effect =
   | { kind: "compose"; prompt: string; targetId: string }
   | { kind: "agent-tick"; agentId: string }
-  | { kind: "sound"; tone: "ok" | "warn" | "boot" };
+  /** الوكيل أنهى خطواته ويحتاج عملًا حقيقيًا (قراءة ملفات، سؤال العصب) */
+  | { kind: "agent-report"; agentId: string }
+  | { kind: "sound"; tone: "ok" | "warn" | "boot" }
+  /** فتح شاشة من التطبيق المضيف — الخروج من نوفا إلى منتجها */
+  | { kind: "navigate"; route: string }
+  /** طلب نبضة المزرعة من الخادم ثم كتابتها تقريرًا */
+  | { kind: "farm-report"; path: string };
 
 export type ExecResult = {
   state: NovaState;

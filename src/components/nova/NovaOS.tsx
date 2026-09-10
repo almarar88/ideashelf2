@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AppHost from "./AppHost";
+import ContextMenu from "./ContextMenu";
+import Switcher from "./Switcher";
 import { KernelProvider, useNova } from "./kernel-context";
 import { BootScreen, Dock, IntentBar, LockScreen, NotifCenter, TopBar, Toasts } from "./Shell";
 import WindowFrame from "./WindowFrame";
@@ -14,9 +16,17 @@ import WindowFrame from "./WindowFrame";
  * المُخطِّط الذي يقود *النظام*، لكنه لا يملك إلا نداءات النظام التي يملكها
  * المستخدم نفسه. لذلك: قدرة بلا صلاحيات مفتوحة، وسجل كامل بلا استثناء.
  */
-export default function NovaOS({ neural, model }: { neural: boolean; model: string }) {
+export default function NovaOS({
+  neural,
+  model,
+  identity,
+}: {
+  neural: boolean;
+  model: string;
+  identity: { name: string; handle: string; role: string };
+}) {
   return (
-    <KernelProvider neural={neural} model={model}>
+    <KernelProvider neural={neural} model={model} identity={identity}>
       <Desktop />
     </KernelProvider>
   );
@@ -26,23 +36,39 @@ function Desktop() {
   const { state, run, deskRef, neural } = useNova();
   const [intent, setIntent] = useState(false);
   const [bell, setBell] = useState(false);
+  const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
+  const [switching, setSwitching] = useState<number | null>(null);
+  // مؤشر المبدّل يعيش في مرجع لا في مُحدِّث حالة: تنفيذ نداء نظام داخل
+  // مُحدِّث setState يعني تعديل مكوّن أثناء تصيير آخر — وهو خطأ فعلي في React.
+  const switchIdx = useRef<number | null>(null);
 
   // ── اختصارات النظام
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
+      const inField = ["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName ?? "");
+
       if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        setCtx(null);
         setIntent((v) => !v);
         return;
       }
       if (e.key === "Escape") {
         setIntent(false);
         setBell(false);
+        setCtx(null);
         return;
       }
       if (!mod) return;
-      const inField = ["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName ?? "");
+
+      // تبديل النوافذ: الحلقة تتقدّم مع كل ضغطة، والإفلات يُركّز المختار
+      if (e.key === "`" || e.code === "Backquote") {
+        e.preventDefault();
+        switchIdx.current = (switchIdx.current ?? 0) + 1;
+        setSwitching(switchIdx.current);
+        return;
+      }
       if (e.key.toLowerCase() === "j" && !inField) {
         e.preventDefault();
         run({ op: "win.arrange", args: { mode: "grid" } });
@@ -55,10 +81,30 @@ function Desktop() {
         e.preventDefault();
         run({ op: "power", args: { action: "lock" } });
       }
+      if (e.key.toLowerCase() === "w" && !inField) {
+        e.preventDefault();
+        run({ op: "win.close", args: {} });
+      }
     };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== "Control" && e.key !== "Meta") return;
+      const idx = switchIdx.current;
+      if (idx === null) return;
+      switchIdx.current = null;
+      setSwitching(null);
+      const order = [...state.windows].sort((a, b) => b.z - a.z);
+      const pick = order[idx % Math.max(1, order.length)];
+      if (pick) run({ op: "win.focus", args: { id: pick.id } });
+    };
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [run]);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, [run, state.windows]);
 
   const ordered = [...state.windows].sort((a, b) => a.z - b.z);
 
@@ -90,6 +136,12 @@ function Desktop() {
             onPointerDown={() => {
               setIntent(false);
               setBell(false);
+              setCtx(null);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setIntent(false);
+              setCtx({ x: e.clientX, y: e.clientY });
             }}
             onDoubleClick={(e) => {
               if (e.target === e.currentTarget) setIntent(true);
@@ -115,6 +167,8 @@ function Desktop() {
             ))}
           </div>
 
+          {ctx && <ContextMenu x={ctx.x} y={ctx.y} onClose={() => setCtx(null)} />}
+          {switching !== null && <Switcher index={switching} />}
           {intent && <IntentBar onClose={() => setIntent(false)} />}
           {bell && <NotifCenter onClose={() => setBell(false)} />}
           <Toasts />

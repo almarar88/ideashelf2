@@ -1,5 +1,10 @@
 import { APPS } from "./apps";
+import { fold, foldWithMap } from "./text";
 import type { NovaState, Plan, SyscallCall } from "./types";
+
+// طبقة النص انتقلت إلى text.ts لتشاركها الطبقات الثلاث؛ نعيد تصديرها
+// حتى لا يتغيّر أي مستورد قائم.
+export { fold, foldWithMap };
 
 /**
  * طبقة الانعكاس (Reflex)
@@ -58,19 +63,6 @@ const WALLS: Record<string, string> = {
   grid: "grid",
 };
 
-/** تطبيع عربي: إزالة التشكيل وتوحيد الألف والياء والهاء */
-export function fold(text: string): string {
-  return text
-    .replace(/[ً-ْـ]/g, "")
-    .replace(/[أإآ]/g, "ا")
-    .replace(/ى/g, "ي")
-    .replace(/ة/g, "ه")
-    .replace(/ؤ/g, "و")
-    .replace(/ئ/g, "ي")
-    .toLowerCase()
-    .trim();
-}
-
 function has(t: string, ...words: string[]): boolean {
   return words.some((w) => t.includes(fold(w)));
 }
@@ -87,15 +79,26 @@ function quoted(raw: string): string | null {
   return m ? m[1].trim() : null;
 }
 
-/** بعد كلمة مفتاحية: خذ ما تبقّى من الجملة كموضوع */
+/**
+ * بعد كلمة مفتاحية: خذ ما تبقّى من الجملة كموضوع.
+ * يقطع إلى نهاية *الكلمة* التي طابقت لا إلى نهاية المفتاح، لأن المفتاح
+ * كثيرًا ما يكون بادئة لكلمة أطول («وكيل» في «وكيلًا»).
+ */
 function after(raw: string, keys: string[]): string | null {
-  const t = fold(raw);
+  const { folded, map } = foldWithMap(raw);
   for (const k of keys) {
-    const idx = t.indexOf(fold(k));
-    if (idx >= 0) {
-      const tail = raw.slice(idx + k.length).replace(/^[\s:،,\-–]+/, "").trim();
-      if (tail) return tail;
-    }
+    const needle = fold(k);
+    if (!needle) continue;
+    const at = folded.indexOf(needle);
+    if (at < 0) continue;
+
+    // تقدّم إلى نهاية الكلمة المطابقة
+    let end = at + needle.length;
+    while (end < folded.length && !/\s/.test(folded[end])) end += 1;
+
+    const rawStart = end < map.length ? map[end] : raw.length;
+    const tail = raw.slice(rawStart).replace(/^[\s:،,\-–—]+/, "").trim();
+    if (tail) return tail;
   }
   return null;
 }
@@ -134,8 +137,36 @@ export function reflexPlan(intent: string, state: NovaState): Plan {
   }
   if (has(t, "من انت", "ما هو نوفا", "who are you", "عرف نفسك")) {
     say =
-      "أنا نوفا: نظام تشغيل تُقاد حالته بالنية. كل ما تطلبه يتحوّل إلى نداءات نظام مُسجّلة، ولهذا يمكن إرجاع أي شيء فعلته.";
+      "أنا نوفا: نظام تشغيل تُقاد حالته بالنية. كل ما تطلبه يتحوّل إلى نداءات نظام مُسجّلة، ولهذا يمكن إرجاع أي شيء فعلته. وأنا موصولة ببيانات مزرعتك: اسألني عنها أو قل «المزرعة».";
     return done();
+  }
+
+  // ── المزرعة: البيانات الحقيقية أولى من أي تفسير عام
+  if (has(t, "تقرير المزرعه", "اكتب تقرير", "تقرير عن المزرعه", "farm report")) {
+    calls.push({ op: "farm.report", args: {} });
+    say = "أكتب تقرير النبضة الآن وأفتحه.";
+    return done();
+  }
+  // ── التنقّل إلى شاشات التطبيق المضيف
+  {
+    const routes: [string[], string][] = [
+      [["خريطه المزرعه", "الخريطه", "map"], "/farm"],
+      [["لوحه التحكم", "الداشبورد", "dashboard"], "/dashboard"],
+      [["شاشه النخيل", "صفحه النخيل"], "/palms"],
+      [["شاشه العمال", "صفحه العمال"], "/workers"],
+      [["شاشه المصاريف", "صفحه المصاريف"], "/expenses"],
+      [["التقويم", "المواعيد", "calendar"], "/calendar"],
+      [["كشف الامراض", "تشخيص", "diagnosis"], "/disease-detection"],
+    ];
+    if (has(t, "افتح", "اذهب", "روح", "open", "go to")) {
+      for (const [words, route] of routes) {
+        if (words.some((w) => t.includes(fold(w)))) {
+          calls.push({ op: "nav.open", args: { route } });
+          say = `أفتح ${route} في تبويب جديد.`;
+          return done();
+        }
+      }
+    }
   }
 
   // ── الطاقة والأوضاع
@@ -157,9 +188,16 @@ export function reflexPlan(intent: string, state: NovaState): Plan {
 
   // ── الإرجاع الزمني
   if (has(t, "ارجع بالزمن", "تراجع", "الغ اخر", "undo", "rewind")) {
-    const seq = Math.max(0, state.seq - 1);
+    // «تراجع» يجب أن يُرى أثره. النداءات الكلامية (say/notify) لا تغيّر شيئًا،
+    // فالرجوع خطوة واحدة فوقها يبدو كأنه لم يعمل. لذلك نرجع إلى ما قبل
+    // آخر نداء غيّر الحالة فعلًا.
+    const inert = new Set(["say", "notify", "clipboard.set", "journal.rewind"]);
+    const meaningful = [...state.journal].reverse().find((j) => j.ok && !inert.has(j.call.op));
+    const seq = meaningful ? Math.max(0, meaningful.seq - 1) : Math.max(0, state.seq - 1);
     calls.push({ op: "journal.rewind", args: { seq } });
-    say = `أرجعت النظام إلى النقطة ${seq}.`;
+    say = meaningful
+      ? `أرجعت النظام إلى ما قبل «${meaningful.call.op}» (النقطة ${seq}).`
+      : "لا يوجد ما أرجعه في هذه الجلسة.";
     return done();
   }
 
@@ -297,6 +335,25 @@ export function reflexPlan(intent: string, state: NovaState): Plan {
     const what = after(raw, ["ذكرني", "نبهني", "remind me", "notify"]) ?? raw;
     calls.push({ op: "notify", args: { title: "تذكير", body: what.slice(0, 200), level: "warn" } });
     say = "سجّلت التذكير في مركز الإشعارات.";
+    return done();
+  }
+
+  // ── المزرعة كاسم لا كفعل.
+  // هذه الكتلة كانت أعلى الملف فاختطفت كل نيّة تذكر «المزرعة» — حتى
+  // «أطلق وكيلًا يجهّز ملخص المزرعة» كانت تفتح لوحة بدل أن تطلق وكيلًا.
+  // موضعها الصحيح هنا: بعد أن تُستنفد النوايا التي تحمل فعلًا صريحًا.
+  if (has(t, "المزرعه", "نبضه", "كم نخله", "كم نخلة", "النخيل", "المصاريف", "العمال", "المزادات", "farm", "pulse")) {
+    const focus = has(t, "مصاريف", "مال", "money")
+      ? "money"
+      : has(t, "عمال", "workers")
+      ? "workers"
+      : has(t, "سوق", "مزاد", "market")
+      ? "market"
+      : has(t, "نخل", "palms")
+      ? "palms"
+      : "all";
+    calls.push({ op: "farm.pulse", args: { focus } });
+    say = "هذه نبضة المزرعة من بياناتك الحقيقية.";
     return done();
   }
 

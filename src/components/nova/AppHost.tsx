@@ -6,6 +6,7 @@ import Files from "./apps/Files";
 import Monitor from "./apps/Monitor";
 import Notes from "./apps/Notes";
 import Oracle from "./apps/Oracle";
+import Pulse from "./apps/Pulse";
 import Rules from "./apps/Rules";
 import Settings from "./apps/Settings";
 import ShellApp from "./apps/ShellApp";
@@ -21,6 +22,8 @@ export default function AppHost({ win }: { win: NovaWindow }) {
   switch (win.app) {
     case "oracle":
       return <Oracle />;
+    case "pulse":
+      return <Pulse />;
     case "files":
       return <Files win={win} />;
     case "shell":
