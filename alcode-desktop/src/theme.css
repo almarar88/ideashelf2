@@ -1,0 +1,149 @@
+/*
+ * لوحة "الرمل الدافئ" — نفس هوية نسخة الهاتف حرفًا بحرف:
+ * خلفية رملية، بطاقات بيضاء كبيرة الاستدارة بظلّ خفيف بلا حدود،
+ * عناوين سوداء عريضة، وباستيل هادئ للفئات.
+ */
+:root {
+  --sand: #EDE7E1;
+  --surface: #FFFFFF;
+  --surface-soft: #FBF8F5;
+  --surface-high: #F2ECE6;
+  --outline: #E2DAD2;
+  --ink: #111111;
+  --muted: #8C8680;
+
+  --lavender: #D9DCF7;
+  --lavender-ink: #4B4FA6;
+  --mint: #C9E7DC;
+  --mint-ink: #2F6B57;
+  --butter: #F2E08D;
+  --butter-ink: #6E5A12;
+  --peach: #F6E7D8;
+  --peach-ink: #8A5E33;
+  --rose: #F7D9DC;
+  --rose-ink: #9B4B57;
+  --olive: #DCCF8E;
+
+  --amber: #E9A93B;
+  --emerald: #3CC28A;
+  --danger: #D4574F;
+
+  --radius-lg: 26px;
+  --radius-md: 20px;
+  --radius-sm: 14px;
+  --shadow: 0 6px 20px rgba(17, 17, 17, 0.06);
+  --shadow-lg: 0 14px 40px rgba(17, 17, 17, 0.14);
+}
+
+:root[data-theme='dark'] {
+  --sand: #141210;
+  --surface: #1E1B18;
+  --surface-soft: #211E1A;
+  --surface-high: #272320;
+  --outline: #3A3430;
+  --ink: #F5F0EA;
+  --muted: #A39C94;
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--sand);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Noto Sans Arabic', sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, textarea { font-family: inherit; color: inherit; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--outline); border-radius: 6px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin: 0; }
+.h2 { font-size: 20px; font-weight: 700; margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+
+.pill {
+  border-radius: 999px;
+  padding: 10px 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-weight: 600;
+  font-size: 13px;
+  transition: transform 0.14s ease;
+}
+.pill:hover { transform: translateY(-1px); }
+.pill.active { background: var(--ink); color: var(--sand); }
+
+.chip {
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-high);
+}
+
+.btn {
+  border-radius: 999px;
+  padding: 11px 22px;
+  font-weight: 600;
+  background: var(--ink);
+  color: var(--sand);
+  transition: opacity 0.15s ease;
+}
+.btn:hover { opacity: 0.86; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.ghost { background: var(--surface-high); color: var(--ink); }
+.btn.danger { background: var(--danger); color: #fff; }
+
+.field {
+  width: 100%;
+  background: var(--surface-high);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 11px 14px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.field:focus { border-color: var(--lavender-ink); }
+
+.row { display: flex; align-items: center; gap: 12px; }
+.col { display: flex; flex-direction: column; }
+.grow { flex: 1; min-width: 0; }
+.wrap { flex-wrap: wrap; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.enter { animation: fade-up 0.24s ease both; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+.dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--lavender-ink);
+  animation: pulse 1.1s ease-in-out infinite;
+}
+.dot:nth-child(2) { animation-delay: 0.18s; }
+.dot:nth-child(3) { animation-delay: 0.36s; }

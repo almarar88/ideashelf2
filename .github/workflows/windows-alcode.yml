@@ -1,0 +1,59 @@
+name: Build Alcode Ai for Windows
+
+on:
+  push:
+    paths:
+      - 'alcode-desktop/**'
+      - '.github/workflows/windows-alcode.yml'
+  pull_request:
+    paths:
+      - 'alcode-desktop/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    # ويندوز حقيقي: هو وحده ما يصنع مُثبِّت NSSIS كاملًا،
+    # وبناؤه على لينكس تحت wine يقف عند هذه الخطوة.
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: alcode-desktop
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: alcode-desktop/package-lock.json
+
+      - name: تثبيت الاعتماديات
+        run: npm ci
+
+      - name: فحص الأنواع
+        run: npm run typecheck
+
+      - name: اختبارات الحواجز والأدوات
+        run: npm test
+
+      - name: بناء المُثبِّت والنسخة المحمولة
+        run: npx electron-builder --win nsis dir
+
+      - name: ضغط النسخة المحمولة
+        run: Compress-Archive -Path release/win-unpacked/* -DestinationPath release/AlcodeAi-win-portable.zip
+        shell: pwsh
+
+      - name: رفع المُثبِّت
+        uses: actions/upload-artifact@v4
+        with:
+          name: AlcodeAi-Setup
+          path: alcode-desktop/release/*.exe
+          if-no-files-found: error
+
+      - name: رفع النسخة المحمولة
+        uses: actions/upload-artifact@v4
+        with:
+          name: AlcodeAi-portable
+          path: alcode-desktop/release/AlcodeAi-win-portable.zip
+          if-no-files-found: error
