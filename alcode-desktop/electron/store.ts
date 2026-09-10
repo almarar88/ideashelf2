@@ -167,6 +167,10 @@ export const stores = {
   conversations: new JsonStore<any[]>('conversations.json', []),
   /** آخر يوم أُرسل فيه ملخّص الصباح — على القرص ليصمد بين التشغيلات. */
   brief: new JsonStore<{ on: string }>('brief.json', { on: '' }),
+  /** المفتاح المفعَّل ووقت أول تشغيل (بداية عدّاد التجربة). */
+  license: new JsonStore<{ key: string; firstRunAt: number }>(
+    'license.json', { key: '', firstRunAt: 0 },
+  ),
   usage: new JsonStore<{ input: number; output: number; cached: number; requests: number }>(
     'usage.json', { input: 0, output: 0, cached: 0, requests: 0 },
   ),

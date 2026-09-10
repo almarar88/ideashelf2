@@ -1,3 +1,13 @@
+export interface LicenseState {
+  tier: 'free' | 'pro'
+  source: 'licensed' | 'trial' | 'unlicensed-build' | 'none'
+  email: string
+  expiresAt: number
+  trialDaysLeft: number
+  valid: boolean
+  message: string
+}
+
 /** واجهة الجسر كما تراها شيفرة العرض. */
 export interface AlcodeBridge {
   settings: {
@@ -54,6 +64,11 @@ export interface AlcodeBridge {
     saveHabit(habit: unknown): Promise<boolean>
     deleteHabit(id: string): Promise<boolean>
     openExternal(url: string): Promise<boolean>
+  }
+  license: {
+    state(): Promise<LicenseState>
+    activate(key: string): Promise<{ ok: boolean; message: string; state: LicenseState }>
+    clear(): Promise<LicenseState>
   }
   diag: {
     log(): Promise<{

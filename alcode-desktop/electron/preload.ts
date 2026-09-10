@@ -70,6 +70,11 @@ const api = {
     deleteHabit: (id: string) => ipcRenderer.invoke('daily:deleteHabit', id),
     openExternal: (url: string) => ipcRenderer.invoke('daily:openExternal', url),
   },
+  license: {
+    state: () => ipcRenderer.invoke('license:state'),
+    activate: (key: string) => ipcRenderer.invoke('license:activate', key),
+    clear: () => ipcRenderer.invoke('license:clear'),
+  },
   diag: {
     log: () => ipcRenderer.invoke('diag:log'),
     openLog: () => ipcRenderer.invoke('diag:openLog'),

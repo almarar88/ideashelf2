@@ -15,6 +15,7 @@ import { searchPlaces } from './daily/weather'
 import { locateViaIp, locateViaWindows, placeFromCoordinates } from './daily/locate'
 import { validateFeed, topicSource } from './daily/news'
 import { longGregorianAr, longHijriAr } from './daily/dates'
+import { currentState, ensureFirstRun, licensingEnabled, verifyKey } from './license'
 import {
   installCrashGuards, log, markBootStarted, markBootSucceeded, previousBootFailed,
   readLogTail, reportFatal, startupLogPath,
@@ -592,6 +593,31 @@ function registerIpc() {
     return true
   })
 
+  ipcMain.handle('license:state', async () => currentState())
+
+  ipcMain.handle('license:activate', async (_event, key: string) => {
+    const trimmed = String(key ?? '').trim()
+    if (!licensingEnabled()) {
+      return { ok: true, message: 'هذه النسخة بلا قيود أصلًا.', state: await currentState() }
+    }
+    const payload = verifyKey(trimmed)
+    if (!payload) {
+      return {
+        ok: false,
+        message: 'المفتاح غير صالح. تأكّد من نسخه كاملًا بلا مسافات.',
+        state: await currentState(),
+      }
+    }
+    await stores.license.update((current) => ({ ...current, key: trimmed }))
+    log(`فُعّل ترخيص: ${payload.tier} — ${payload.email}`)
+    return { ok: true, message: 'فُعّل الترخيص. أهلًا بك.', state: await currentState() }
+  })
+
+  ipcMain.handle('license:clear', async () => {
+    await stores.license.update((current) => ({ ...current, key: '' }))
+    return currentState()
+  })
+
   ipcMain.handle('diag:log', async () => ({
     path: startupLogPath(),
     tail: readLogTail(240),
@@ -744,6 +770,20 @@ function registerIpc() {
     fromQuick?: boolean
   }) => {
     const settings = await stores.settings.load()
+
+    // البوّابة الوحيدة: كل طلب للمساعد يمرّ من هنا. وضعها في الواجهة وحدها
+    // يعني أن أي نافذة أو نداء مباشر يتجاوزها.
+    const license = await currentState()
+    if (license.tier !== 'pro') {
+      return {
+        ok: false,
+        error: license.message ||
+          'ميزات المساعد تحتاج ترخيصًا. الرفيق اليومي — الصلاة والطقس والأخبار ' +
+          'والمهام — يبقى مجّانًا بالكامل.',
+        locked: true,
+      }
+    }
+
     if (!settings.apiKey) {
       return { ok: false, error: 'أضِف مفتاح Anthropic من الإعدادات أولًا.' }
     }
@@ -858,6 +898,7 @@ if (!single) {
     }
 
     await step('تسجيل قنوات الجسر', registerIpc)
+    await step('بدء عدّاد التجربة', ensureFirstRun)
 
     const settings = await stores.settings.load().catch((error) => {
       log('تعذّرت قراءة الإعدادات — نستعمل الافتراضية', error)

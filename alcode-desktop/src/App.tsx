@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Bubble, ConfirmDialog, Section, Thinking, useAutoScroll } from './components'
 import { useAgent } from './useAgent'
 import { AppSettings, Place } from './types'
+import type { LicenseState } from '../electron/preload-api'
 import {
   DayTab, HomeTab, NewsTab, PrayerTab, TimeZoneContext, Use24hContext, WeatherTab,
 } from './daily'
@@ -35,6 +36,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('home')
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [toolCount, setToolCount] = useState(0)
+  const [license, setLicense] = useState<LicenseState | null>(null)
   const [platform, setPlatform] = useState<{ windows: boolean; version: string } | null>(null)
 
   const agent = useAgent(false)
@@ -45,11 +47,16 @@ export default function App() {
     setSettings(await window.alcode.settings.get())
   }, [])
 
+  const refreshLicense = useCallback(async () => {
+    setLicense(await window.alcode.license.state())
+  }, [])
+
   useEffect(() => {
     void refreshSettings()
+    void refreshLicense()
     void window.alcode.tools.count().then(setToolCount)
     void window.alcode.platform().then(setPlatform)
-  }, [refreshSettings])
+  }, [refreshSettings, refreshLicense])
 
   // المظهر يتبع الإعداد، و"النظام" يتبع تفضيل ويندوز نفسه.
   useEffect(() => {
@@ -211,6 +218,8 @@ export default function App() {
               <button className="pill" onClick={agent.reset}>محادثة جديدة</button>
             </header>
 
+            {license && <LicenseBanner license={license} onGo={() => setTab('settings')} />}
+
             <div
               ref={scrollRef}
               className="card grow"
@@ -315,6 +324,8 @@ export default function App() {
             onPatch={patchSettings}
             onRefresh={refreshSettings}
             version={platform?.version ?? ''}
+            license={license}
+            onLicenseChange={refreshLicense}
           />
         )}
         </TimeZoneContext.Provider>
@@ -528,11 +539,13 @@ const CATEGORIES = [
   { id: 'science', label: 'علوم' },
 ]
 
-function SettingsTab({ settings, onPatch, onRefresh, version }: {
+function SettingsTab({ settings, onPatch, onRefresh, version, license, onLicenseChange }: {
   settings: AppSettings
   onPatch: (patch: Partial<AppSettings>) => Promise<void>
   onRefresh: () => Promise<void>
   version: string
+  license: LicenseState | null
+  onLicenseChange: () => Promise<void>
 }) {
   const [key, setKey] = useState('')
   const [testing, setTesting] = useState(false)
@@ -563,6 +576,8 @@ function SettingsTab({ settings, onPatch, onRefresh, version }: {
       <p className="muted small" style={{ marginTop: 0, marginBottom: 20 }}>
         Alcode Ai {version} · كل بياناتك على هذا الجهاز
       </p>
+
+      {license && <LicenseSection license={license} onChange={onLicenseChange} />}
 
       <Section title="مفتاح Anthropic">
         <div className="card">
@@ -1390,6 +1405,171 @@ function Diagnostics() {
             {info.tail || 'السجل فارغ.'}
           </pre>
         )}
+      </div>
+    </Section>
+  )
+}
+
+// ------------------------------------------------------------- الترخيص
+
+const BUY_URL = 'https://github.com/almarar88/ideashelf2/releases'
+
+/**
+ * شريط أعلى المساعد يقول حالة الترخيص.
+ *
+ * لا يظهر لمن اشترى، ولا في نسخة بلا قيود. غرضه أن يعرف المستخدم ما لديه
+ * قبل أن يصطدم برفض — الاصطدام الصامت هو ما يفقد المشتري لا السعر.
+ */
+function LicenseBanner({ license, onGo }: { license: LicenseState; onGo: () => void }) {
+  if (license.source === 'licensed' || license.source === 'unlicensed-build') return null
+
+  const lapsed = license.tier !== 'pro'
+  return (
+    <div
+      className="row"
+      style={{
+        gap: 12, marginBottom: 12, padding: '10px 16px', borderRadius: 999,
+        background: lapsed ? 'var(--rose)' : 'var(--butter)',
+        color: lapsed ? 'var(--rose-ink)' : 'var(--butter-ink)',
+      }}
+    >
+      <span style={{ fontSize: 16 }}>{lapsed ? '🔒' : '⏳'}</span>
+      <span className="grow small" style={{ fontWeight: 600 }}>
+        {lapsed
+          ? license.message
+          : `الفترة التجريبية — بقي ${license.trialDaysLeft} ${
+            license.trialDaysLeft === 1 ? 'يوم' : 'أيام'
+          } من ميزات المساعد.`}
+      </span>
+      <button className="pill" onClick={onGo}>
+        {lapsed ? 'فعّل مفتاحك' : 'التفاصيل'}
+      </button>
+    </div>
+  )
+}
+
+const TIER_LABEL: Record<LicenseState['source'], string> = {
+  licensed: 'مفعّل',
+  trial: 'فترة تجريبية',
+  'unlicensed-build': 'نسخة مفتوحة',
+  none: 'مجّاني',
+}
+
+function LicenseSection({ license, onChange }: {
+  license: LicenseState
+  onChange: () => Promise<void>
+}) {
+  const [key, setKey] = useState('')
+  const [state, setState] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const activate = async () => {
+    if (!key.trim()) return
+    setBusy(true)
+    const result = await window.alcode.license.activate(key.trim())
+    setBusy(false)
+    setState(result.ok ? `✅ ${result.message}` : `⚠️ ${result.message}`)
+    if (result.ok) setKey('')
+    await onChange()
+  }
+
+  if (license.source === 'unlicensed-build') {
+    return (
+      <Section title="الترخيص">
+        <div className="card">
+          <p className="muted small" style={{ margin: 0 }}>
+            هذه نسخة مبنيّة من المصدر بلا مفتاح تحقّق، فكل الميزات مفتوحة.
+          </p>
+        </div>
+      </Section>
+    )
+  }
+
+  return (
+    <Section title="الترخيص">
+      <div className="card col" style={{ gap: 16 }}>
+        <div className="row wrap" style={{ gap: 20 }}>
+          <Stat label="الحالة" value={TIER_LABEL[license.source]} />
+          <Stat label="الباقة" value={license.tier === 'pro' ? 'Pro' : 'مجّاني'} />
+          {license.source === 'trial' && (
+            <Stat label="أيام متبقّية" value={license.trialDaysLeft} />
+          )}
+          {license.email && <Stat label="المشتري" value={license.email} />}
+          {license.expiresAt > 0 && (
+            <Stat
+              label="ينتهي"
+              value={new Date(license.expiresAt * 1000).toLocaleDateString('ar')}
+            />
+          )}
+        </div>
+
+        {license.message && <div className="small">{license.message}</div>}
+
+        <hr className="divider" />
+
+        <div>
+          <div className="small" style={{ fontWeight: 700, marginBottom: 8 }}>
+            ما يشمله كل مستوى
+          </div>
+          <div
+            style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+              gap: 10,
+            }}
+          >
+            <div className="tile" style={{ background: 'var(--mint)', color: 'var(--mint-ink)' }}>
+              <div style={{ fontWeight: 700, color: 'var(--ink)' }}>مجّاني — للأبد</div>
+              <p className="small" style={{ margin: '6px 0 0', opacity: 0.9 }}>
+                الصلاة والقبلة وجدول الشهر · الطقس · الأخبار · المهام والعادات ·
+                التنبيهات وملخّص الصباح. يعمل بلا إنترنت وبلا حساب.
+              </p>
+            </div>
+            <div className="tile" style={{ background: 'var(--lavender)', color: 'var(--lavender-ink)' }}>
+              <div style={{ fontWeight: 700, color: 'var(--ink)' }}>Pro</div>
+              <p className="small" style={{ margin: '6px 0 0', opacity: 0.9 }}>
+                كل ما سبق + المساعد الذي ينفّذ على جهازك: ٦٨ أداة، الشريط
+                السريع، رؤية الشاشة، إدارة النوافذ والملفات، والبحث في الإنترنت.
+              </p>
+            </div>
+          </div>
+          <p className="muted small" style={{ margin: '8px 0 0' }}>
+            Pro يعمل بمفتاح Anthropic الخاصّ بك — تدفع للنموذج مباشرةً بسعر
+            التكلفة، ولا يمرّ شيء من محادثاتك بنا.
+          </p>
+        </div>
+
+        <Field label="فعّل مفتاحك">
+          <div className="row wrap" style={{ gap: 8 }}>
+            <input
+              className="field grow"
+              value={key}
+              onChange={(event) => setKey(event.target.value)}
+              placeholder="ALC1..."
+              style={{ direction: 'ltr', fontSize: 12 }}
+            />
+            <button className="btn" onClick={activate} disabled={busy || !key.trim()}>
+              {busy ? 'أتحقّق…' : 'تفعيل'}
+            </button>
+          </div>
+          {state && <div className="small" style={{ marginTop: 8 }}>{state}</div>}
+        </Field>
+
+        <div className="row wrap" style={{ gap: 8 }}>
+          <button
+            className="btn ghost"
+            onClick={() => window.alcode.daily.openExternal(BUY_URL)}
+          >
+            احصل على مفتاح
+          </button>
+          {license.source === 'licensed' && (
+            <button
+              className="chip"
+              onClick={async () => { await window.alcode.license.clear(); await onChange() }}
+            >
+              إزالة المفتاح من هذا الجهاز
+            </button>
+          )}
+        </div>
       </div>
     </Section>
   )
