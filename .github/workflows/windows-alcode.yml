@@ -10,6 +10,9 @@ on:
       - 'alcode-desktop/**'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     # ويندوز حقيقي: هو وحده ما يصنع مُثبِّت NSSIS كاملًا،
@@ -57,3 +60,27 @@ jobs:
           name: AlcodeAi-portable
           path: alcode-desktop/release/AlcodeAi-win-portable.zip
           if-no-files-found: error
+
+      # الإصدار يعطي رابط تنزيل مباشرًا بلا تسجيل دخول وبلا حدّ حجم،
+      # بخلاف ملفات Actions التي تتطلّب حسابًا وتنتهي صلاحيتها.
+      - name: نشر إصدار للتنزيل المباشر
+        if: github.ref == 'refs/heads/claude/daily-companion-app-8fnen3'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-v${{ github.run_number }}
+          name: Alcode Ai لويندوز — بناء ${{ github.run_number }}
+          body: |
+            نسخة ويندوز من Alcode Ai — مساعد ينفّذ أوامرك على جهازك فعلًا.
+
+            **AlcodeAi-Setup-1.0.0.exe** — المُثبِّت (الأسهل: شغّله وتابع الخطوات)
+            **AlcodeAi-win-portable.zip** — نسخة محمولة بلا تثبيت
+
+            سيعرض ويندوز تحذير SmartScreen لأن الملف غير موقّع رقميًا:
+            اضغط **More info ← Run anyway**.
+
+            بعد التشغيل: الإعدادات ← مفتاح Anthropic ← الصق مفتاحك.
+            اختصار الشريط السريع: **Ctrl + Space**
+          files: |
+            alcode-desktop/release/*.exe
+            alcode-desktop/release/AlcodeAi-win-portable.zip
+          fail_on_unmatched_files: false
