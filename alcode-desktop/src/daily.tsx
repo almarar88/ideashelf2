@@ -15,14 +15,30 @@ const pastel = (i: number) => `var(--${PASTELS[i % PASTELS.length]})`
  */
 export const Use24hContext = createContext(true)
 
+/**
+ * منطقة المدينة المختارة.
+ *
+ * ضرورية لا تحسينًا: المحرّك يحسب لحظات صحيحة بتوقيت المدينة، لكن العرض بلا
+ * `timeZone` يترجمها إلى منطقة الجهاز. من يضبط دبي وجهازه على توقيت آخر كان
+ * يرى الفجر ٠٠:٤٤ بدل ٠٤:٤٤ — رأيتُ ذلك في لقطة اختبار على جهاز بتوقيت UTC.
+ */
+export const TimeZoneContext = createContext<string | undefined>(undefined)
+
 function useFmtTime() {
   const use24h = useContext(Use24hContext)
+  const timeZone = useZone()
   return useCallback(
     (at: number) => new Intl.DateTimeFormat('ar', {
-      hour: '2-digit', minute: '2-digit', hour12: !use24h,
+      hour: '2-digit', minute: '2-digit', hour12: !use24h, timeZone,
     }).format(new Date(at)),
-    [use24h],
+    [use24h, timeZone],
   )
+}
+
+/** المنطقة الصالحة للتمرير إلى Intl، أو undefined لتُستعمل منطقة الجهاز. */
+function useZone(): string | undefined {
+  const zone = useContext(TimeZoneContext)
+  return zone && zone !== 'auto' ? zone : undefined
 }
 
 function remaining(at: number) {
@@ -34,21 +50,47 @@ function remaining(at: number) {
 
 // ------------------------------------------------------------ الرئيسية
 
-export function HomeTab({ onGo }: { onGo: (tab: string) => void }) {
+function greeting(zone?: string): string {
+  // الساعة بتوقيت المدينة: «صباح الخير» في دبي لا يتبع ساعة جهاز في لندن.
+  const hour = Number(
+    new Intl.DateTimeFormat('en', { hour: 'numeric', hour12: false, timeZone: zone })
+      .format(new Date()),
+  )
+  if (hour < 5) return 'ليلة هادئة'
+  if (hour < 12) return 'صباح الخير'
+  if (hour < 15) return 'نهارك سعيد'
+  if (hour < 18) return 'مساء الخير'
+  return 'مساء النور'
+}
+
+/** أوامر جاهزة تُرسل للمساعد بنقرة واحدة. */
+const QUICK_ASKS = [
+  { icon: '🧹', text: 'رتّب مجلد التنزيلات' },
+  { icon: '👁️', text: 'شو في الشاشة؟' },
+  { icon: '💽', text: 'وين راحت مساحة القرص؟' },
+  { icon: '🪟', text: 'صغّر كل النوافذ' },
+  { icon: '📊', text: 'شو حالة الجهاز؟' },
+  { icon: '💧', text: 'ذكّرني بعد ٢٠ دقيقة أشرب ماء' },
+]
+
+export function HomeTab({ onGo, onAsk, userName }: {
+  onGo: (tab: string) => void
+  onAsk: (text: string) => void
+  userName: string
+}) {
   const fmtTime = useFmtTime()
+  const zone = useZone()
   const [day, setDay] = useState<any>(null)
-  const [tick, setTick] = useState(Date.now())
+  const [, setTick] = useState(Date.now())
 
   const load = useCallback(async () => setDay(await window.alcode.daily.day()), [])
 
   useEffect(() => {
     void load()
+    // العدّاد يتحدّث كل نصف دقيقة بلا إعادة جلب من الشبكة.
     const timer = setInterval(() => setTick(Date.now()), 30_000)
     return () => clearInterval(timer)
   }, [load])
-
-  // إعادة الحساب كل نصف دقيقة تبقي العدّاد صادقًا بلا إعادة جلب من الشبكة.
-  useMemo(() => tick, [tick])
 
   if (!day) return <Loading />
 
@@ -56,81 +98,158 @@ export function HomeTab({ onGo }: { onGo: (tab: string) => void }) {
   const next = day.next
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', paddingLeft: 6 }}>
-      <header style={{ marginBottom: 18 }}>
-        <h1 className="h1" style={{ marginBottom: 2 }}>يومك</h1>
-        <p className="muted small" style={{ margin: 0 }}>
-          {day.gregorian} · {day.hijri}
-          {day.place ? ` · ${day.place}` : ''}
-        </p>
+    <div style={{ height: '100%', overflowY: 'auto', paddingLeft: 6 }} className="enter">
+      <header className="row" style={{ marginBottom: 20, alignItems: 'flex-start' }}>
+        <div className="grow">
+          <h1 className="h1" style={{ marginBottom: 2 }}>
+            {greeting(zone)}{userName ? `، ${userName}` : ''}
+          </h1>
+          <p className="muted small" style={{ margin: 0 }}>
+            {day.gregorian} · {day.hijri}
+            {day.place ? ` · ${day.place}` : ''}
+          </p>
+        </div>
+        <button className="pill" onClick={() => void load()} title="تحديث (Ctrl+R)">
+          ↻ تحديث
+        </button>
       </header>
 
-      {!day.place && (
-        <div className="card" style={{ background: 'var(--butter)', marginBottom: 18 }}>
-          <strong>حدّد مدينتك أولًا</strong>
-          <p className="small" style={{ margin: '6px 0 12px' }}>
-            أوقات الصلاة والطقس تحتاج موقعك. تُحسب الصلاة فلكيًا على جهازك بلا إنترنت.
-          </p>
-          <button className="btn" onClick={() => onGo('settings')}>اختر المدينة</button>
-        </div>
-      )}
+      {!day.place && <LocationCard onDone={load} onGo={onGo} />}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr', gap: 14, marginBottom: 18 }}>
+      {/* ------------------------------------------- البلاطات الكبيرة */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
+          gap: 14,
+          marginBottom: 20,
+        }}
+      >
         {next && (
-          <div className="card" style={{ background: 'var(--peach)' }}>
-            <div className="small" style={{ opacity: 0.7 }}>الصلاة القادمة</div>
-            <div style={{ fontSize: 40, fontWeight: 700, lineHeight: 1.15 }}>{next.arabic}</div>
-            <div style={{ fontSize: 17, fontWeight: 600 }}>
-              {fmtTime(next.at)} · بعد {remaining(next.at)}
+          <button
+            className="tile hover-lift"
+            onClick={() => onGo('prayer')}
+            style={{
+              background: 'var(--peach)', color: 'var(--peach-ink)',
+              textAlign: 'start', minHeight: 150,
+            }}
+          >
+            <div className="label">الصلاة القادمة</div>
+            <div style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.2, color: 'var(--ink)' }}>
+              {next.arabic}
             </div>
-            <button
-              className="pill"
-              style={{ marginTop: 12, width: 'fit-content' }}
-              onClick={() => onGo('prayer')}
-            >
-              كل المواقيت
-            </button>
-          </div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{fmtTime(next.at)}</div>
+            <div className="small" style={{ opacity: 0.85 }}>بعد {remaining(next.at)}</div>
+          </button>
         )}
 
         {weather && (
-          <div className="card" style={{ background: 'var(--mint)' }}>
-            <div className="small" style={{ opacity: 0.7 }}>الطقس الآن</div>
-            <div style={{ fontSize: 40, fontWeight: 700, lineHeight: 1.15 }}>
-              {Math.round(weather.now.temperature)}°
+          <button
+            className="tile hover-lift"
+            onClick={() => onGo('weather')}
+            style={{
+              background: 'var(--sky)', color: 'var(--sky-ink)',
+              textAlign: 'start', minHeight: 150,
+            }}
+          >
+            <div className="label">الطقس الآن</div>
+            <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
+              <span style={{ fontSize: 34, fontWeight: 700, color: 'var(--ink)' }}>
+                {Math.round(weather.now.temperature)}°
+              </span>
+              <span style={{ fontSize: 22 }}>{day.weatherEmoji}</span>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>{day.weatherText}</div>
+            <div className="small" style={{ opacity: 0.85 }}>
               {weather.daily?.[0]
-                ? `اليوم ${Math.round(weather.daily[0].max)}° / ${Math.round(weather.daily[0].min)}°`
+                ? `${Math.round(weather.daily[0].max)}° / ${Math.round(weather.daily[0].min)}°`
                 : ''}
+              {' · محسوسة '}{Math.round(weather.now.feelsLike)}°
             </div>
-            <div className="small" style={{ opacity: 0.75 }}>
-              محسوسة {Math.round(weather.now.feelsLike)}° · رطوبة {weather.now.humidity}%
-            </div>
-            <button
-              className="pill"
-              style={{ marginTop: 10, width: 'fit-content' }}
-              onClick={() => onGo('weather')}
-            >
-              تفاصيل الطقس
-            </button>
+          </button>
+        )}
+
+        <button
+          className="tile hover-lift"
+          onClick={() => onGo('day')}
+          style={{
+            background: 'var(--mint)', color: 'var(--mint-ink)',
+            textAlign: 'start', minHeight: 150,
+          }}
+        >
+          <div className="label">مهام اليوم</div>
+          <div style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.2, color: 'var(--ink)' }}>
+            {day.tasksOpen}
           </div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>
+            {day.tasksOpen === 0 ? 'ما في شي معلّق' : 'مفتوحة'}
+          </div>
+          <div className="small" style={{ opacity: 0.85 }}>
+            أنجزت {day.tasksDone} · عادات {day.habitsDone}/{day.habitsTotal}
+          </div>
+        </button>
+
+        {day.qibla && (
+          <button
+            className="tile hover-lift"
+            onClick={() => onGo('prayer')}
+            style={{
+              background: 'var(--lavender)', color: 'var(--lavender-ink)',
+              textAlign: 'start', minHeight: 150,
+            }}
+          >
+            <div className="label">القبلة</div>
+            <div className="row" style={{ gap: 10 }}>
+              <span
+                style={{
+                  fontSize: 30, display: 'inline-block',
+                  transform: `rotate(${day.qibla.bearing}deg)`,
+                }}
+              >
+                🧭
+              </span>
+              <span style={{ fontSize: 26, fontWeight: 700, color: 'var(--ink)' }}>
+                {Math.round(day.qibla.bearing)}°
+              </span>
+            </div>
+            <div className="small" style={{ opacity: 0.85 }}>
+              {Math.round(day.qibla.distanceKm).toLocaleString('ar')} كم إلى الكعبة
+            </div>
+          </button>
         )}
       </div>
 
+      {/* -------------------------------------------- اسأل المساعد */}
+      <Section title="اسأل المساعد" action={<Link onClick={() => onGo('chat')} />}>
+        <div className="row wrap" style={{ gap: 8 }}>
+          {QUICK_ASKS.map((ask) => (
+            <button
+              key={ask.text}
+              className="pill"
+              onClick={() => onAsk(ask.text)}
+            >
+              <span style={{ marginInlineEnd: 6 }}>{ask.icon}</span>{ask.text}
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      {/* ---------------------------------------------- مواقيت اليوم */}
       {day.prayers && (
-        <Section title="أوقات اليوم" action={<Link onClick={() => onGo('prayer')} />}>
+        <Section title="مواقيت اليوم" action={<Link onClick={() => onGo('prayer')} />}>
           <div className="row wrap" style={{ gap: 8 }}>
             {day.prayers.map((p: any, i: number) => {
               const isNext = next?.key === p.key
+              const passed = p.at < Date.now() && !isNext
               return (
                 <div
                   key={p.key}
-                  className="card"
+                  className="tile plain"
                   style={{
-                    flex: '1 1 120px', padding: '12px 14px', textAlign: 'center',
+                    flex: '1 1 118px', padding: '13px 15px', textAlign: 'center',
                     background: isNext ? 'var(--ink)' : pastel(i),
                     color: isNext ? 'var(--sand)' : 'var(--ink)',
+                    opacity: passed ? 0.55 : 1,
                   }}
                 >
                   <div className="small" style={{ opacity: 0.75 }}>{p.arabic}</div>
@@ -142,43 +261,173 @@ export function HomeTab({ onGo }: { onGo: (tab: string) => void }) {
         </Section>
       )}
 
+      {/* ------------------------------------------ المهام والعادات */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         <Section title="مهامك" action={<Link onClick={() => onGo('day')} />}>
-          <div className="card">
-            <div className="row" style={{ gap: 20 }}>
-              <Stat value={day.tasksOpen} label="مفتوحة" />
-              <Stat value={day.tasksDone} label="منجزة" />
-            </div>
-            {day.tasksOpen === 0 && (
-              <p className="muted small" style={{ marginBottom: 0 }}>
-                ما في مهام مفتوحة. قل للمساعد «ذكّرني…» ليضيف واحدة.
+          <div className="card" style={{ padding: 10 }}>
+            {day.topTasks.length === 0 ? (
+              <p className="muted small" style={{ padding: 10, margin: 0 }}>
+                ما في مهام مفتوحة. قل للمساعد «ذكّرني…» أو أضِف واحدة من «يومي».
               </p>
+            ) : (
+              day.topTasks.map((task: any) => (
+                <div key={task.id} className="row" style={{ gap: 10, padding: '7px 10px' }}>
+                  <button
+                    onClick={async () => {
+                      await window.alcode.daily.saveTask({ ...task, done: true })
+                      void load()
+                    }}
+                    title="أنجزتها"
+                    style={{
+                      width: 20, height: 20, borderRadius: 7, flexShrink: 0,
+                      border: '2px solid var(--outline)',
+                    }}
+                  />
+                  <span className="grow">{task.title}</span>
+                  {task.dueDate && <span className="chip small">{task.dueDate}</span>}
+                </div>
+              ))
             )}
           </div>
         </Section>
 
-        <Section title="أبرز العناوين" action={<Link onClick={() => onGo('news')} />}>
-          <div className="card" style={{ padding: 8 }}>
-            {(day.headlines ?? []).slice(0, 5).map((article: any) => (
-              <button
-                key={article.link}
-                onClick={() => window.alcode.daily.openExternal(article.link)}
-                style={{
-                  display: 'block', textAlign: 'start', width: '100%',
-                  padding: '8px 10px', borderRadius: 12, lineHeight: 1.5,
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: 13 }}>{article.title}</div>
-                <div className="muted small">{article.sourceName}</div>
-              </button>
-            ))}
-            {!day.headlines?.length && (
+        <Section title="عاداتك" action={<Link onClick={() => onGo('day')} />}>
+          <div className="card" style={{ padding: 10 }}>
+            {day.topHabits.length === 0 ? (
               <p className="muted small" style={{ padding: 10, margin: 0 }}>
-                لا عناوين بعد — تحقّق من الاتصال.
+                ما في عادات بعد. أضِف واحدة من «يومي» وتابع سلسلتك.
               </p>
+            ) : (
+              day.topHabits.map((habit: any) => (
+                <div key={habit.id} style={{ padding: '7px 10px' }}>
+                  <div className="row" style={{ gap: 8, marginBottom: 5 }}>
+                    <span>{habit.emoji || '🔁'}</span>
+                    <span className="grow">{habit.title}</span>
+                    <span className="muted small">{habit.today}/{habit.target}</span>
+                  </div>
+                  <div className="meter">
+                    <span
+                      style={{
+                        width: `${Math.min(100, (habit.today / Math.max(1, habit.target)) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </Section>
+      </div>
+
+      {/* ------------------------------------------------ العناوين */}
+      <Section title="أبرز العناوين" action={<Link onClick={() => onGo('news')} />}>
+        <div
+          className="card"
+          style={{
+            padding: 8, display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 2,
+          }}
+        >
+          {(day.headlines ?? []).slice(0, 6).map((article: any) => (
+            <button
+              key={article.link}
+              onClick={() => window.alcode.daily.openExternal(article.link)}
+              style={{
+                display: 'block', textAlign: 'start', width: '100%',
+                padding: '9px 11px', borderRadius: 14, lineHeight: 1.55,
+              }}
+              className="hover-lift"
+            >
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{article.title}</div>
+              <div className="muted small">{article.sourceName}</div>
+            </button>
+          ))}
+          {!day.headlines?.length && (
+            <p className="muted small" style={{ padding: 10, margin: 0 }}>
+              لا عناوين بعد — تحقّق من الاتصال أو أضِف مصدرًا من الإعدادات.
+            </p>
+          )}
+        </div>
+      </Section>
+
+      <div style={{ height: 20 }} />
+    </div>
+  )
+}
+
+/**
+ * بطاقة الموقع: تظهر ما دامت المدينة غير محدّدة.
+ *
+ * زر واحد يطلب الموقع من ويندوز نفسه — وهو ما يُظهر طلب الصلاحية في النظام.
+ * إن رُفض نفتح صفحة الخصوصية مباشرة بدل أن نقول «مرفوض» ونترك المستخدم يبحث.
+ */
+function LocationCard({ onDone, onGo }: { onDone: () => void; onGo: (tab: string) => void }) {
+  const [state, setState] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [denied, setDenied] = useState(false)
+  const [offerIp, setOfferIp] = useState(false)
+
+  const detect = async (allowIp: boolean) => {
+    setBusy(true)
+    setState(allowIp ? 'أقدّر موقعك من الشبكة…' : 'أسأل ويندوز عن موقعك…')
+    setDenied(false)
+    const result = await window.alcode.daily.detectPlace(allowIp)
+    setBusy(false)
+    if (result.ok) {
+      const how = result.source === 'ip' ? 'تقديرًا من الشبكة' : 'من خدمة ويندوز'
+      setState(`✅ ${result.place.name} — ${how}`)
+      onDone()
+      return
+    }
+    setDenied(result.status === 'denied')
+    setOfferIp(true)
+    setState(`⚠️ ${result.message}`)
+  }
+
+  return (
+    <div
+      className="tile"
+      style={{ background: 'var(--butter)', color: 'var(--butter-ink)', marginBottom: 20 }}
+    >
+      <div className="row" style={{ gap: 14, alignItems: 'flex-start' }}>
+        <div style={{ fontSize: 30 }}>📍</div>
+        <div className="grow">
+          <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--ink)' }}>
+            وين أنت؟
+          </div>
+          <p className="small" style={{ margin: '4px 0 12px', opacity: 0.9 }}>
+            الصلاة والطقس يحتاجان موقعك. أوقات الصلاة تُحسب فلكيًا على جهازك
+            بلا إنترنت، وموقعك لا يُرسل إلى أي جهة.
+          </p>
+          <div className="row wrap" style={{ gap: 8 }}>
+            <button className="btn" onClick={() => void detect(false)} disabled={busy}>
+              {busy ? 'لحظة…' : '📡 استعمل موقعي'}
+            </button>
+            <button className="btn ghost" onClick={() => onGo('settings')}>
+              ✍️ أكتب المدينة بنفسي
+            </button>
+            {denied && (
+              <button
+                className="btn ghost"
+                onClick={() => window.alcode.daily.openLocationSettings()}
+              >
+                ⚙️ افتح صلاحية الموقع
+              </button>
+            )}
+            {offerIp && !denied && (
+              <button className="btn ghost" onClick={() => void detect(true)} disabled={busy}>
+                🌐 قدّره من الشبكة
+              </button>
+            )}
+          </div>
+          {state && <div className="small" style={{ marginTop: 10 }}>{state}</div>}
+          {offerIp && !denied && (
+            <p className="small" style={{ margin: '8px 0 0', opacity: 0.8 }}>
+              التقدير من الشبكة يكشف عنوان IP لخدمة خارجية ويخطئ بعشرات الكيلومترات.
+              خدمة ويندوز أدقّ وأخصّ.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -192,12 +441,59 @@ function Link({ onClick }: { onClick: () => void }) {
   )
 }
 
-function Stat({ value, label }: { value: number; label: string }) {
+/** وقت صلاة بعينها من قائمة اليوم. */
+function timeOf(prayers: any[], key: string): number {
+  return prayers.find((p) => p.key === key)?.at ?? 0
+}
+
+/** الصلاة التي قبل الوقت المعطى — بداية القوس في العدّاد الدائري. */
+function previousAt(prayers: any[], at: number): number {
+  const before = prayers.filter((p) => p.at < at)
+  return before.length ? before[before.length - 1].at : at - 4 * 3_600_000
+}
+
+function spanOf(from: number, to: number): string {
+  const minutes = Math.max(0, Math.round((to - from) / 60_000))
+  return `${Math.floor(minutes / 60)} س ${minutes % 60} د`
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 26, fontWeight: 700 }}>{value}</div>
+      <div style={{ fontSize: 19, fontWeight: 700 }}>{value}</div>
       <div className="muted small">{label}</div>
     </div>
+  )
+}
+
+/**
+ * عدّاد دائري: القوس يمتلئ بما مضى من المدّة بين الصلاتين.
+ * SVG خالص بلا مكتبة — دائرتان وخاصية stroke-dasharray.
+ */
+function Ring({ from, to }: { from: number; to: number }) {
+  const total = Math.max(1, to - from)
+  const done = Math.min(1, Math.max(0, (Date.now() - from) / total))
+  const radius = 34
+  const circumference = 2 * Math.PI * radius
+  return (
+    <svg width="86" height="86" viewBox="0 0 86 86" style={{ flexShrink: 0 }}>
+      <circle
+        cx="43" cy="43" r={radius} fill="none"
+        stroke="currentColor" strokeWidth="7" opacity="0.22"
+      />
+      <circle
+        cx="43" cy="43" r={radius} fill="none"
+        stroke="currentColor" strokeWidth="7" strokeLinecap="round"
+        strokeDasharray={`${circumference * done} ${circumference}`}
+        transform="rotate(-90 43 43)"
+      />
+      <text
+        x="43" y="48" textAnchor="middle"
+        style={{ fontSize: 16, fontWeight: 700, fill: 'var(--ink)' }}
+      >
+        {Math.round(done * 100)}%
+      </text>
+    </svg>
   )
 }
 
@@ -215,7 +511,7 @@ export function PrayerTab() {
   const fmtTime = useFmtTime()
   const [day, setDay] = useState<any>(null)
   const [month, setMonth] = useState<any[]>([])
-  const [showMonth, setShowMonth] = useState(false)
+  const [showMonth, setShowMonth] = useState(true)
   const [cursor, setCursor] = useState(() => new Date())
 
   useEffect(() => { void window.alcode.daily.day().then(setDay) }, [])
@@ -245,15 +541,74 @@ export function PrayerTab() {
         {day.place} · {day.hijri} · حساب فلكي محلّي بلا إنترنت
       </p>
 
-      {day.next && (
-        <div className="card" style={{ background: 'var(--peach)', marginBottom: 16 }}>
-          <div className="small" style={{ opacity: 0.7 }}>الصلاة القادمة</div>
-          <div style={{ fontSize: 44, fontWeight: 700 }}>{day.next.arabic}</div>
-          <div style={{ fontSize: 17, fontWeight: 600 }}>
-            {fmtTime(day.next.at)} · بعد {remaining(day.next.at)}
+      <div
+        style={{
+          display: 'grid', gridTemplateColumns: 'minmax(260px, 1.1fr) 1fr', gap: 14,
+          marginBottom: 18,
+        }}
+      >
+        {day.next && (
+          <div
+            className="tile"
+            style={{ background: 'var(--peach)', color: 'var(--peach-ink)' }}
+          >
+            <div className="row" style={{ gap: 18 }}>
+              <Ring from={previousAt(day.prayers, day.next.at)} to={day.next.at} />
+              <div>
+                <div className="label">الصلاة القادمة</div>
+                <div style={{ fontSize: 38, fontWeight: 700, lineHeight: 1.2, color: 'var(--ink)' }}>
+                  {day.next.arabic}
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>{fmtTime(day.next.at)}</div>
+                <div className="small" style={{ opacity: 0.85 }}>
+                  بعد {remaining(day.next.at)}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="stack">
+          {day.qibla && (
+            <div
+              className="tile"
+              style={{ background: 'var(--lavender)', color: 'var(--lavender-ink)' }}
+            >
+              <div className="label">القبلة</div>
+              <div className="row" style={{ gap: 12 }}>
+                <span
+                  style={{
+                    fontSize: 26, display: 'inline-block',
+                    transform: `rotate(${day.qibla.bearing}deg)`,
+                  }}
+                >
+                  🧭
+                </span>
+                <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>
+                  {Math.round(day.qibla.bearing)}°
+                </span>
+                <span className="small grow" style={{ opacity: 0.85 }}>
+                  {Math.round(day.qibla.distanceKm).toLocaleString('ar')} كم إلى الكعبة
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="card" style={{ padding: 14 }}>
+            <div className="row wrap" style={{ gap: 20 }}>
+              <Fact label="الشروق" value={fmtTime(timeOf(day.prayers, 'sunrise'))} />
+              <Fact label="الغروب" value={fmtTime(timeOf(day.prayers, 'maghrib'))} />
+              <Fact
+                label="طول النهار"
+                value={spanOf(
+                  timeOf(day.prayers, 'sunrise'),
+                  timeOf(day.prayers, 'maghrib'),
+                )}
+              />
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
       <div className="row wrap" style={{ gap: 10, marginBottom: 18 }}>
         {day.prayers.map((p: any, i: number) => (
@@ -316,6 +671,7 @@ const cell: React.CSSProperties = {
 
 export function WeatherTab() {
   const use24h = useContext(Use24hContext)
+  const zone = useZone()
   const [bundle, setBundle] = useState<any>(null)
   const [busy, setBusy] = useState(false)
 
@@ -330,6 +686,10 @@ export function WeatherTab() {
   if (!bundle) return <Empty text="حدّد مدينتك من الإعدادات ليظهر الطقس." />
 
   const now = bundle.now
+  const today = bundle.daily?.[0]
+  const hourText = (epochSeconds: number) => new Intl.DateTimeFormat('ar', {
+    hour: '2-digit', minute: '2-digit', hour12: !use24h, timeZone: zone,
+  }).format(new Date(epochSeconds * 1000))
   const upcoming = (bundle.hourly ?? []).filter(
     (h: any) => h.epochSeconds * 1000 > Date.now() - 1_800_000,
   ).slice(0, 14)
@@ -346,16 +706,41 @@ export function WeatherTab() {
         </button>
       </div>
 
-      <div className="card" style={{ background: 'var(--mint)', marginBottom: 16 }}>
-        <div style={{ fontSize: 56, fontWeight: 700, lineHeight: 1 }}>
-          {Math.round(now.temperature)}°
+      <div
+        className="tile"
+        style={{ background: 'var(--sky)', color: 'var(--sky-ink)', marginBottom: 16 }}
+      >
+        <div className="row wrap" style={{ gap: 22 }}>
+          <div className="row" style={{ gap: 14 }}>
+            <span style={{ fontSize: 52, lineHeight: 1 }}>{today?.emoji ?? ''}</span>
+            <div>
+              <div style={{ fontSize: 54, fontWeight: 700, lineHeight: 1, color: 'var(--ink)' }}>
+                {Math.round(now.temperature)}°
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{today?.text ?? ''}</div>
+            </div>
+          </div>
+          <div className="grow" />
+          {today && (
+            <div style={{ textAlign: 'start' }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)' }}>
+                {Math.round(today.max)}° / {Math.round(today.min)}°
+              </div>
+              <div className="small" style={{ opacity: 0.85 }}>
+                الأشعة فوق البنفسجية {Math.round(today.uvIndex)} · مطر{' '}
+                {today.precipitationProbability}%
+              </div>
+            </div>
+          )}
         </div>
-        <div className="row wrap" style={{ gap: 18, marginTop: 12 }}>
+        <div className="row wrap" style={{ gap: 18, marginTop: 16 }}>
           <Metric label="محسوسة" value={`${Math.round(now.feelsLike)}°`} />
           <Metric label="الرطوبة" value={`${now.humidity}%`} />
           <Metric label="الرياح" value={`${Math.round(now.windSpeed)} كم/س`} />
           <Metric label="الضغط" value={`${Math.round(now.pressure)}`} />
           <Metric label="الغيوم" value={`${now.cloudCover}%`} />
+          {today && <Metric label="الشروق" value={hourText(today.sunriseEpoch)} />}
+          {today && <Metric label="الغروب" value={hourText(today.sunsetEpoch)} />}
         </div>
       </div>
 
@@ -365,9 +750,10 @@ export function WeatherTab() {
             {upcoming.map((hour: any) => (
               <div key={hour.epochSeconds} style={{ textAlign: 'center', minWidth: 52 }}>
                 <div className="muted small">
-                  {new Intl.DateTimeFormat('ar', { hour: '2-digit', hour12: !use24h })
+                  {new Intl.DateTimeFormat('ar', { hour: '2-digit', hour12: !use24h, timeZone: zone })
                     .format(new Date(hour.epochSeconds * 1000))}
                 </div>
+                <div style={{ fontSize: 17 }}>{hour.emoji}</div>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>
                   {Math.round(hour.temperature)}°
                 </div>
@@ -382,9 +768,11 @@ export function WeatherTab() {
         <div className="card" style={{ padding: 8 }}>
           {(bundle.daily ?? []).map((day: any, index: number) => (
             <div key={day.epochSeconds} className="row" style={{ padding: '9px 10px', gap: 12 }}>
+              <span style={{ fontSize: 18, width: 26, textAlign: 'center' }}>{day.emoji}</span>
               <div className="grow" style={{ fontWeight: 600 }}>
-                {index === 0 ? 'اليوم' : new Intl.DateTimeFormat('ar', { weekday: 'long' })
+                {index === 0 ? 'اليوم' : new Intl.DateTimeFormat('ar', { weekday: 'long', timeZone: zone })
                   .format(new Date(day.epochSeconds * 1000))}
+                <span className="muted small" style={{ marginInlineStart: 8 }}>{day.text}</span>
               </div>
               <div className="muted small">مطر {day.precipitationProbability}%</div>
               <div style={{ fontWeight: 700, minWidth: 80, textAlign: 'end' }}>

@@ -22,6 +22,7 @@ function load(file) {
 
 const news = load('electron/daily/news.ts')
 const dates = load('electron/daily/dates.ts')
+const weather = load('electron/daily/weather.ts')
 
 // ------------------------------------------------------------ الأخبار
 
@@ -126,4 +127,33 @@ test('التحية تتبع الساعة', () => {
   assert.equal(dates.greeting(7), 'صباح الخير')
   assert.equal(dates.greeting(13), 'نهارك سعيد')
   assert.equal(dates.greeting(22), 'مساء الخير')
+})
+
+// ------------------------------------------------------------- الطقس
+
+test('طوابع Open-Meteo تُقرأ بمنطقة المكان لا بمنطقة الجهاز', () => {
+  // شروق دبي ٠٦:٠٢ بتوقيتها المحلّي، وإزاحتها +٤ ساعات.
+  const dubai = weather.openMeteoEpoch('2026-09-10T06:02', 4 * 3600)
+  assert.equal(new Date(dubai * 1000).toISOString(), '2026-09-10T02:02:00.000Z')
+
+  // الاختبار نفسه بمنطقة سالبة: نيويورك −٤ صيفًا.
+  const newYork = weather.openMeteoEpoch('2026-09-10T06:02', -4 * 3600)
+  assert.equal(new Date(newYork * 1000).toISOString(), '2026-09-10T10:02:00.000Z')
+
+  // بلا إزاحة تبقى القراءة UTC كما هي.
+  assert.equal(
+    new Date(weather.openMeteoEpoch('2026-09-10T06:02', 0) * 1000).toISOString(),
+    '2026-09-10T06:02:00.000Z',
+  )
+
+  // قيمة فارغة أو تالفة لا تُسقط الجلب كله.
+  assert.equal(weather.openMeteoEpoch('', 3600), 0)
+  assert.equal(weather.openMeteoEpoch('ليس تاريخًا', 3600), 0)
+})
+
+test('رموز WMO تُترجم إلى عربي وأيقونة', () => {
+  assert.equal(weather.describeWeather(0, true).text, 'صحو')
+  assert.notEqual(weather.describeWeather(0, true).emoji, weather.describeWeather(0, false).emoji)
+  // رمز غير معروف لا ينهار بل يعيد وصفًا محايدًا.
+  assert.ok(weather.describeWeather(9999, true).text.length > 0)
 })

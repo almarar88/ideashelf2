@@ -33,6 +33,9 @@ export interface HourForecast {
   weatherCode: number
   precipitationProbability: number
   isDay: boolean
+  /** الوصف والأيقونة يُحسبان هنا لا في الواجهة: جدول رموز WMO واحد لا اثنان. */
+  text: string
+  emoji: string
 }
 
 export interface DayForecast {
@@ -44,6 +47,8 @@ export interface DayForecast {
   sunsetEpoch: number
   uvIndex: number
   precipitationProbability: number
+  text: string
+  emoji: string
 }
 
 export interface WeatherBundle {
@@ -95,6 +100,23 @@ export function placeLabel(place: Place): string {
     .join('، ')
 }
 
+/**
+ * يحوّل طابع Open-Meteo الزمني إلى ثوانٍ منذ الحقبة.
+ *
+ * الخدمة مع `timezone=auto` تعيد أوقاتًا بتوقيت المكان بلا لاحقة منطقة
+ * («2026-09-10T06:02»). تمرير هذه السلسلة إلى Date.parse يفسّرها بمنطقة
+ * *الجهاز* لا المكان، فتنزاح كل الأوقات بفارق المنطقتين: جهاز على UTC كان
+ * يعرض شروق دبي ١٠:٠٢ بدل ٠٦:٠٢. الردّ يحمل `utc_offset_seconds` لهذا الغرض
+ * تحديدًا: نقرأ السلسلة كـ UTC ثم نطرح إزاحة المكان. مستقلّة عن منطقة الجهاز
+ * بالكامل، وهذا ما يختبره `daily.test.mjs`.
+ */
+export function openMeteoEpoch(value: string, offsetSeconds: number): number {
+  if (!value) return 0
+  const normalized = (value.length === 16 ? `${value}:00` : value) + 'Z'
+  const parsed = Date.parse(normalized)
+  return Number.isNaN(parsed) ? 0 : Math.floor(parsed / 1000) - offsetSeconds
+}
+
 export async function fetchWeather(place: Place): Promise<WeatherBundle> {
   const url =
     'https://api.open-meteo.com/v1/forecast' +
@@ -111,11 +133,8 @@ export async function fetchWeather(place: Place): Promise<WeatherBundle> {
   const hourly = data.hourly ?? {}
   const daily = data.daily ?? {}
 
-  const toEpoch = (value: string): number => {
-    // Open-Meteo يعيد وقتًا محليًا بلا لاحقة منطقة؛ نحوّله على أساس المنطقة المعادة.
-    const parsed = Date.parse(value.length === 16 ? `${value}:00` : value)
-    return Number.isNaN(parsed) ? 0 : Math.floor(parsed / 1000)
-  }
+  const offsetSeconds = Number(data.utc_offset_seconds ?? 0)
+  const toEpoch = (value: string) => openMeteoEpoch(value, offsetSeconds)
 
   const hours: HourForecast[] = (hourly.time ?? []).map((time: string, index: number) => ({
     epochSeconds: toEpoch(time),
@@ -123,6 +142,10 @@ export async function fetchWeather(place: Place): Promise<WeatherBundle> {
     weatherCode: Number(hourly.weather_code?.[index] ?? 0),
     precipitationProbability: Number(hourly.precipitation_probability?.[index] ?? 0),
     isDay: Number(hourly.is_day?.[index] ?? 1) === 1,
+    ...describeWeather(
+      Number(hourly.weather_code?.[index] ?? 0),
+      Number(hourly.is_day?.[index] ?? 1) === 1,
+    ),
   }))
 
   const days: DayForecast[] = (daily.time ?? []).map((time: string, index: number) => ({
@@ -134,6 +157,8 @@ export async function fetchWeather(place: Place): Promise<WeatherBundle> {
     sunsetEpoch: toEpoch(String(daily.sunset?.[index] ?? '')),
     uvIndex: Number(daily.uv_index_max?.[index] ?? 0),
     precipitationProbability: Number(daily.precipitation_probability_max?.[index] ?? 0),
+    // الأيام تُوصف دائمًا بأيقونة النهار: «ليل» بلا معنى لملخّص يوم كامل.
+    ...describeWeather(Number(daily.weather_code?.[index] ?? 0), true),
   }))
 
   return {

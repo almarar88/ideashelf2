@@ -1,5 +1,5 @@
 import { Settings, stores } from '../store'
-import { calculate, DayPrayers, isoDate, nextPrayer, PrayerKey, PRAYERS } from './prayer'
+import { calculate, DayPrayers, isoDate, nextPrayer, PrayerKey, PRAYERS, distanceToKaaba, qiblaBearing } from './prayer'
 import { Article, DEFAULT_SOURCES, fetchNews, NewsSource, topicSource } from './news'
 import { fetchWeather, WeatherBundle, describeWeather } from './weather'
 import { hijriParts, isRamadan, longGregorianAr, longHijriAr } from './dates'
@@ -77,9 +77,19 @@ export interface DayBundle {
   prayers: { key: PrayerKey; arabic: string; at: number }[] | null
   next: { key: PrayerKey; arabic: string; at: number } | null
   weather: WeatherBundle | null
+  /** وصف عربي وأيقونة للحالة الآن — الواجهة لا تعيد ترجمة رموز WMO. */
+  weatherText: string
+  weatherEmoji: string
   headlines: Article[]
   tasksOpen: number
   tasksDone: number
+  /** أقرب المهام المفتوحة، لتُعرض في الشاشة الرئيسية بلا طلب ثانٍ. */
+  topTasks: { id: string; title: string; dueDate: string; done: boolean }[]
+  habitsTotal: number
+  habitsDone: number
+  topHabits: { id: string; title: string; emoji: string; today: number; target: number }[]
+  /** اتجاه القبلة بالدرجات والمسافة بالكيلومترات. */
+  qibla: { bearing: number; distanceKm: number } | null
 }
 
 /** كل ما تحتاجه الشاشة الرئيسية في طلب واحد. */
@@ -89,7 +99,14 @@ export async function getDay(): Promise<DayBundle> {
   const day = prayersFor(settings, now)
   const tasks = await stores.tasks.load()
 
-  const [weather, articles] = await Promise.all([getWeather(), getNews()])
+  const [weather, articles, habits] = await Promise.all([
+    getWeather(), getNews(), stores.habits.load(),
+  ])
+
+  const key = isoDate(now)
+  const info = weather
+    ? describeWeather(weather.now.weatherCode, weather.now.isDay)
+    : { text: '', emoji: '' }
 
   return {
     today: isoDate(now),
@@ -103,9 +120,32 @@ export async function getDay(): Promise<DayBundle> {
       : null,
     next: day ? nextPrayer(day, now.getTime()) : null,
     weather,
+    weatherText: info.text,
+    weatherEmoji: info.emoji,
     headlines: articles.slice(0, 12),
     tasksOpen: tasks.filter((t) => !t.done).length,
     tasksDone: tasks.filter((t) => t.done).length,
+    topTasks: tasks
+      .filter((t) => !t.done)
+      // الأقرب موعدًا أولًا، وما بلا موعد في الآخر.
+      .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'))
+      .slice(0, 4)
+      .map((t) => ({ id: t.id, title: t.title, dueDate: t.dueDate ?? '', done: t.done })),
+    habitsTotal: habits.length,
+    habitsDone: habits.filter((h) => (h.log[key] ?? 0) >= h.targetPerDay).length,
+    topHabits: habits.slice(0, 4).map((h) => ({
+      id: h.id,
+      title: h.title,
+      emoji: h.emoji,
+      today: h.log[key] ?? 0,
+      target: h.targetPerDay,
+    })),
+    qibla: settings.place
+      ? {
+        bearing: qiblaBearing(settings.place.latitude, settings.place.longitude),
+        distanceKm: distanceToKaaba(settings.place.latitude, settings.place.longitude),
+      }
+      : null,
   }
 }
 

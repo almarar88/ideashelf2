@@ -36,6 +36,15 @@ export interface AlcodeBridge {
     addTopic(query: string): Promise<boolean>
     removeTopic(query: string): Promise<boolean>
     methods(): Promise<{ id: string; arabic: string }[]>
+    detectPlace(allowIp?: boolean): Promise<{
+      ok: boolean
+      status: 'ok' | 'denied' | 'unavailable' | 'timeout' | 'not-windows'
+      message: string
+      place: any
+      source: 'windows' | 'ip' | 'none'
+      accuracyMeters?: number
+    }>
+    openLocationSettings(): Promise<boolean>
     searchPlaces(query: string): Promise<any[]>
     prayerMonth(year: number, month: number): Promise<any[]>
     tasks(): Promise<any[]>
@@ -45,6 +54,12 @@ export interface AlcodeBridge {
     saveHabit(habit: unknown): Promise<boolean>
     deleteHabit(id: string): Promise<boolean>
     openExternal(url: string): Promise<boolean>
+  }
+  diag: {
+    log(): Promise<{
+      path: string; tail: string; version: string; electron: string; platform: string
+    }>
+    openLog(): Promise<boolean>
   }
   quick: {
     hide(): void

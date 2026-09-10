@@ -1,5 +1,6 @@
 import {
-  app, BrowserWindow, globalShortcut, ipcMain, Menu, Notification, screen, shell, Tray,
+  app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, Notification,
+  nativeImage, screen, shell, Tray,
 } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
@@ -11,8 +12,13 @@ import { isWindows } from './ps'
 import { activeSources, contextSummary, getDay, getNews, getWeather, prayersFor } from './daily'
 import { METHODS, PRAYERS } from './daily/prayer'
 import { searchPlaces } from './daily/weather'
+import { locateViaIp, locateViaWindows, placeFromCoordinates } from './daily/locate'
 import { validateFeed, topicSource } from './daily/news'
 import { longGregorianAr, longHijriAr } from './daily/dates'
+import {
+  installCrashGuards, log, markBootStarted, markBootSucceeded, previousBootFailed,
+  readLogTail, reportFatal, startupLogPath,
+} from './startup'
 
 /**
  * العملية الرئيسية: النافذة، شريط المهام، الاختصار العام، وجسر الأوامر.
@@ -23,6 +29,17 @@ import { longGregorianAr, longHijriAr } from './daily/dates'
  */
 
 const isDev = !app.isPackaged
+
+/**
+ * الأيقونة: كان الكود يشير إلى build/icon.ico وهو ملف لا وجود له ولا يُحزَم
+ * (المحزوم هو icon.png). النتيجة: شريط المهام يفشل بصمت فيبقى المستخدم بلا
+ * نافذة وبلا أيقونة يفتح منها. نستعمل الملف الموجود فعلًا ونتحقّق منه.
+ */
+function appIcon(): Electron.NativeImage | undefined {
+  const image = nativeImage.createFromPath(join(__dirname, '../build/icon.png'))
+  return image.isEmpty() ? undefined : image
+}
+
 let mainWindow: BrowserWindow | null = null
 let quickWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -48,7 +65,7 @@ function createMainWindow() {
     backgroundColor: '#EDE7E1',
     autoHideMenuBar: true,
     title: 'Alcode Ai',
-    icon: join(__dirname, '../build/icon.ico'),
+    icon: appIcon(),
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -57,8 +74,47 @@ function createMainWindow() {
     },
   })
 
+  // النافذة تُظهَر في كل الأحوال:
+  //  ١) عند أول رسم — الحالة السليمة.
+  //  ٢) وإلا بعد ثانيتين من انتهاء التحميل — إن انهارت الواجهة قبل الرسم.
+  //  ٣) وإلا بعد ست ثوانٍ مهما جرى — إن لم يكتمل التحميل أصلًا.
+  // بدون (٢) و(٣) يبقى التطبيق حيًّا بلا نافذة، وهو ما شكا منه المستخدم.
+  const reveal = (why: string) => {
+    if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isVisible()) return
+    log(`إظهار النافذة (${why})`)
+    mainWindow.show()
+    mainWindow.focus()
+    // ظهرت نافذة: الإقلاع نجح، فتُمحى العلامة ويعود التسريع في المرّة القادمة.
+    markBootSucceeded()
+  }
+
+  mainWindow.once('ready-to-show', () => reveal('أول رسم'))
+  mainWindow.webContents.once('did-finish-load', () => {
+    setTimeout(() => reveal('انتهى التحميل بلا رسم'), 2_000)
+  })
+  const lastResort = setTimeout(() => reveal('مهلة الإقلاع'), 6_000)
+  mainWindow.once('show', () => clearTimeout(lastResort))
+
+  mainWindow.webContents.on('did-fail-load', (_event, code, description, url) => {
+    log('فشل تحميل الواجهة', `${code} ${description} ${url}`)
+    reveal('فشل التحميل')
+    void mainWindow?.webContents.executeJavaScript(
+      `document.body.innerHTML = ${JSON.stringify(
+        '<div style="padding:40px;font:16px system-ui;direction:rtl">' +
+        '<h2>تعذّر تحميل الواجهة</h2><p>راجع السجل في:<br><code>' +
+        startupLogPath() + '</code></p></div>',
+      )}`,
+    ).catch(() => undefined)
+  })
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    log('انهارت عملية العرض', details.reason)
+    if (details.reason !== 'clean-exit') {
+      mainWindow?.webContents.reload()
+    }
+  })
+
   loadInto(mainWindow, '#/')
-  mainWindow.once('ready-to-show', () => mainWindow?.show())
 
   // الإغلاق يخفي بدل أن ينهي: التذكيرات والاختصار العام يحتاجان بقاء التطبيق.
   mainWindow.on('close', (event) => {
@@ -109,7 +165,17 @@ function createQuickWindow() {
 }
 
 function toggleQuick() {
-  if (!quickWindow) createQuickWindow()
+  if (!quickWindow) {
+    try {
+      createQuickWindow()
+    } catch (error) {
+      // نافذة شفّافة تفشل على بعض تعريفات الرسوميات: نفتح النافذة الكبيرة بدلها
+      // بدل أن يضغط المستخدم الاختصار فلا يحدث شيء.
+      log('تعذّر إنشاء الشريط السريع — نفتح النافذة الرئيسية', error)
+      showMain()
+      return
+    }
+  }
   if (!quickWindow) return
   if (quickWindow.isVisible()) {
     quickWindow.hide()
@@ -131,10 +197,16 @@ function showMain() {
 // -------------------------------------------------------- شريط المهام
 
 function createTray() {
-  const iconPath = join(__dirname, '../build/icon.ico')
+  const image = appIcon()
+  if (!image) {
+    log('لا أيقونة لشريط المهام — يُتجاوز')
+    return
+  }
   try {
-    tray = new Tray(iconPath)
-  } catch {
+    // شريط المهام في ويندوز يريد ١٦×١٦؛ الأيقونة الأصلية ١٠٢٤ فتُصغَّر.
+    tray = new Tray(image.resize({ width: 16, height: 16 }))
+  } catch (error) {
+    log('تعذّر إنشاء أيقونة شريط المهام', error)
     return
   }
   tray.setToolTip('Alcode Ai')
@@ -142,6 +214,14 @@ function createTray() {
     Menu.buildFromTemplate([
       { label: 'فتح Alcode Ai', click: showMain },
       { label: 'الشريط السريع', click: toggleQuick },
+      { type: 'separator' },
+      {
+        label: 'مجلد السجل',
+        click: () => {
+          const path = startupLogPath()
+          if (path) shell.showItemInFolder(path)
+        },
+      },
       { type: 'separator' },
       { label: 'خروج', click: () => { quitting = true; app.quit() } },
     ]),
@@ -193,6 +273,83 @@ function startReminderLoop() {
     )
     mainWindow?.webContents.send('reminders:fired', due.map((r) => r.text))
   }, 30_000)
+}
+
+// ------------------------------------------------- تنبيهات الصلاة
+
+/** ما أُعلن عنه اليوم، حتى لا يتكرّر التنبيه في كل دورة فحص. */
+const announced = new Set<string>()
+
+/**
+ * تنبيه عند كل صلاة. نفحص كل نصف دقيقة كما في حلقة التذكيرات وللسبب نفسه:
+ * مؤقّت واحد لكل صلاة يتوقّف عند سكون الجهاز ويمرّ الوقت بصمت.
+ */
+function startPrayerLoop() {
+  setInterval(async () => {
+    const settings = await stores.settings.load()
+    if (!settings.place || !settings.prayerAlerts) return
+
+    const now = new Date()
+    const day = prayersFor(settings, now)
+    if (!day) return
+
+    const stamp = now.getTime()
+    for (const prayer of PRAYERS) {
+      if (!prayer.obligatory) continue
+      const at = day.times[prayer.key]
+      const key = `${now.toDateString()}:${prayer.key}`
+      if (announced.has(key)) continue
+      // نافذة دقيقة واحدة: مرّ الوقت ولم يمضِ عليه أكثر من ٦٠ ثانية.
+      if (at > stamp || stamp - at > 60_000) continue
+      announced.add(key)
+      if (Notification.isSupported()) {
+        new Notification({
+          title: `🕌 ${prayer.arabic}`,
+          body: `حان وقت ${prayer.arabic} — ${settings.place.name}`,
+        }).show()
+      }
+      mainWindow?.webContents.send('prayer:fired', prayer.key)
+    }
+    // لا نُبقي مفاتيح الأمس: مجموعة تكبر بلا حدّ عبر الأسابيع.
+    if (announced.size > 40) announced.clear()
+  }, 30_000)
+}
+
+// ---------------------------------------------------- ملخّص الصباح
+
+/** آخر يوم أُرسل فيه الملخّص، حتى لا يتكرّر في اليوم نفسه. */
+let briefedOn = ''
+
+/**
+ * إشعار واحد في الصباح: التاريخ، الصلاة القادمة، الطقس، والمهام.
+ * يُرسَل عند أول فحص يتجاوز الوقت المحدّد — فإن كان الجهاز نائمًا وقتها
+ * وصل عند الاستيقاظ بدل أن يُفقَد.
+ */
+function startBriefLoop() {
+  setInterval(async () => {
+    const settings = await stores.settings.load()
+    if (!settings.morningBriefAt) return
+
+    const now = new Date()
+    const today = now.toDateString()
+    if (briefedOn === today) return
+
+    const [hour, minute] = settings.morningBriefAt.split(':').map(Number)
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return
+    if (now.getHours() * 60 + now.getMinutes() < hour * 60 + minute) return
+
+    briefedOn = today
+    const summary = await contextSummary().catch(() => '')
+    if (!summary || !Notification.isSupported()) return
+
+    const notification = new Notification({
+      title: `☀️ صباح الخير${settings.userName ? ' ' + settings.userName : ''}`,
+      // الإشعار يقتصر على أول أربعة أسطر: ويندوز يقصّ ما زاد بلا رحمة.
+      body: summary.split('\n').slice(0, 4).join('\n'),
+    })
+    notification.on('click', showMain)
+    notification.show()
+  }, 60_000)
 }
 
 // ------------------------------------------------------------- الجلسة
@@ -384,6 +541,53 @@ function registerIpc() {
     return true
   })
 
+  /**
+   * تحديد الموقع تلقائيًا. `allowIp` صريح: تقدير IP يكشف عنوانك لخدمة خارجية،
+   * فلا يجري إلا إذا اختاره المستخدم بعد فشل خدمة ويندوز.
+   */
+  ipcMain.handle('daily:detectPlace', async (_event, allowIp: boolean) => {
+    let result = await locateViaWindows()
+    if (result.status !== 'ok' && allowIp === true) {
+      const fallback = await locateViaIp()
+      if (fallback.status === 'ok') result = fallback
+    }
+    if (result.status !== 'ok') {
+      return { ok: false, status: result.status, message: result.message, place: null, source: 'none' }
+    }
+    const place = await placeFromCoordinates(result.latitude, result.longitude)
+    await stores.settings.update((current) => ({ ...current, place }))
+    log(`حُدّد الموقع من ${result.source}: ${place.name}`)
+    return {
+      ok: true,
+      status: 'ok',
+      message: '',
+      place,
+      source: result.source,
+      accuracyMeters: result.accuracyMeters,
+    }
+  })
+
+  /** يفتح صفحة خصوصية الموقع في ويندوز ليمنح المستخدم الصلاحية بنفسه. */
+  ipcMain.handle('daily:openLocationSettings', async () => {
+    await shell.openExternal('ms-settings:privacy-location')
+    return true
+  })
+
+  ipcMain.handle('diag:log', async () => ({
+    path: startupLogPath(),
+    tail: readLogTail(240),
+    version: app.getVersion(),
+    electron: process.versions.electron,
+    platform: `${process.platform} ${process.arch}`,
+  }))
+
+  ipcMain.handle('diag:openLog', async () => {
+    const path = startupLogPath()
+    if (!path) return false
+    shell.showItemInFolder(path)
+    return true
+  })
+
   ipcMain.handle('daily:methods', async () =>
     METHODS.map((method) => ({ id: method.id, arabic: method.arabic })))
 
@@ -559,28 +763,69 @@ function registerIpc() {
 
 // --------------------------------------------------------------- إقلاع
 
+installCrashGuards()
+log(`إقلاع Alcode Ai ${app.getVersion()} — ${process.platform} ${process.arch}`)
+
+// يجب أن يسبق whenReady: تعطيل التسريع لا يُقبل بعد جهوزية التطبيق.
+if (previousBootFailed()) {
+  log('التشغيل السابق لم يُظهر نافذة — نُقلع بلا تسريع عتادي')
+  app.disableHardwareAcceleration()
+}
+markBootStarted()
+
 const single = app.requestSingleInstanceLock()
 if (!single) {
+  log('نسخة أخرى تعمل بالفعل — نُظهر نافذتها ونخرج')
   app.quit()
 } else {
   app.on('second-instance', showMain)
 
   app.whenReady().then(async () => {
-    registerIpc()
+    // كل خطوة داخل حرس: خطأ في أي منها كان يعني قبلًا تطبيقًا حيًّا بلا نافذة.
+    // النافذة تُنشأ أولًا حتى يرى المستخدم شيئًا حتى لو تعطّل ما بعدها.
+    try {
+      log('جاهز — أُنشئ النافذة')
+      createMainWindow()
+    } catch (error) {
+      reportFatal('إنشاء النافذة', error)
+      return
+    }
 
-    const settings = await stores.settings.load().catch(() => defaultSettings)
-    createMainWindow()
-    createQuickWindow()
-    createTray()
-    registerHotkey(settings.hotkey)
-    startReminderLoop()
+    const step = async (name: string, work: () => unknown) => {
+      try {
+        await work()
+        log(`تمّ: ${name}`)
+      } catch (error) {
+        // خطوة ثانوية تفشل لا تُسقط التطبيق — تُسجَّل ويستمر.
+        log(`تعذّر: ${name}`, error)
+      }
+    }
 
-    if (process.argv.includes('--hidden')) mainWindow?.hide()
+    await step('تسجيل قنوات الجسر', registerIpc)
+
+    const settings = await stores.settings.load().catch((error) => {
+      log('تعذّرت قراءة الإعدادات — نستعمل الافتراضية', error)
+      return defaultSettings
+    })
+
+    await step('شريط المهام', createTray)
+    await step('الاختصار العام', () => registerHotkey(settings.hotkey))
+    await step('حلقة التذكيرات', startReminderLoop)
+    await step('حلقة تنبيهات الصلاة', startPrayerLoop)
+    await step('حلقة ملخّص الصباح', startBriefLoop)
+
+    // الشريط السريع نافذة شفّافة، وهي أكثر ما يتعارض مع تعريفات الرسوميات.
+    // نؤجّلها إلى أول استعمال فعلي بدل أن تُخطر الإقلاع كله.
+    if (process.argv.includes('--hidden')) {
+      log('أُقلِع مخفيًا بطلب من ويندوز')
+      mainWindow?.hide()
+    }
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
     })
-  })
+    log('اكتمل الإقلاع')
+  }).catch((error) => reportFatal('الإقلاع', error))
 
   app.on('window-all-closed', () => {
     // نبقى في شريط المهام: الاختصار العام والتذكيرات تحتاج عملية حيّة.

@@ -28,6 +28,10 @@
   --emerald: #3CC28A;
   --danger: #D4574F;
 
+  --sky: #D6E9F7;
+  --sky-ink: #2A5F86;
+
+  --radius-xl: 32px;
   --radius-lg: 26px;
   --radius-md: 20px;
   --radius-sm: 14px;
@@ -45,6 +49,21 @@
   --muted: #A39C94;
   --shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 14px 40px rgba(0, 0, 0, 0.55);
+
+  /* الباستيل في الوضع الداكن يُخفَّض تشبّعه، وإلا صار وهجًا يؤذي الليل. */
+  --lavender: #2E3050;
+  --lavender-ink: #B9BDF0;
+  --mint: #1E3A33;
+  --mint-ink: #8FD8C0;
+  --butter: #3A331A;
+  --butter-ink: #E8D68A;
+  --peach: #37291F;
+  --peach-ink: #E6B98C;
+  --rose: #3A2429;
+  --rose-ink: #EAA7B1;
+  --sky: #1D2E3D;
+  --sky-ink: #9CC9E8;
+  --olive: #33301D;
 }
 
 * { box-sizing: border-box; }
@@ -148,3 +167,79 @@ input, textarea { font-family: inherit; color: inherit; }
 }
 .dot:nth-child(2) { animation-delay: 0.18s; }
 .dot:nth-child(3) { animation-delay: 0.36s; }
+
+/* ------------------------------------------------------ عناصر التصميم */
+
+/*
+ * البلاطة: بطاقة ملوّنة كبيرة الاستدارة بلا حدود، هي وحدة البناء الأساسية
+ * في تصميم نسخة الهاتف. النصّ عليها يأخذ لون الحبر الداكن للباستيل نفسه
+ * حتى يبقى التباين كافيًا في الوضعين.
+ */
+.tile {
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.tile > * { position: relative; z-index: 1; }
+.tile.plain::after { display: none; }
+
+/* دائرة زخرفية باهتة تكسر فراغ البلاطة، كما في التصميم المرجعي. */
+.tile::after {
+  content: '';
+  position: absolute;
+  inset-inline-end: -54px;
+  top: -54px;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.13;
+}
+
+.stack { display: grid; gap: 14px; }
+
+.hover-lift { transition: transform 0.16s ease, box-shadow 0.16s ease; }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+
+.label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  opacity: 0.62;
+}
+
+.divider { height: 1px; background: var(--outline); border: none; margin: 0; }
+
+/* مفتاح لوحة المفاتيح كما يظهر في التلميحات. */
+kbd {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--surface-high);
+  border-radius: 6px;
+  padding: 2px 6px;
+  direction: ltr;
+  display: inline-block;
+}
+
+/* شريط تقدّم رفيع للعادات والمهام. */
+.meter { height: 7px; border-radius: 999px; background: var(--surface-high); overflow: hidden; }
+.meter > span { display: block; height: 100%; border-radius: 999px; background: var(--ink); }
+
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.sheet { animation: sheet-in 0.16s ease both; }
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 17, 17, 0.34);
+  display: grid;
+  place-items: start center;
+  padding-top: 12vh;
+  z-index: 60;
+}

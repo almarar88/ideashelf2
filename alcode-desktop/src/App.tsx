@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Bubble, ConfirmDialog, Section, Thinking, useAutoScroll } from './components'
 import { useAgent } from './useAgent'
 import { AppSettings, Place } from './types'
-import { DayTab, HomeTab, NewsTab, PrayerTab, Use24hContext, WeatherTab } from './daily'
+import {
+  DayTab, HomeTab, NewsTab, PrayerTab, TimeZoneContext, Use24hContext, WeatherTab,
+} from './daily'
 
 type Tab =
   | 'home' | 'chat' | 'day' | 'prayer' | 'weather' | 'news'
@@ -75,6 +77,64 @@ export default function App() {
     void agent.send(text)
   }
 
+  /** إرسال من خارج شاشة المحادثة: ننتقل إليها أولًا ليرى الردّ يُكتب. */
+  const ask = useCallback((text: string) => {
+    setTab('chat')
+    void agent.send(text)
+  }, [agent])
+
+  // ------------------------------------------------------- الاختصارات
+  const [palette, setPalette] = useState(false)
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const typing = event.target instanceof HTMLElement &&
+        ['INPUT', 'TEXTAREA'].includes(event.target.tagName)
+
+      if (event.key === 'Escape') {
+        setPalette(false)
+        return
+      }
+
+      if (!event.ctrlKey || event.altKey) return
+
+      // Ctrl+1..9 ينتقل بين التبويبات بترتيب الشريط الجانبي.
+      const digit = Number(event.key)
+      if (Number.isInteger(digit) && digit >= 1 && digit <= TABS.length) {
+        event.preventDefault()
+        setTab(TABS[digit - 1].id)
+        return
+      }
+
+      switch (event.key.toLowerCase()) {
+        case 'k':
+          event.preventDefault()
+          setPalette((open) => !open)
+          break
+        case 'n':
+          event.preventDefault()
+          agent.reset()
+          setTab('chat')
+          break
+        case ',':
+          event.preventDefault()
+          setTab('settings')
+          break
+        case 'l':
+          // التركيز على حقل الكتابة، كما في شريط عنوان المتصفّح.
+          if (typing) break
+          event.preventDefault()
+          setTab('chat')
+          setTimeout(() => document.getElementById('ask-field')?.focus(), 60)
+          break
+        default:
+          break
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [agent])
+
   return (
     <div style={{ height: '100vh', display: 'flex' }}>
       {/* ------------------------------------------------ الشريط الجانبي */}
@@ -135,6 +195,7 @@ export default function App() {
       {/* ------------------------------------------------------- المحتوى */}
       <main style={{ flex: 1, minWidth: 0, padding: '18px 22px 18px 0', overflow: 'hidden' }}>
         <Use24hContext.Provider value={settings?.use24h ?? true}>
+        <TimeZoneContext.Provider value={settings?.place?.timezone}>
         {tab === 'chat' && (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <header className="row" style={{ marginBottom: 14 }}>
@@ -213,6 +274,7 @@ export default function App() {
               }}
             >
               <input
+                id="ask-field"
                 className="grow"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -234,7 +296,13 @@ export default function App() {
           </div>
         )}
 
-        {tab === 'home' && <HomeTab onGo={(next) => setTab(next as Tab)} />}
+        {tab === 'home' && (
+          <HomeTab
+            onGo={(next) => setTab(next as Tab)}
+            onAsk={ask}
+            userName={settings?.userName ?? ''}
+          />
+        )}
         {tab === 'day' && <DayTab />}
         {tab === 'prayer' && <PrayerTab />}
         {tab === 'weather' && <WeatherTab />}
@@ -249,8 +317,18 @@ export default function App() {
             version={platform?.version ?? ''}
           />
         )}
+        </TimeZoneContext.Provider>
         </Use24hContext.Provider>
       </main>
+
+      {palette && (
+        <CommandPalette
+          tabs={TABS}
+          onClose={() => setPalette(false)}
+          onGo={(next) => { setTab(next); setPalette(false) }}
+          onAsk={(text) => { ask(text); setPalette(false) }}
+        />
+      )}
 
       {agent.confirmRequest && (
         <ConfirmDialog request={agent.confirmRequest} onAnswer={agent.answerConfirm} />
@@ -431,13 +509,14 @@ const HIGH_LAT = [
   { id: 'SEVENTH_OF_NIGHT' as const, label: 'سُبع الليل' },
 ]
 
+// المفاتيح صغيرة الحرف كما في محرّك الحساب — الإزاحة تُخزَّن بها حرفيًا.
 const PRAYER_KEYS = [
-  { id: 'FAJR', label: 'الفجر' },
-  { id: 'SUNRISE', label: 'الشروق' },
-  { id: 'DHUHR', label: 'الظهر' },
-  { id: 'ASR', label: 'العصر' },
-  { id: 'MAGHRIB', label: 'المغرب' },
-  { id: 'ISHA', label: 'العشاء' },
+  { id: 'fajr', label: 'الفجر' },
+  { id: 'sunrise', label: 'الشروق' },
+  { id: 'dhuhr', label: 'الظهر' },
+  { id: 'asr', label: 'العصر' },
+  { id: 'maghrib', label: 'المغرب' },
+  { id: 'isha', label: 'العشاء' },
 ]
 
 const CATEGORIES = [
@@ -569,7 +648,7 @@ function SettingsTab({ settings, onPatch, onRefresh, version }: {
 
       <Section title="الرفيق اليومي">
         <div className="card col" style={{ gap: 18 }}>
-          <PlacePicker settings={settings} onPatch={onPatch} />
+          <PlacePicker settings={settings} onPatch={onPatch} onRefresh={onRefresh} />
 
           <Field label="طريقة حساب الصلاة">
             <select
@@ -659,6 +738,32 @@ function SettingsTab({ settings, onPatch, onRefresh, version }: {
             value={settings.use24h}
             onChange={(value) => void onPatch({ use24h: value })}
           />
+
+          <Toggle
+            label="تنبيه عند كل صلاة"
+            hint="إشعار من ويندوز عند دخول وقت كل صلاة مفروضة"
+            value={settings.prayerAlerts}
+            onChange={(value) => void onPatch({ prayerAlerts: value })}
+          />
+
+          <Field label="ملخّص الصباح">
+            <div className="row wrap" style={{ gap: 8 }}>
+              {['', '06:00', '07:00', '08:00', '09:00'].map((time) => (
+                <button
+                  key={time || 'off'}
+                  className={settings.morningBriefAt === time ? 'pill active' : 'pill'}
+                  onClick={() => void onPatch({ morningBriefAt: time })}
+                  style={{ direction: time ? 'ltr' : 'rtl' }}
+                >
+                  {time || 'بلا ملخّص'}
+                </button>
+              ))}
+            </div>
+            <p className="muted small" style={{ margin: '6px 0 0' }}>
+              إشعار واحد فيه تاريخك وصلاتك القادمة والطقس ومهامك. إن كان الجهاز
+              نائمًا وقتها وصل عند استيقاظه بدل أن يُفقَد.
+            </p>
+          </Field>
         </div>
       </Section>
 
@@ -721,6 +826,26 @@ function SettingsTab({ settings, onPatch, onRefresh, version }: {
           </Field>
         </div>
       </Section>
+
+      <Section title="الاختصارات">
+        <div className="card">
+          <div
+            style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: 8,
+            }}
+          >
+            {SHORTCUTS.map((item) => (
+              <div key={item.keys} className="row" style={{ gap: 10 }}>
+                <kbd>{item.keys}</kbd>
+                <span className="small grow">{item.what}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+      <Diagnostics />
 
       {usage && (
         <Section title="الاستهلاك">
@@ -787,10 +912,12 @@ function Toggle({ label, hint, value, onChange }: {
   )
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <div>
-      <div style={{ fontSize: 22, fontWeight: 700 }}>{value.toLocaleString('en')}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, direction: 'ltr' }}>
+        {typeof value === 'number' ? value.toLocaleString('en') : value}
+      </div>
       <div className="muted small">{label}</div>
     </div>
   )
@@ -798,13 +925,36 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 // ------------------------------------------------- اختيار المدينة والأخبار
 
-function PlacePicker({ settings, onPatch }: {
+function PlacePicker({ settings, onPatch, onRefresh }: {
   settings: AppSettings
   onPatch: (patch: Partial<AppSettings>) => Promise<void>
+  onRefresh: () => Promise<void>
 }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Place[]>([])
   const [searching, setSearching] = useState(false)
+  const [locating, setLocating] = useState(false)
+  const [locateState, setLocateState] = useState('')
+  const [locateDenied, setLocateDenied] = useState(false)
+
+  /**
+   * يسأل ويندوز عن الموقع. النظام هو من يعرض طلب الصلاحية، فإن رُفض
+   * نقول ذلك ونفتح صفحة الخصوصية بدل أن نتركه يبحث عنها.
+   */
+  const detect = async () => {
+    setLocating(true)
+    setLocateState('أسأل ويندوز عن موقعك…')
+    setLocateDenied(false)
+    const result = await window.alcode.daily.detectPlace(false)
+    setLocating(false)
+    if (result.ok) {
+      setLocateState(`✅ ${result.place.name}`)
+      await onRefresh()
+      return
+    }
+    setLocateDenied(result.status === 'denied')
+    setLocateState(`⚠️ ${result.message}`)
+  }
 
   // بحث متأخّر: ما نطلب من الخادم على كل حرف، بل بعد سكون ثلث ثانية.
   useEffect(() => {
@@ -840,12 +990,31 @@ function PlacePicker({ settings, onPatch }: {
           <button className="chip" onClick={() => void onPatch({ place: null })}>إزالة</button>
         </div>
       )}
-      <input
-        className="field"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={place ? 'ابحث لتغيير المدينة…' : 'اكتب اسم مدينتك… (دبي، الرياض، لندن)'}
-      />
+      <div className="row" style={{ gap: 8 }}>
+        <input
+          className="field grow"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={place ? 'ابحث لتغيير المدينة…' : 'اكتب اسم مدينتك… (دبي، الرياض، لندن)'}
+        />
+        <button className="btn ghost" onClick={() => void detect()} disabled={locating}>
+          {locating ? 'لحظة…' : '📡 موقعي'}
+        </button>
+      </div>
+      {locateState && (
+        <div className="small" style={{ marginTop: 8 }}>
+          {locateState}
+          {locateDenied && (
+            <button
+              className="chip"
+              style={{ marginInlineStart: 8 }}
+              onClick={() => window.alcode.daily.openLocationSettings()}
+            >
+              افتح صلاحية الموقع في ويندوز
+            </button>
+          )}
+        </div>
+      )}
       {searching && <div className="muted small" style={{ marginTop: 6 }}>أبحث…</div>}
       {results.length > 0 && (
         <div className="col" style={{ gap: 4, marginTop: 8 }}>
@@ -1039,4 +1208,189 @@ function NewsSettings({ settings, onPatch, onRefresh }: {
     setTopic('')
     await load()
   }
+}
+
+// ------------------------------------------------------- لوحة الأوامر
+
+/**
+ * Ctrl+K: مكان واحد للوصول إلى كل شيء — تنقّل، أوامر جاهزة، أو سؤال حرّ
+ * يُرسَل للمساعد كما هو. يوفّر على المستخدم تذكّر أي تبويب فيه ماذا.
+ */
+const PALETTE_ACTIONS = [
+  { icon: '🧹', label: 'رتّب مجلد التنزيلات', ask: 'رتّب مجلد التنزيلات' },
+  { icon: '👁️', label: 'اقرأ ما في الشاشة', ask: 'شو في الشاشة؟' },
+  { icon: '📊', label: 'حالة الجهاز', ask: 'شو حالة الجهاز؟' },
+  { icon: '💽', label: 'أكبر الملفات على القرص', ask: 'وين راحت مساحة القرص؟' },
+  { icon: '🪟', label: 'صغّر كل النوافذ', ask: 'صغّر كل النوافذ' },
+  { icon: '🔇', label: 'اكتم الصوت', ask: 'اكتم الصوت' },
+  { icon: '🕌', label: 'كم باقي على الصلاة القادمة؟', ask: 'كم باقي على الصلاة القادمة؟' },
+  { icon: '⛅', label: 'كيف الجو بكرة؟', ask: 'كيف الجو بكرة؟' },
+  { icon: '📰', label: 'لخّص لي أخبار اليوم', ask: 'لخّص لي أهم أخبار اليوم' },
+]
+
+function CommandPalette({ tabs, onClose, onGo, onAsk }: {
+  tabs: { id: Tab; label: string; icon: string }[]
+  onClose: () => void
+  onGo: (tab: Tab) => void
+  onAsk: (text: string) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [cursor, setCursor] = useState(0)
+
+  const trimmed = query.trim()
+  const match = (text: string) => text.toLowerCase().includes(trimmed.toLowerCase())
+
+  type Row = { key: string; icon: string; label: string; hint: string; run: () => void }
+  const rows: Row[] = [
+    ...tabs
+      .filter((tab) => !trimmed || match(tab.label))
+      .map((tab, index) => ({
+        key: `tab:${tab.id}`,
+        icon: tab.icon,
+        label: tab.label,
+        hint: `Ctrl+${index + 1}`,
+        run: () => onGo(tab.id),
+      })),
+    ...PALETTE_ACTIONS
+      .filter((action) => !trimmed || match(action.label))
+      .map((action) => ({
+        key: `ask:${action.label}`,
+        icon: action.icon,
+        label: action.label,
+        hint: 'للمساعد',
+        run: () => onAsk(action.ask),
+      })),
+  ]
+
+  // أي نصّ لا يطابق شيئًا يبقى سؤالًا صالحًا: نرسله كما هو بدل «لا نتائج».
+  if (trimmed && rows.length === 0) {
+    rows.push({
+      key: 'free',
+      icon: '✨',
+      label: `اسأل: «${trimmed}»`,
+      hint: 'Enter',
+      run: () => onAsk(trimmed),
+    })
+  }
+
+  const safeCursor = Math.min(cursor, Math.max(0, rows.length - 1))
+
+  return (
+    <div className="scrim" onClick={onClose}>
+      <div
+        className="card sheet"
+        onClick={(event) => event.stopPropagation()}
+        style={{ width: 'min(620px, 92vw)', padding: 10, boxShadow: 'var(--shadow-lg)' }}
+      >
+        <input
+          autoFocus
+          className="field"
+          value={query}
+          onChange={(event) => { setQuery(event.target.value); setCursor(0) }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown') {
+              event.preventDefault()
+              setCursor((c) => Math.min(c + 1, rows.length - 1))
+            } else if (event.key === 'ArrowUp') {
+              event.preventDefault()
+              setCursor((c) => Math.max(0, c - 1))
+            } else if (event.key === 'Enter') {
+              event.preventDefault()
+              rows[safeCursor]?.run()
+            }
+          }}
+          placeholder="انتقل، أو اطلب شيئًا…"
+          style={{ background: 'transparent', fontSize: 16, padding: '12px 14px' }}
+        />
+        <hr className="divider" />
+        <div style={{ maxHeight: '48vh', overflowY: 'auto', padding: 4 }}>
+          {rows.map((row, index) => (
+            <button
+              key={row.key}
+              onMouseEnter={() => setCursor(index)}
+              onClick={row.run}
+              className="row"
+              style={{
+                width: '100%', gap: 12, padding: '10px 12px', borderRadius: 14,
+                textAlign: 'start',
+                background: index === safeCursor ? 'var(--surface-high)' : 'transparent',
+              }}
+            >
+              <span style={{ fontSize: 16 }}>{row.icon}</span>
+              <span className="grow">{row.label}</span>
+              <kbd>{row.hint}</kbd>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ------------------------------------------------------------ التشخيص
+
+const SHORTCUTS = [
+  { keys: 'Ctrl + Space', what: 'الشريط السريع من أي مكان في ويندوز' },
+  { keys: 'Ctrl + K', what: 'لوحة الأوامر: تنقّل أو اطلب' },
+  { keys: 'Ctrl + 1…9', what: 'الانتقال إلى تبويب بالترتيب' },
+  { keys: 'Ctrl + N', what: 'محادثة جديدة' },
+  { keys: 'Ctrl + L', what: 'التركيز على حقل الكتابة' },
+  { keys: 'Ctrl + ,', what: 'الإعدادات' },
+  { keys: 'Esc', what: 'إغلاق لوحة الأوامر أو الشريط السريع' },
+]
+
+/**
+ * شاشة التشخيص.
+ *
+ * وُجدت لأن المستخدم واجه «التطبيق ما يفتح» بلا أي رسالة: كانت الواجهة تنهار
+ * قبل أول رسم فلا تظهر النافذة أبدًا. الآن كل خطوة إقلاع تُسجَّل، وهذه الشاشة
+ * تعرض السجل وتفتح مجلده — فيصير التشخيص ممكنًا بدل التخمين.
+ */
+function Diagnostics() {
+  const [info, setInfo] = useState<{
+    path: string; tail: string; version: string; electron: string; platform: string
+  } | null>(null)
+  const [open, setOpen] = useState(false)
+
+  const load = useCallback(async () => setInfo(await window.alcode.diag.log()), [])
+
+  useEffect(() => { void load() }, [load])
+
+  if (!info) return null
+
+  return (
+    <Section title="التشخيص">
+      <div className="card col" style={{ gap: 12 }}>
+        <div className="row wrap" style={{ gap: 18 }}>
+          <Stat label="الإصدار" value={info.version} />
+          <Stat label="Electron" value={info.electron} />
+          <Stat label="النظام" value={info.platform} />
+        </div>
+        <p className="muted small" style={{ margin: 0 }}>
+          كل خطوة إقلاع تُسجَّل هنا. إن لم يفتح التطبيق يومًا، هذا الملف يقول
+          أين وقف بالضبط.
+        </p>
+        <div className="row wrap" style={{ gap: 8 }}>
+          <button className="chip" onClick={() => setOpen((value) => !value)}>
+            {open ? 'إخفاء السجل' : 'اعرض السجل'}
+          </button>
+          <button className="chip" onClick={() => window.alcode.diag.openLog()}>
+            افتح مجلد السجل
+          </button>
+          <button className="chip" onClick={() => void load()}>تحديث</button>
+        </div>
+        {open && (
+          <pre
+            className="small"
+            style={{
+              background: 'var(--surface-high)', borderRadius: 14, padding: 12,
+              maxHeight: 260, overflow: 'auto', whiteSpace: 'pre-wrap', margin: 0,
+            }}
+          >
+            {info.tail || 'السجل فارغ.'}
+          </pre>
+        )}
+      </div>
+    </Section>
+  )
 }

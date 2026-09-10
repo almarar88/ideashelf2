@@ -61,4 +61,6 @@ export interface AppSettings {
   customSources: { id: string; name: string; url: string; category: string }[]
   topics: string[]
   newsRefreshMinutes: number
+  prayerAlerts: boolean
+  morningBriefAt: string
 }

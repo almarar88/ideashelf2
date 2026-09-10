@@ -124,6 +124,10 @@ export interface Settings {
   /** مواضيع يتابعها بكلماته. */
   topics: string[]
   newsRefreshMinutes: number
+  /** تنبيه عند كل صلاة. */
+  prayerAlerts: boolean
+  /** ملخّص الصباح كإشعار، بالساعة والدقيقة (HH:mm) أو فراغ لتعطيله. */
+  morningBriefAt: string
 }
 
 export const defaultSettings: Settings = {
@@ -149,6 +153,8 @@ export const defaultSettings: Settings = {
   customSources: [],
   topics: [],
   newsRefreshMinutes: 30,
+  prayerAlerts: true,
+  morningBriefAt: '07:00',
 }
 
 export const stores = {

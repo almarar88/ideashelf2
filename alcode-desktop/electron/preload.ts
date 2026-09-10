@@ -57,6 +57,8 @@ const api = {
     addTopic: (query: string) => ipcRenderer.invoke('daily:addTopic', query),
     removeTopic: (query: string) => ipcRenderer.invoke('daily:removeTopic', query),
     methods: () => ipcRenderer.invoke('daily:methods'),
+    detectPlace: (allowIp = false) => ipcRenderer.invoke('daily:detectPlace', allowIp),
+    openLocationSettings: () => ipcRenderer.invoke('daily:openLocationSettings'),
     searchPlaces: (query: string) => ipcRenderer.invoke('daily:searchPlaces', query),
     prayerMonth: (year: number, month: number) =>
       ipcRenderer.invoke('daily:prayerMonth', year, month),
@@ -67,6 +69,10 @@ const api = {
     saveHabit: (habit: unknown) => ipcRenderer.invoke('daily:saveHabit', habit),
     deleteHabit: (id: string) => ipcRenderer.invoke('daily:deleteHabit', id),
     openExternal: (url: string) => ipcRenderer.invoke('daily:openExternal', url),
+  },
+  diag: {
+    log: () => ipcRenderer.invoke('diag:log'),
+    openLog: () => ipcRenderer.invoke('diag:openLog'),
   },
   quick: {
     hide: () => ipcRenderer.send('quick:hide'),
