@@ -40,6 +40,10 @@ jobs:
       - name: اختبارات الحواجز والأدوات
         run: npm test
 
+      # الترجمة أولًا: electron-builder يحزم dist/ و dist-electron/ ولا يبنيهما.
+      - name: ترجمة العملية الرئيسية والواجهة
+        run: npm run build
+
       - name: بناء المُثبِّت والنسخة المحمولة
         run: npx electron-builder --win nsis dir
 
