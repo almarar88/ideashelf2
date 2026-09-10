@@ -14,17 +14,21 @@ import { join } from 'node:path'
  */
 
 // ننفّذ الوحدة المترجمة: الاختبار يعمل على JavaScript والمصدر TypeScript.
+// نستدعي المترجم بـ node مباشرة لا بـ npx: على ويندوز اسمه npx.cmd
+// و execFile لا يشغّل ملفات .cmd بلا صدفة، فيسقط الاختبار هناك وحده.
+const { createRequire } = await import('node:module')
+const requireHere = createRequire(import.meta.url)
+const tsc = requireHere.resolve('typescript/bin/tsc')
+
 const dir = mkdtempSync(join(tmpdir(), 'alc-prayer-'))
-execFileSync('npx', ['tsc', 'electron/daily/prayer.ts',
+execFileSync(process.execPath, [tsc, 'electron/daily/prayer.ts',
   '--outDir', dir, '--module', 'commonjs', '--target', 'es2022',
   '--moduleResolution', 'node', '--skipLibCheck'], { stdio: 'pipe' })
 
 const modulePath = join(dir, 'prayer.js')
 // نحوّل CommonJS إلى وحدة قابلة للاستيراد في ESM.
 writeFileSync(join(dir, 'prayer.cjs'), readFileSync(modulePath))
-const { createRequire } = await import('node:module')
-const require = createRequire(import.meta.url)
-const prayer = require(join(dir, 'prayer.cjs'))
+const prayer = requireHere(join(dir, 'prayer.cjs'))
 
 const references = [
   ['الرياض', 24.7136, 46.6753, 'Asia/Riyadh', 'UMM_AL_QURA', '2026-01-15',

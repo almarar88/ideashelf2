@@ -6,14 +6,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
 
+const requireHere = createRequire(import.meta.url)
+// نستدعي المترجم بـ node مباشرة لا بـ npx: على ويندوز اسمه npx.cmd
+// و execFile لا يشغّل ملفات .cmd بلا صدفة، فيسقط الاختبار هناك وحده.
+const tsc = requireHere.resolve('typescript/bin/tsc')
+
 /** يترجم وحدة TypeScript ويحمّلها للاختبار. */
 function load(file) {
   const dir = mkdtempSync(join(tmpdir(), 'alc-'))
-  execFileSync('npx', ['tsc', file, '--outDir', dir, '--module', 'commonjs',
+  execFileSync(process.execPath, [tsc, file, '--outDir', dir, '--module', 'commonjs',
     '--target', 'es2022', '--moduleResolution', 'node', '--skipLibCheck'], { stdio: 'pipe' })
-  const require = createRequire(import.meta.url)
   const name = file.split('/').pop().replace('.ts', '.js')
-  return require(join(dir, name))
+  return requireHere(join(dir, name))
 }
 
 const news = load('electron/daily/news.ts')
