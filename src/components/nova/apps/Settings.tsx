@@ -13,7 +13,7 @@ const WALLS: { key: string; label: string }[] = [
 
 /** الهوية: كل تغيير هنا نداء نظام — أي أنه قابل للإرجاع مثل أي شيء آخر. */
 export default function Settings() {
-  const { state, run, reset, neural, model } = useNova();
+  const { state, run, reset, neural, model, edition } = useNova();
   const t = state.theme;
 
   return (
@@ -94,10 +94,18 @@ export default function Settings() {
         </div>
         <div className="kv">
           <span className="dim">الطراز</span>
-          <span className="mono">{neural ? model : "reflex/1.0"}</span>
+          <span className="mono ltr">{neural ? model : "reflex/1.0"}</span>
+        </div>
+        <div className="kv">
+          <span className="dim">النسخة</span>
+          <span>
+            {edition === "device" ? "نسخة الجهاز — مُضمَّنة بلا خادم" : "نسخة الويب — خلف خادم التطبيق"}
+          </span>
         </div>
         <div className="dim" style={{ fontSize: 12.5, marginTop: 9, lineHeight: 1.75 }}>
-          {neural
+          {edition === "device"
+            ? "نسخة الجهاز تعمل بطبقة الانعكاس المحلية بالكامل: لا شبكة، لا مفتاح، ولا خادم. النوافذ والملفات والأسطح والصلاحيات وتوليد التطبيقات والوكلاء والإرجاع الزمني تعمل كلها هنا. ما يحتاج خادمًا — تخطيط Claude وبيانات المزرعة — غائب بحكم التصميم لا بخلل."
+            : neural
             ? "العصب يخطّط بحرية داخل جدول نداءات النظام فقط. أي نداء لا يطابق مخططه يُرفض قبل أن يلمس الحالة، أي أن الذكاء يملك صلاحياتك لا أكثر."
             : "لا يوجد ANTHROPIC_API_KEY في البيئة، فيعمل النظام بطبقة الانعكاس المحلية: حتمية، بلا شبكة، وتفهم الصيغ الشائعة. أضف المفتاح لتفتح التخطيط الحر وتوليد التطبيقات العصبي."}
         </div>

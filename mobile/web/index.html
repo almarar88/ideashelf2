@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <meta name="theme-color" content="#07070d" />
+    <title>NOVA OS</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./nova.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #07070d;
+        /* منع نطّ السحب داخل نظام نوافذ */
+        overscroll-behavior: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #splash {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at 50% 45%, #16162a, #05050a 70%);
+        color: #8b8da6;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        letter-spacing: 12px;
+        font-size: 34px;
+        font-weight: 200;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="splash">NOVA</div>
+    <div id="nova-root"></div>
+    <script src="./nova.js" defer></script>
+    <script>
+      // الشاشة الأولى تُخفى بعد أن تتولّى النواة الرسم
+      window.addEventListener("load", function () {
+        setTimeout(function () {
+          var s = document.getElementById("splash");
+          if (s) s.remove();
+        }, 120);
+      });
+    </script>
+  </body>
+</html>

@@ -13,7 +13,7 @@ const money = (n: number) => Math.round(n).toLocaleString("ar-SA");
  * الأرقام هنا هي أرقام قاعدة بيانات التطبيق، ونفسها تُغذّي إجابات الذكاء.
  */
 export default function Pulse() {
-  const { run, neural, ask } = useNova();
+  const { run, neural, ask, edition } = useNova();
   const [pulse, setPulse] = useState<FarmPulse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "empty">("loading");
   const [advice, setAdvice] = useState<string | null>(null);
@@ -24,7 +24,9 @@ export default function Pulse() {
   // الجلب اشتراك على نظام خارجي (الخادم): ضبط الحالة يحدث في رد النداء لا في متن الأثر
   useEffect(() => {
     let alive = true;
-    fetchPulse().then((p) => {
+    // نسخة الجهاز بلا خادم: نُعلن ذلك فورًا بدل انتظار فشل شبكة
+    const source = edition === "device" ? Promise.resolve(null) : fetchPulse();
+    source.then((p) => {
       if (!alive) return;
       setPulse(p);
       setState(p ? "ready" : "empty");
@@ -32,7 +34,7 @@ export default function Pulse() {
     return () => {
       alive = false;
     };
-  }, [tick]);
+  }, [edition, tick]);
 
   const refresh = () => {
     setState("loading");
@@ -71,9 +73,10 @@ export default function Pulse() {
       <div className="empty">
         <div style={{ fontSize: 26 }}>◉</div>
         <div>لا بيانات مزرعة متاحة</div>
-        <div className="faint" style={{ fontSize: 12, maxWidth: 340, lineHeight: 1.8 }}>
-          قاعدة البيانات غير مهيّأة أو فارغة. نوفا تعمل كاملة بدونها، لكن هذه النافذة
-          تحتاج بيانات التطبيق الحقيقية.
+        <div className="faint" style={{ fontSize: 12, maxWidth: 360, lineHeight: 1.8 }}>
+          {edition === "device"
+            ? "أنت تشغّل نسخة الجهاز: نوفا مُضمَّنة في التطبيق وتعمل بلا خادم، ولذلك لا تصل إلى قاعدة بيانات المزرعة. كل ما عداها يعمل كاملًا."
+            : "قاعدة البيانات غير مهيّأة أو فارغة. نوفا تعمل كاملة بدونها، لكن هذه النافذة تحتاج بيانات التطبيق الحقيقية."}
         </div>
         <button className="btn tiny" onClick={refresh}>
           أعد المحاولة

@@ -21,13 +21,16 @@ export default function NovaOS({
   neural,
   model,
   identity,
+  edition = "web",
 }: {
   neural: boolean;
   model: string;
   identity: { name: string; handle: string; role: string };
+  /** "device" = مُضمَّنة في تطبيق بلا خادم (APK): ما يحتاج خادمًا يُعلن ذلك */
+  edition?: "web" | "device";
 }) {
   return (
-    <KernelProvider neural={neural} model={model} identity={identity}>
+    <KernelProvider neural={neural} model={model} identity={identity} edition={edition}>
       <Desktop />
     </KernelProvider>
   );
@@ -107,11 +110,20 @@ function Desktop() {
       if (pick) run({ op: "win.focus", args: { id: pick.id } });
     };
 
+    /**
+     * زرّ الرجوع على أندرويد.
+     * القشرة الأصلية لا تعرف شيئًا عن حالة النظام؛ ترسل حدثًا واحدًا فقط،
+     * والنواة تُترجمه إلى نداء إغلاق مُسجّل. هذا هو حدّ التماس كله.
+     */
+    const onBack = () => run({ op: "win.close", args: {} });
+
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("nova:back", onBack);
     return () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("nova:back", onBack);
     };
   }, [run, state.windows]);
 
@@ -174,7 +186,13 @@ function Desktop() {
                 <div style={{ fontSize: 34, letterSpacing: 10 }} className="accent">
                   NOVA
                 </div>
-                <div style={{ fontSize: 15 }}>اضغط Ctrl + K وقل ما تريد</div>
+                {/* النصيحة تتبع الجهاز: «اضغط Ctrl+K» بلا معنى على هاتف */}
+                <div style={{ fontSize: 15 }} className="hint-keys">
+                  اضغط Ctrl + K وقل ما تريد
+                </div>
+                <div style={{ fontSize: 15 }} className="hint-touch">
+                  المس ◈ في الشريط السفلي وقل ما تريد
+                </div>
                 <div className="faint" style={{ fontSize: 12.5, maxWidth: 420, lineHeight: 1.8 }}>
                   لا حاجة لتتعلّم مكان أي شيء. النظام يفهم النية ويحوّلها إلى نداءات
                   مُسجّلة يمكنك الرجوع عنها كلها من «الخط الزمني».

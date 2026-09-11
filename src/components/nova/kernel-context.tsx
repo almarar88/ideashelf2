@@ -20,10 +20,14 @@ import { sanitizePlan } from "@/lib/nova/syscalls";
 import type { Effect, JournalEntry, NovaState, Plan, SyscallCall } from "@/lib/nova/types";
 
 
+export type Edition = "web" | "device";
+
 type NovaApi = {
   state: NovaState;
   neural: boolean;
   model: string;
+  /** أين تعمل نوفا: خلف خادم التطبيق، أم مُضمَّنة في جهاز بلا خادم */
+  edition: Edition;
   busy: boolean;
   lastPlan: Plan | null;
   desk: { w: number; h: number };
@@ -115,11 +119,13 @@ export function KernelProvider({
   neural,
   model,
   identity,
+  edition = "web",
   children,
 }: {
   neural: boolean;
   model: string;
   identity: Identity;
+  edition?: Edition;
   children: React.ReactNode;
 }) {
   const [state, setState] = useState<NovaState>(() => hydrate(neural, identity));
@@ -198,9 +204,11 @@ export function KernelProvider({
 
         if (fx.kind === "farm-report") {
           void (async () => {
-            const pulse = await fetchPulse();
+            const pulse = edition === "device" ? null : await fetchPulse();
             const body = pulse
               ? pulseToMarkdown(pulse)
+              : edition === "device"
+              ? "# تقرير المزرعة\n\nهذه نسخة الجهاز: نوفا مُضمَّنة في التطبيق وتعمل بلا خادم، فلا وصول إلى قاعدة بيانات المزرعة.\n\nشغّل نسخة الويب على `/os` لقراءة أرقامك الحقيقية."
               : "# تقرير المزرعة\n\nتعذّر قراءة البيانات من قاعدة بيانات التطبيق.";
             const r = execute(
               ref.current,
@@ -271,6 +279,28 @@ export function KernelProvider({
           void (async () => {
             let spec = null;
             let source: "neural" | "reflex" = "reflex";
+            // نسخة الجهاز بلا خادم: الطلب سيفشل يقينًا، وانتظار فشله تأخير
+            // بلا فائدة وضجيج في السجل. نذهب إلى المواصفة الاحتياطية مباشرة.
+            if (edition === "device") {
+              const r = execute(
+                ref.current,
+                {
+                  op: "app.install",
+                  args: {
+                    id: fx.targetId,
+                    name: fallbackSpec(fx.prompt).name,
+                    icon: fallbackSpec(fx.prompt).icon,
+                    prompt: fx.prompt,
+                    spec: fallbackSpec(fx.prompt),
+                    source: "reflex",
+                  },
+                },
+                "kernel"
+              );
+              commit(r.state);
+              consumeRef.current(r.effects);
+              return;
+            }
             try {
               const res = await fetch("/api/nova/compose", {
                 method: "POST",
@@ -307,7 +337,7 @@ export function KernelProvider({
         }
       }
     },
-    [commit, neural]
+    [commit, edition, neural]
   );
 
   /** حقن أبعاد سطح المكتب الحقيقية: النداء المُسجّل يجب أن يصف ما حدث فعلًا */
@@ -691,6 +721,7 @@ export function KernelProvider({
       state,
       neural,
       model,
+      edition,
       busy,
       lastPlan,
       desk,
@@ -713,6 +744,7 @@ export function KernelProvider({
       state,
       neural,
       model,
+      edition,
       busy,
       lastPlan,
       desk,

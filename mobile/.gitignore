@@ -1,0 +1,8 @@
+# مخرجات البناء ومفتاح التوقيع: لا يُودَع أي منهما
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/nova-debug.keystore
+android/app/src/main/assets/nova/
+bundle-report.json

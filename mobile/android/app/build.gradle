@@ -1,0 +1,70 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.nova.os"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.nova.os"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.1"
+    }
+
+    // توقيع تجريبي: يكفي للتثبيت اليدوي على جهاز، ولا يصلح لمتجر
+    signingConfigs {
+        debugLocal {
+            storeFile file("nova-debug.keystore")
+            storePassword "novaos123"
+            keyAlias "nova"
+            keyPassword "novaos123"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.debugLocal
+        }
+        debug {
+            signingConfig signingConfigs.debugLocal
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packagingOptions {
+        resources.excludes += ["META-INF/*"]
+    }
+}
+
+configurations.configureEach {
+    /*
+     * kotlin-stdlib دمج حزمتي jdk7/jdk8 داخله منذ 1.8، وبعض التبعيات
+     * القديمة ما زالت تطلبهما صريحًا — فتتكرّر الأصناف ويفشل التغليف.
+     * التوجيه إلى stdlib الموحّد هو الحل الرسمي لهذا التعارض.
+     */
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == "org.jetbrains.kotlin"
+                && details.requested.name in ["kotlin-stdlib-jdk7", "kotlin-stdlib-jdk8"]) {
+            details.useTarget("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")
+            details.because("jdk7/jdk8 مدموجان في stdlib منذ 1.8")
+        }
+    }
+}
+
+dependencies {
+    /*
+     * تبعية واحدة فقط: WebViewAssetLoader يقدّم أصول التطبيق على أصل https
+     * حقيقي، وهذا شرط عمل IndexedDB بثبات (أصل file:// معتم في Chromium
+     * الحديث). appcompat لا حاجة إليها: النشاط يمدّ android.app.Activity
+     * والسمة سمة نظام — وحملها كان يجرّ تعارض kotlin أعلاه.
+     */
+    implementation "androidx.webkit:webkit:1.11.0"
+}

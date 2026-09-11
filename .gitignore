@@ -50,3 +50,6 @@ next-env.d.ts
 
 # local verification scripts
 /verify*.js
+
+# حزم أندرويد المبنية
+*.apk
