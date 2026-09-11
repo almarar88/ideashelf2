@@ -24,8 +24,9 @@ export default function ContextMenu({
   const { state, run } = useNova();
 
   const items: (Item | "sep")[] = [
-    { label: "نبضة المزرعة", call: { op: "farm.pulse", args: {} } },
     { label: "استورد ملفات", call: { op: "fs.import", args: {} } },
+    { label: "الحاسبة", call: { op: "win.open", args: { app: "calc" } } },
+    { label: "الرسّام", call: { op: "win.open", args: { app: "paint" } } },
     { label: "شريط النيّة", call: { op: "win.open", args: { app: "oracle" } }, keys: "Ctrl+K" },
     { label: "المشغل — اصنع تطبيقًا", call: { op: "win.open", args: { app: "studio" } } },
     "sep",
@@ -38,6 +39,7 @@ export default function ContextMenu({
     { label: "سطح عمل جديد", call: { op: "space.create", args: {} } },
     { label: "أرسل النافذة إلى السطح ٢", call: { op: "space.send", args: { index: 2 } }, keys: "Ctrl+⇧2" },
     { label: "الصلاحيات", call: { op: "win.open", args: { app: "guard" } } },
+    { label: "عن النظام", call: { op: "win.open", args: { app: "about" } } },
     "sep",
     {
       label: state.theme.mode === "night" ? "وضع الفجر" : "وضع الليل",

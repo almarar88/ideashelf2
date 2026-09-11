@@ -34,7 +34,7 @@ export default function Oracle() {
             <div style={{ fontSize: 26 }}>◈</div>
             <div>أنا نوفا. لا تبحث عن زر — قل ما تريد.</div>
             <div className="faint" style={{ fontSize: 12 }}>
-              «رتّب النوافذ»، «اصنع تطبيقًا للمصاريف»، «ابحث عن النخيل»
+              «رتّب النوافذ»، «اصنع تطبيقًا لعاداتي»، «احسب ٨٤×٧»
             </div>
           </div>
         )}

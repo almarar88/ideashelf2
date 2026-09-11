@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { pulseToContext, readFarmPulse } from "@/lib/nova/bridge";
 import { neuralAvailable, neuralPlan } from "@/lib/nova/cortex";
 
 /**
@@ -24,12 +23,7 @@ export async function POST(req: NextRequest) {
   const context = typeof body.context === "string" ? body.context.slice(0, 4000) : "";
   if (!intent) return NextResponse.json({ error: "النية مطلوبة" }, { status: 400 });
 
-  // نبضة المزرعة تُضاف إلى السياق: هكذا يجيب المُخطِّط عن أرقامك الفعلية
-  // بدل أن يخمّن، ويعرف متى يفتح لوحة المزرعة بدل أن يشرحها.
-  const pulse = await readFarmPulse();
-  const fullContext = `${context}\n\n— بيانات المزرعة الحقيقية —\n${pulseToContext(pulse)}`;
-
-  const result = await neuralPlan(intent, fullContext);
+  const result = await neuralPlan(intent, context);
   if (!result) {
     return NextResponse.json({ available: false, reason: "cortex-failed" }, { status: 200 });
   }

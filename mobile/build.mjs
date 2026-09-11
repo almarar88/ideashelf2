@@ -23,6 +23,9 @@ const result = await build({
   sourcemap: false,
   format: "iife",
   target: ["chrome100"],
+  // الافتراضي يهرّب كل حرف عربي إلى \uXXXX فينتفخ الملف بلا سبب:
+  // الأصول تُقدَّم بترميز UTF-8 معلن، فلا حاجة إلى التهريب.
+  charset: "utf8",
   jsx: "automatic",
   loader: { ".css": "css" },
   alias: { "@": path.join(repo, "src") },

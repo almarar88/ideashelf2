@@ -34,7 +34,7 @@ export default function Files({ win }: { win: NovaWindow }) {
           </div>
           <input
             className="field"
-            placeholder="ابحث بالمعنى: مزرعة، ميزانية، وكيل…"
+            placeholder="ابحث بالمعنى: أفكار، رسوم، وكيل…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />

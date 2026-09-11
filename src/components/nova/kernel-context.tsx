@@ -11,7 +11,6 @@ import {
 } from "react";
 import { APP_MAP } from "@/lib/nova/apps";
 import { searchFs } from "@/lib/nova/fs";
-import { fetchPulse, pulseToMarkdown } from "@/lib/nova/pulse-client";
 import { IMPORT_LIMITS, clearSession, dataUrlToBlob, loadSession, readFile, saveSession } from "@/lib/nova/store";
 import { execute, executePlan, fireAutomations, initialState, replay } from "@/lib/nova/kernel";
 import { fold, reflexPlan } from "@/lib/nova/reflex";
@@ -196,28 +195,6 @@ export function KernelProvider({
             );
             commit(r.state);
           }
-        }
-
-        if (fx.kind === "navigate") {
-          window.open(fx.route, "_blank", "noopener,noreferrer");
-        }
-
-        if (fx.kind === "farm-report") {
-          void (async () => {
-            const pulse = edition === "device" ? null : await fetchPulse();
-            const body = pulse
-              ? pulseToMarkdown(pulse)
-              : edition === "device"
-              ? "# تقرير المزرعة\n\nهذه نسخة الجهاز: نوفا مُضمَّنة في التطبيق وتعمل بلا خادم، فلا وصول إلى قاعدة بيانات المزرعة.\n\nشغّل نسخة الويب على `/os` لقراءة أرقامك الحقيقية."
-              : "# تقرير المزرعة\n\nتعذّر قراءة البيانات من قاعدة بيانات التطبيق.";
-            const r = execute(
-              ref.current,
-              { op: "fs.write", args: { path: fx.path, content: body, tags: ["مزرعة", "تقرير", "نبضة"], open: true } },
-              "kernel"
-            );
-            commit(r.state);
-            consumeRef.current(r.effects);
-          })();
         }
 
         if (fx.kind === "agent-report") {
@@ -499,13 +476,22 @@ export function KernelProvider({
       if (!plan) plan = reflexPlan(text, ref.current);
 
       const spoken: SyscallCall[] = plan.say ? [{ op: "say", args: { text: plan.say } }] : [];
-      const after = dispatch([...spoken, ...plan.calls], plan.source);
+      dispatch([...spoken, ...plan.calls], plan.source);
 
+      /**
+       * نقرأ من ref لا من قيمة أعادها dispatch.
+       *
+       * بعض الآثار تُنفّذ *متزامنًا* داخل dispatch (مثل تثبيت تطبيق مولّد في
+       * نسخة الجهاز حيث لا شبكة تُنتظر). لو أودعنا الحالة التي التقطناها قبلها
+       * لطمسناها — وهذا ما كان يحدث فعلًا: التطبيق يُثبَّت ثم يختفي.
+       * ref.current هو آخر حالة مُودَعة دائمًا، فالبناء عليه آمن في الحالتين.
+       */
+      const latest = ref.current;
       commit({
-        ...after,
+        ...latest,
         cortex: {
           backend: plan.source,
-          calls: after.cortex.calls + plan.calls.length,
+          calls: latest.cortex.calls + plan.calls.length,
           lastLatency: plan.latency,
           lastIntent: text,
         },

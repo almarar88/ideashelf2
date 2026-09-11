@@ -507,32 +507,6 @@ export function execute(
       break;
     }
 
-    case "farm.pulse": {
-      const opened = execute(
-        s,
-        { op: "win.open", args: { app: "pulse", props: { focus: args.focus ?? "all" } } },
-        "kernel",
-        false
-      );
-      Object.assign(s, opened.state);
-      note = "نبضة المزرعة";
-      break;
-    }
-
-    case "farm.report": {
-      // التقرير يحتاج قراءة من الخادم، فالنواة تطلبه أثرًا وتبقى نقية
-      const path = normalize(String(args.path ?? "/تقارير/نبضة-المزرعة.md"));
-      effects.push({ kind: "farm-report", path });
-      note = "يُجهَّز تقرير المزرعة";
-      break;
-    }
-
-    case "nav.open": {
-      effects.push({ kind: "navigate", route: String(args.route) });
-      note = `فتح ${args.route}`;
-      break;
-    }
-
     case "theme.set": {
       if (args.mode) s.theme.mode = args.mode as never;
       if (args.accent) s.theme.accent = String(args.accent);

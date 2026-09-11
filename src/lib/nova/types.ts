@@ -154,10 +154,7 @@ export type Effect =
   /** الوكيل أنهى خطواته ويحتاج عملًا حقيقيًا (قراءة ملفات، سؤال العصب) */
   | { kind: "agent-report"; agentId: string }
   | { kind: "sound"; tone: "ok" | "warn" | "boot" }
-  /** فتح شاشة من التطبيق المضيف — الخروج من نوفا إلى منتجها */
-  | { kind: "navigate"; route: string }
-  /** طلب نبضة المزرعة من الخادم ثم كتابتها تقريرًا */
-  | { kind: "farm-report"; path: string }
+
   /** تطبيق مولّد طلب قدرة لا يملكها — تُعرض على المستخدم */
   | { kind: "consent"; app: string; cap: string; call: SyscallCall }
   /** فتح منتقي ملفات النظام — لا يمكن أن يكون نقيًا */

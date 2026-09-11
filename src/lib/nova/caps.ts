@@ -20,8 +20,6 @@ export type Capability =
   | "agents"
   | "forge"
   | "rules"
-  | "farm"
-  | "navigate"
   | "power"
   | "time"
   | "alerts"
@@ -70,18 +68,6 @@ export const CAPS: Record<Capability, CapMeta> = {
     desc: "إنشاء أتمتة تعمل تلقائيًا لاحقًا",
     risk: "high",
     icon: "⟐",
-  },
-  farm: {
-    label: "بيانات المزرعة",
-    desc: "قراءة أرقام مزرعتك الحقيقية",
-    risk: "mid",
-    icon: "◉",
-  },
-  navigate: {
-    label: "التنقّل",
-    desc: "فتح شاشات التطبيق في تبويب جديد",
-    risk: "mid",
-    icon: "↗",
   },
   power: {
     label: "الطاقة",

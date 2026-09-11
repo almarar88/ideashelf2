@@ -129,36 +129,6 @@ export const SYSCALLS = {
     doc: "يبحث في الأسماء والوسوم والمحتوى ويفتح نافذة نتائج.",
     schema: z.object({ query: z.string().min(1).max(120) }),
   },
-  "farm.pulse": {
-    title: "أبصر المزرعة",
-    cap: "farm" as Capability,
-    doc: "يفتح لوحة نبضة المزرعة الحقيقية (نخيل، عمال، مصاريف، مزادات) من قاعدة بيانات التطبيق.",
-    schema: z.object({ focus: z.enum(["all", "palms", "money", "workers", "market"]).optional() }),
-  },
-  "farm.report": {
-    title: "اكتب تقرير المزرعة",
-    cap: "farm" as Capability,
-    doc: "يحوّل نبضة المزرعة الحالية إلى ملف تقرير في المحتوى.",
-    schema: z.object({ path: z.string().max(160).optional() }),
-  },
-  "nav.open": {
-    title: "افتح شاشة في التطبيق",
-    cap: "navigate" as Capability,
-    doc: "يفتح شاشة من تطبيق المزرعة في تبويب جديد. route واحد من: /dashboard, /farm, /palms, /workers, /expenses, /calendar, /market, /auctions, /disease-detection.",
-    schema: z.object({
-      route: z.enum([
-        "/dashboard",
-        "/farm",
-        "/palms",
-        "/workers",
-        "/expenses",
-        "/calendar",
-        "/market",
-        "/auctions",
-        "/disease-detection",
-      ]),
-    }),
-  },
   "theme.set": {
     title: "غيّر الهوية البصرية",
     cap: "look" as Capability,

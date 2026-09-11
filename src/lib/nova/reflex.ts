@@ -137,36 +137,8 @@ export function reflexPlan(intent: string, state: NovaState): Plan {
   }
   if (has(t, "من انت", "ما هو نوفا", "who are you", "عرف نفسك")) {
     say =
-      "أنا نوفا: نظام تشغيل تُقاد حالته بالنية. كل ما تطلبه يتحوّل إلى نداءات نظام مُسجّلة، ولهذا يمكن إرجاع أي شيء فعلته. وأنا موصولة ببيانات مزرعتك: اسألني عنها أو قل «المزرعة».";
+      "أنا نوفا: نظام تشغيل تُقاد حالته بالنيّة. كل ما تطلبه يتحوّل إلى نداءات نظام مُسجّلة، ولهذا يمكن إرجاع أي شيء فعلته. لا أنتظر منك تعلّم مكان الأزرار — قل ما تريد.";
     return done();
-  }
-
-  // ── المزرعة: البيانات الحقيقية أولى من أي تفسير عام
-  if (has(t, "تقرير المزرعه", "اكتب تقرير", "تقرير عن المزرعه", "farm report")) {
-    calls.push({ op: "farm.report", args: {} });
-    say = "أكتب تقرير النبضة الآن وأفتحه.";
-    return done();
-  }
-  // ── التنقّل إلى شاشات التطبيق المضيف
-  {
-    const routes: [string[], string][] = [
-      [["خريطه المزرعه", "الخريطه", "map"], "/farm"],
-      [["لوحه التحكم", "الداشبورد", "dashboard"], "/dashboard"],
-      [["شاشه النخيل", "صفحه النخيل"], "/palms"],
-      [["شاشه العمال", "صفحه العمال"], "/workers"],
-      [["شاشه المصاريف", "صفحه المصاريف"], "/expenses"],
-      [["التقويم", "المواعيد", "calendar"], "/calendar"],
-      [["كشف الامراض", "تشخيص", "diagnosis"], "/disease-detection"],
-    ];
-    if (has(t, "افتح", "اذهب", "روح", "open", "go to")) {
-      for (const [words, route] of routes) {
-        if (words.some((w) => t.includes(fold(w)))) {
-          calls.push({ op: "nav.open", args: { route } });
-          say = `أفتح ${route} في تبويب جديد.`;
-          return done();
-        }
-      }
-    }
   }
 
   // ── الطاقة والأوضاع
@@ -393,22 +365,29 @@ export function reflexPlan(intent: string, state: NovaState): Plan {
     return done();
   }
 
-  // ── المزرعة كاسم لا كفعل.
-  // هذه الكتلة كانت أعلى الملف فاختطفت كل نيّة تذكر «المزرعة» — حتى
-  // «أطلق وكيلًا يجهّز ملخص المزرعة» كانت تفتح لوحة بدل أن تطلق وكيلًا.
-  // موضعها الصحيح هنا: بعد أن تُستنفد النوايا التي تحمل فعلًا صريحًا.
-  if (has(t, "المزرعه", "نبضه", "كم نخله", "كم نخلة", "النخيل", "المصاريف", "العمال", "المزادات", "farm", "pulse")) {
-    const focus = has(t, "مصاريف", "مال", "money")
-      ? "money"
-      : has(t, "عمال", "workers")
-      ? "workers"
-      : has(t, "سوق", "مزاد", "market")
-      ? "market"
-      : has(t, "نخل", "palms")
-      ? "palms"
-      : "all";
-    calls.push({ op: "farm.pulse", args: { focus } });
-    say = "هذه نبضة المزرعة من بياناتك الحقيقية.";
+  // ── حساب سريع: «احسب ١٢×٨» ينفّذ لا يفتح نافذة فارغة
+  if (has(t, "احسب", "كم يساوي", "ناتج", "calculate", "compute")) {
+    const expr = after(raw, ["احسب", "كم يساوي", "ناتج", "calculate", "compute"]);
+    calls.push({ op: "win.open", args: { app: "calc", props: expr ? { expr } : {} } });
+    say = expr ? `الحاسبة جاهزة على «${expr}».` : "فتحت الحاسبة.";
+    return done();
+  }
+
+  // ── مؤقّت: «مؤقت عشر دقائق»
+  if (has(t, "مؤقت", "مؤقّت", "نبهني بعد", "timer")) {
+    const digits = raw.match(/(\d+)/)?.[1];
+    const words: [string[], number][] = [
+      [["دقيقه", "دقيقة", "واحده"], 1],
+      [["دقيقتين", "اثنتين"], 2],
+      [["ثلاث", "٣"], 3],
+      [["خمس", "٥"], 5],
+      [["عشر", "١٠"], 10],
+      [["ربع ساعه", "ربع ساعة"], 15],
+      [["نصف ساعه", "نصف ساعة"], 30],
+    ];
+    const minutes = digits ? Number(digits) : words.find(([w]) => w.some((x) => t.includes(fold(x))))?.[1];
+    calls.push({ op: "win.open", args: { app: "clock", props: minutes ? { minutes } : {} } });
+    say = minutes ? `المؤقّت على ${minutes} دقيقة — اضغط ابدأ.` : "فتحت الساعة.";
     return done();
   }
 
@@ -430,6 +409,6 @@ export function reflexPlan(intent: string, state: NovaState): Plan {
   calls.push({ op: "say", args: { text: `لم أتعرّف على نية دقيقة في «${raw}».` } });
   calls.push({ op: "win.open", args: { app: "oracle" } });
   say =
-    "طبقة الانعكاس المحلية لم تفهم الطلب بدقة. مع مفتاح ANTHROPIC_API_KEY تتولى طبقة العصب (Claude) التخطيط الحر. جرّب: «اصنع تطبيق…»، «رتّب شبكة»، «ابحث عن مزرعة».";
+    "طبقة الانعكاس المحلية لم تفهم الطلب بدقة. مع مفتاح ANTHROPIC_API_KEY تتولى طبقة العصب (Claude) التخطيط الحر. جرّب: «اصنع تطبيقًا…»، «رتّب شبكة»، «افتح الحاسبة»، «مؤقّت خمس دقائق».";
   return done();
 }

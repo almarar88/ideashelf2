@@ -146,19 +146,15 @@ test("قاعدة الأتمتة لا تُطلق نفسها عند كتابة م�
 
 test("الانعكاس: النيّة ذات الفعل تفوز على الاسم", () => {
   const s = live();
-  // «المزرعة» اسم قوي، لكن «أطلق وكيلًا» فعل صريح — والفعل أولى
-  const agent = reflexPlan("أطلق وكيلًا يجهّز ملخص المزرعة", s);
+  // «الحاسبة» اسم تطبيق قوي، لكن «أطلق وكيلًا» فعل صريح — والفعل أولى
+  const agent = reflexPlan("أطلق وكيلًا يجهّز ملخص ملفاتي", s);
   assert.equal(agent.calls[0]?.op, "agent.spawn", "الفعل يجب أن يفوز على الاسم");
 
-  const compose = reflexPlan("اصنع لي تطبيقًا لمتابعة مصاريف المزرعة", s);
+  const compose = reflexPlan("اصنع لي تطبيقًا لمتابعة مصاريفي", s);
   assert.equal(compose.calls[0]?.op, "app.compose");
 
-  const search = reflexPlan("ابحث عن المزرعة", s);
+  const search = reflexPlan("ابحث عن أفكاري", s);
   assert.equal(search.calls[0]?.op, "fs.search");
-
-  // الاسم وحده يفتح اللوحة
-  const pulse = reflexPlan("المزرعة", s);
-  assert.equal(pulse.calls[0]?.op, "farm.pulse");
 });
 
 test("الانعكاس: التراجع يستهدف آخر نداء غيّر الحالة فعلًا", () => {
@@ -175,7 +171,7 @@ test("الانعكاس: التراجع يستهدف آخر نداء غيّر ا�
 });
 
 test("التطبيع يحفظ مواقع الحروف الأصلية", () => {
-  const raw = "أطلق وكيلًا يجهّز ملخص المزرعة";
+  const raw = "أطلق وكيلًا يجهّز ملخص ملفاتي";
   const { folded, map } = foldWithMap(raw);
   assert.equal(map.length, folded.length, "لكل حرف مُطبَّع موضع أصلي واحد");
   // موضع «يجهّز» في النص المُطبَّع يجب أن يشير إلى «ي» في النص الأصلي
@@ -187,7 +183,7 @@ test("التطبيع يحفظ مواقع الحروف الأصلية", () => {
 test("استخراج الموضوع لا ينكسر مع الحركات ولا مع البادئات", () => {
   const s = live();
   // «وكيل» بادئة لـ«وكيلًا»، و«يجهّز» تحمل شدّة — الاسم يجب أن يخرج نظيفًا
-  const plan = reflexPlan("أطلق وكيلًا يجهّز ملخص المزرعة", s);
+  const plan = reflexPlan("أطلق وكيلًا يجهّز ملخص ملفاتي", s);
   const args = plan.calls[0]?.args as { name: string; goal: string };
   assert.equal(plan.calls[0]?.op, "agent.spawn");
   assert.ok(!/^[ًٌٍَُِّْ]/.test(args.name), `اسم الوكيل مشوّه: ${args.name}`);
@@ -202,12 +198,12 @@ test("استخراج الموضوع لا ينكسر مع الحركات ولا �
 
 test("البحث الدلالي يتجاوز البادئات العربية", () => {
   const fs = seedFs();
-  // «والنخيل» و«النخيل» و«نخيل» يجب أن تصل كلها إلى الملف نفسه
-  for (const q of ["النخيل", "والنخيل", "نخيل", "مشروع النخيل"]) {
+  // «والأفكار» و«الأفكار» و«أفكار» يجب أن تصل كلها إلى الملف نفسه
+  for (const q of ["أفكار", "الأفكار", "وأفكار", "تطبيقات أريدها"]) {
     const hits = searchFs(fs, q);
     assert.ok(
-      hits.some((f) => f.path.includes("النخيل")),
-      `الاستعلام «${q}» لم يجد ملف النخيل`
+      hits.some((f) => f.path.includes("أفكار")),
+      `الاستعلام «${q}» لم يجد ملف الأفكار`
     );
   }
   // ولا يعيد نتائج لما ليس موجودًا
@@ -326,4 +322,39 @@ test("اسم التطبيق المولّد يُقشَّر من لام الجرّ
   assert.equal(titleFromPrompt("لبن النخيل"), "لبن النخيل");
   assert.equal(titleFromPrompt("لتسجيل الجرعات"), "تسجيل الجرعات");
   assert.equal(titleFromPrompt(""), "تطبيق جديد");
+});
+
+test("الانعكاس: الاسم وحده يفتح تطبيقه", () => {
+  const s = live();
+  const open = reflexPlan("الحاسبة", s);
+  assert.equal(open.calls[0]?.op, "win.open");
+  assert.equal((open.calls[0]?.args as { app: string }).app, "calc");
+
+  const paint = reflexPlan("افتح الرسّام", s);
+  assert.equal((paint.calls[0]?.args as { app: string }).app, "paint");
+});
+
+test("الانعكاس: النوايا العامة تحمل معاملاتها", () => {
+  const s = live();
+  // الحساب يصل بتعبيره، والمؤقّت بمدّته — لا نافذة فارغة ينتظر المستخدم تعبئتها
+  const calc = reflexPlan("احسب 1280 × 12", s);
+  assert.equal((calc.calls[0]?.args as { app: string }).app, "calc");
+  assert.match(String((calc.calls[0]?.args as { props: { expr?: string } }).props.expr), /1280/);
+
+  const timer = reflexPlan("مؤقّت عشر دقائق", s);
+  assert.equal((timer.calls[0]?.args as { app: string }).app, "clock");
+  assert.equal((timer.calls[0]?.args as { props: { minutes?: number } }).props.minutes, 10);
+
+  const timer2 = reflexPlan("مؤقت 25 دقيقة", s);
+  assert.equal((timer2.calls[0]?.args as { props: { minutes?: number } }).props.minutes, 25);
+});
+
+test("لا أثر لأي ربط بتطبيق مضيف في جدول النداءات", () => {
+  // النظام عام: أي نداء يخصّ منتجًا بعينه يُعدّ تسرّبًا معماريًا
+  const ops = Object.keys(SYSCALLS);
+  for (const leaked of ["farm.pulse", "farm.report", "nav.open"]) {
+    assert.equal(ops.includes(leaked), false, `${leaked} ما زال في الجدول`);
+  }
+  // ولا قدرة تخصّ منتجًا
+  assert.equal(Object.keys(CAPS).includes("farm"), false);
 });

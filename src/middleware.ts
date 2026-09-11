@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
 const SESSION_COOKIE = "farm_session";
-const PUBLIC_PATHS = ["/login", "/api/auth/login"];
+/**
+ * نوفا (/os) نظام تشغيل عام يعيش في المتصفح بالكامل: حالته على جهاز
+ * المستخدم ولا يقرأ بيانات الخادم، فلا معنى لأن يحجبه تسجيل دخول.
+ * أما /api/nova/* فتبقى محميّة لأنها تصرف مفتاح Claude — وذاك حماية
+ * كلفة لا حماية بيانات، ولهذا تعمل نوفا كاملة بلا دخول بطبقة الانعكاس.
+ */
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/os"];
 
 function getSecretKey() {
   const secret = process.env.AUTH_SECRET || "dev-secret-change-me";
