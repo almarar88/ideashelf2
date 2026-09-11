@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { searchFs } from "@/lib/nova/fs";
+import { humanSize, isImage, searchFs } from "@/lib/nova/fs";
 import { useNova } from "../kernel-context";
 import type { NovaWindow } from "@/lib/nova/types";
 
@@ -24,6 +24,14 @@ export default function Files({ win }: { win: NovaWindow }) {
     <div className="app split-h">
       <div className="pane" style={{ width: "46%", minWidth: 200 }}>
         <div style={{ padding: 10 }}>
+          <div className="row" style={{ marginBottom: 8 }}>
+            <button className="btn tiny" onClick={() => run({ op: "fs.import", args: {} })}>
+              ⤓ استورد ملفات
+            </button>
+            <span className="faint" style={{ fontSize: 11 }}>
+              أو أفلتها على سطح المكتب
+            </span>
+          </div>
           <input
             className="field"
             placeholder="ابحث بالمعنى: مزرعة، ميزانية، وكيل…"
@@ -51,13 +59,14 @@ export default function Files({ win }: { win: NovaWindow }) {
               className={`list-row ${current?.id === f.id ? "sel" : ""}`}
               onClick={() => setSel(f.id)}
             >
-              <span className="faint">{f.mime === "text/markdown" ? "◈" : "▤"}</span>
+              <span className="faint">{isImage(f) ? "▣" : f.mime === "text/markdown" ? "◈" : "▤"}</span>
               <div className="grow" style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {f.path}
                 </div>
                 <div className="faint" style={{ fontSize: 11 }}>
-                  {f.author} · {f.tags.slice(0, 3).join(" · ") || "بلا وسوم"}
+                  {f.author} · {humanSize(f.size ?? f.content.length)} ·{" "}
+                  {f.tags.slice(0, 2).join(" · ") || "بلا وسوم"}
                 </div>
               </div>
             </div>
@@ -74,14 +83,20 @@ export default function Files({ win }: { win: NovaWindow }) {
               <div className="grow" style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 13 }}>{current.path}</div>
                 <div className="faint" style={{ fontSize: 11 }}>
-                  {new Date(current.updatedAt).toLocaleString("ar")} · {current.content.length} حرفًا
+                  {new Date(current.updatedAt).toLocaleString("ar")} ·{" "}
+                  {humanSize(current.size ?? current.content.length)} · {current.mime}
                 </div>
               </div>
-              <button
-                className="btn tiny"
-                onClick={() => run({ op: "win.open", args: { app: "notes", props: { path: current.path } } })}
-              >
-                تحرير
+              {!isImage(current) && (
+                <button
+                  className="btn tiny"
+                  onClick={() => run({ op: "win.open", args: { app: "notes", props: { path: current.path } } })}
+                >
+                  تحرير
+                </button>
+              )}
+              <button className="btn tiny" onClick={() => run({ op: "fs.export", args: { path: current.path } })}>
+                ⤒ تصدير
               </button>
               <button
                 className="btn tiny"
@@ -99,7 +114,18 @@ export default function Files({ win }: { win: NovaWindow }) {
             </div>
             <div className="hr" style={{ margin: 0 }} />
             <div className="scroll grow app-pad" style={{ whiteSpace: "pre-wrap", lineHeight: 1.85 }}>
-              {current.content || <span className="faint">فارغ</span>}
+              {isImage(current) ? (
+                // الصور ملفات حقيقية مستوردة من قرص المستخدم، مخزّنة كـ data URL.
+                // next/image لا يعالج data: URLs (لا شيء لتحسينه: البايتات محلية أصلًا).
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={current.content}
+                  alt={current.path}
+                  style={{ maxWidth: "100%", borderRadius: 10, display: "block" }}
+                />
+              ) : (
+                current.content || <span className="faint">فارغ</span>
+              )}
             </div>
           </>
         )}

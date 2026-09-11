@@ -16,9 +16,17 @@ export type NovaTheme = {
   glass: number;
 };
 
+export type NovaSpace = {
+  id: string;
+  name: string;
+  icon: string;
+};
+
 export type NovaWindow = {
   id: string;
   app: string;
+  /** السطح الذي تعيش عليه النافذة */
+  space: string;
   title: string;
   x: number;
   y: number;
@@ -36,6 +44,8 @@ export type NovaWindow = {
 export type FsNode = {
   id: string;
   path: string;
+  /** حجم المحتوى بالبايت — يهمّ الآن لأن الملفات صارت حقيقية (صور مضمّنة) */
+  size?: number;
   kind: "dir" | "file";
   content: string;
   tags: string[];
@@ -102,12 +112,18 @@ export type ComposedApp = {
   source: "neural" | "reflex";
 };
 
+/** الصلاحيات الممنوحة: معرّف التطبيق → قدراته */
+export type Grants = Record<string, string[]>;
+
 export type NovaState = {
   version: number;
   phase: "boot" | "locked" | "live";
   user: { name: string; handle: string };
   theme: NovaTheme;
   windows: NovaWindow[];
+  spaces: NovaSpace[];
+  /** السطح المعروض الآن */
+  space: string;
   focus: string | null;
   zTop: number;
   fs: FsNode[];
@@ -118,6 +134,8 @@ export type NovaState = {
   automations: Automation[];
   composed: ComposedApp[];
   clipboard: string;
+  /** ما سمح به المستخدم لكل تطبيق مولّد */
+  grants: Grants;
   /** إحصاءات طبقة الذكاء */
   cortex: {
     backend: "neural" | "reflex";
@@ -139,7 +157,13 @@ export type Effect =
   /** فتح شاشة من التطبيق المضيف — الخروج من نوفا إلى منتجها */
   | { kind: "navigate"; route: string }
   /** طلب نبضة المزرعة من الخادم ثم كتابتها تقريرًا */
-  | { kind: "farm-report"; path: string };
+  | { kind: "farm-report"; path: string }
+  /** تطبيق مولّد طلب قدرة لا يملكها — تُعرض على المستخدم */
+  | { kind: "consent"; app: string; cap: string; call: SyscallCall }
+  /** فتح منتقي ملفات النظام — لا يمكن أن يكون نقيًا */
+  | { kind: "pick-files"; dir: string }
+  /** تنزيل ملف إلى قرص المستخدم */
+  | { kind: "download"; path: string; content: string; mime: string };
 
 export type ExecResult = {
   state: NovaState;

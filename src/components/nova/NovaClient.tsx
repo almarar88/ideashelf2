@@ -1,6 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect } from "react";
+import { registerServiceWorker } from "@/lib/nova/install";
 
 /**
  * نوفا نظام يعيش في المتصفح بالكامل: حالته في الذاكرة والتخزين المحلي، لا على الخادم.
@@ -31,5 +33,9 @@ export default function NovaClient({
   model: string;
   identity: Identity;
 }) {
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
+
   return <NovaOS neural={neural} model={model} identity={identity} />;
 }

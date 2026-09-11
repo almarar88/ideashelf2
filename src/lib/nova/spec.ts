@@ -124,9 +124,54 @@ export function interpolate(text: string, state: Record<string, unknown>): strin
 }
 
 /** مواصفة احتياطية تُرسم عند فشل التوليد، حتى لا يرى المستخدم شاشة فارغة */
+/**
+ * اسم التطبيق من وصفه.
+ *
+ * الوصف يأتي عادةً مجرورًا («لمتابعة شرب الماء») لأنه كان مكمّلًا لجملة
+ * «اصنع لي تطبيقًا…»، فتركه كما هو يجعل عنوان النافذة يقرأ ناقصًا.
+ *
+ * لكن التقشير الأعمى للام خطأ: «لوحة» ليست «وحة». العربية لا تُقشَّر
+ * بقاعدة حرفية بلا معجم، ولذلك نقتصر على صيغ مصدرية معروفة تسبقها لام
+ * الجرّ فعلًا. ما ليس في القائمة يُترك كما كتبه المستخدم.
+ */
+const LAM_FORMS = [
+  "متابعة",
+  "إدارة",
+  "ادارة",
+  "حساب",
+  "تسجيل",
+  "مراقبة",
+  "تتبع",
+  "تتبّع",
+  "تنظيم",
+  "جدولة",
+  "قياس",
+  "عرض",
+  "تذكير",
+  "توثيق",
+  "مقارنة",
+  "تخطيط",
+];
+
+export function titleFromPrompt(prompt: string): string {
+  let cleaned = prompt
+    .trim()
+    .replace(/^(?:من\s+أجل|من\s+اجل|يقوم\s+بـ?|خاص\s+بـ?|يخص)\s+/u, "")
+    .replace(/^لـ\s*/u, "")
+    .trim();
+
+  const first = cleaned.split(/\s+/)[0] ?? "";
+  if (first.startsWith("ل") && LAM_FORMS.includes(first.slice(1))) {
+    cleaned = cleaned.slice(1);
+  }
+
+  const words = cleaned.trim().split(/\s+/).slice(0, 4).join(" ");
+  return words.slice(0, 28) || "تطبيق جديد";
+}
+
 export function fallbackSpec(prompt: string): AppSpec {
   return {
-    name: prompt.slice(0, 24) || "تطبيق جديد",
+    name: titleFromPrompt(prompt),
     icon: "✧",
     tagline: "مولّد محليًا بطبقة الانعكاس",
     state: { count: 0, note: "", items: [] },
@@ -160,6 +205,23 @@ export function fallbackSpec(prompt: string): AppSpec {
             { t: "input", key: "note", placeholder: "أضف عنصرًا…" },
             { t: "button", label: "إضافة", tone: "ok", on: { push: { list: "items", from: "note" } } },
             { t: "list", from: "items", empty: "لا عناصر بعد" },
+            { t: "divider" },
+            // زر يطلب قدرة حقيقية (الكتابة في محتواك): أول ضغطة عليه تُظهر
+            // حوار الصلاحيات، لأن هذا التطبيق كود مولّد لا مكوّن نظام.
+            {
+              t: "button",
+              label: "احفظ في ملف",
+              on: {
+                run: {
+                  op: "fs.write",
+                  args: {
+                    path: "/بيتي/من-تطبيق-مولّد.md",
+                    content: "# ناتج تطبيق مولّد\n\nكُتب هذا الملف بصلاحية منحتها أنت صراحةً.",
+                    tags: ["مولّد"],
+                  },
+                },
+              },
+            },
           ],
         },
       ],

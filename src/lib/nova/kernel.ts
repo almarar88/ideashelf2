@@ -1,6 +1,7 @@
 import { APP_MAP, APPS } from "./apps";
-import { basename, nid, normalize, seedFs } from "./fs";
-import { validateCall } from "./syscalls";
+import { basename, mimeOf, nid, normalize, seedFs } from "./fs";
+import { DEFAULT_COMPOSED_CAPS } from "./caps";
+import { SYSCALLS, validateCall, type SyscallOp } from "./syscalls";
 import type {
   Effect,
   ExecResult,
@@ -20,6 +21,12 @@ export function initialState(): NovaState {
     user: { name: "مالك النظام", handle: "@owner" },
     theme: { mode: "night", accent: "#7c5cff", wallpaper: "aurora", motion: true, glass: 0.72 },
     windows: [],
+    spaces: [
+      { id: "sp_1", name: "الرئيسي", icon: "◫" },
+      { id: "sp_2", name: "العمل", icon: "◨" },
+      { id: "sp_3", name: "المراقبة", icon: "◧" },
+    ],
+    space: "sp_1",
     focus: null,
     zTop: 10,
     fs: seedFs(),
@@ -47,6 +54,7 @@ export function initialState(): NovaState {
     ],
     composed: [],
     clipboard: "",
+    grants: {},
     cortex: { backend: "reflex", calls: 0, lastLatency: 0, lastIntent: "" },
     dialog: [],
   };
@@ -59,12 +67,14 @@ function clone(s: NovaState): NovaState {
     user: { ...s.user },
     cortex: { ...s.cortex },
     windows: s.windows.map((w) => ({ ...w, props: { ...w.props } })),
+    spaces: s.spaces.map((sp) => ({ ...sp })),
     fs: s.fs.map((f) => ({ ...f, tags: [...f.tags] })),
     notifications: s.notifications.map((n) => ({ ...n })),
     journal: [...s.journal],
     agents: s.agents.map((a) => ({ ...a, steps: a.steps.map((st) => ({ ...st })) })),
     automations: s.automations.map((a) => ({ ...a, then: [...a.then] })),
     composed: [...s.composed],
+    grants: Object.fromEntries(Object.entries(s.grants).map(([k, v]) => [k, [...v]])),
     dialog: [...s.dialog],
   };
 }
@@ -76,14 +86,23 @@ function push(s: NovaState, n: Omit<import("./types").NovaNotification, "id" | "
   ].slice(0, 40);
 }
 
+/** نوافذ السطح المعروض فقط: كل ما لا يُحدَّد بمعرّف يعمل داخل سياقك الحالي */
+function onSpace(s: NovaState): NovaWindow[] {
+  return s.windows.filter((w) => w.space === s.space);
+}
+
 function target(s: NovaState, id?: string): NovaWindow | undefined {
   if (id) return s.windows.find((w) => w.id === id);
-  if (s.focus) return s.windows.find((w) => w.id === s.focus);
-  return [...s.windows].sort((a, b) => b.z - a.z)[0];
+  const here = onSpace(s);
+  if (s.focus) {
+    const focused = here.find((w) => w.id === s.focus);
+    if (focused) return focused;
+  }
+  return [...here].sort((a, b) => b.z - a.z)[0];
 }
 
 function place(s: NovaState, w: number, h: number) {
-  const n = s.windows.length;
+  const n = onSpace(s).length;
   const x = 90 + ((n * 46) % 340);
   const y = 70 + ((n * 38) % 220);
   return { x, y, w, h };
@@ -114,7 +133,9 @@ export function execute(
    * محسوبًا مرتين عند الإرجاع الزمني: مرة بنفسه ومرة ضمن أبيه — وهو ما كان
    * يُنتج نافذة مكرّرة عند الرجوع.
    */
-  record = true
+  record = true,
+  /** معرّف التطبيق المولّد الذي أصدر النداء — غيابه يعني أن المصدر هو النظام */
+  actor?: string
 ): ExecResult {
   const checked = validateCall(raw);
   if (!checked.ok) {
@@ -130,6 +151,50 @@ export function execute(
   }
 
   const call = checked.call;
+
+  /**
+   * حاجز الصلاحيات.
+   *
+   * actor موجود فقط حين يكون مصدر النداء تطبيقًا مولّدًا — أي كودًا أنشأه
+   * نموذج لغوي من وصف بالكلمات. التطبيقات المثبّتة لا تمرّ من هنا لأنها
+   * *هي* النظام. القاعدة صارمة:
+   *   - منح الصلاحيات نفسه ممنوع على كل تطبيق: لا يمنح أحد نفسه.
+   *   - أي قدرة غير ممنوحة تُرفض وتُعرض على المستخدم، ولا تُنفّذ قبل موافقته.
+   */
+  if (actor) {
+    if (call.op.startsWith("grant.")) {
+      const s0 = clone(prev);
+      if (record) {
+        s0.seq += 1;
+        s0.journal = [
+          ...s0.journal,
+          { seq: s0.seq, at: Date.now(), call, origin, ok: false, note: "التطبيقات لا تمنح نفسها صلاحيات" },
+        ].slice(-400);
+      }
+      return { state: s0, effects: [], ok: false, note: "التطبيقات لا تمنح نفسها صلاحيات" };
+    }
+
+    const needed = SYSCALLS[call.op as SyscallOp].cap;
+    const granted = prev.grants[actor] ?? [];
+    if (!granted.includes(needed)) {
+      const s0 = clone(prev);
+      const why = `«${actor}» يحتاج صلاحية ${needed}`;
+      if (record) {
+        s0.seq += 1;
+        s0.journal = [
+          ...s0.journal,
+          { seq: s0.seq, at: Date.now(), call, origin, ok: false, note: why },
+        ].slice(-400);
+      }
+      return {
+        state: s0,
+        effects: [{ kind: "consent", app: actor, cap: needed, call }],
+        ok: false,
+        note: why,
+      };
+    }
+  }
+
   const args = (call.args ?? {}) as Record<string, never>;
   const s = clone(prev);
   const effects: Effect[] = [];
@@ -145,7 +210,7 @@ export function execute(
         note = `لا يوجد تطبيق باسم ${app}`;
         break;
       }
-      const existing = s.windows.find((w) => w.app === app && !args.props);
+      const existing = s.windows.find((w) => w.app === app && w.space === s.space && !args.props);
       if (existing) {
         existing.minimized = false;
         existing.z = ++s.zTop;
@@ -157,6 +222,7 @@ export function execute(
       const win: NovaWindow = {
         id: nid("w"),
         app,
+        space: s.space,
         title: (args.title as string | undefined) ?? meta.title,
         ...box,
         z: ++s.zTop,
@@ -172,7 +238,9 @@ export function execute(
 
     case "win.close": {
       if (args.all) {
-        s.windows = [];
+        // «أغلق الكل» يعني كل ما على سطحك الحالي، لا أسطح أخرى لا تراها
+        const ids = new Set(onSpace(s).map((w) => w.id));
+        s.windows = s.windows.filter((w) => !ids.has(w.id));
         s.focus = null;
         break;
       }
@@ -202,7 +270,7 @@ export function execute(
 
     case "win.minimize": {
       if (args.all) {
-        s.windows.forEach((w) => (w.minimized = true));
+        onSpace(s).forEach((w) => (w.minimized = true));
         s.focus = null;
         break;
       }
@@ -253,7 +321,7 @@ export function execute(
 
     case "win.arrange": {
       const mode = String(args.mode);
-      const live = s.windows.filter((w) => !w.minimized);
+      const live = onSpace(s).filter((w) => !w.minimized);
       if (live.length === 0) {
         ok = false;
         note = "لا نوافذ للترتيب";
@@ -295,7 +363,7 @@ export function execute(
         live.slice(2).forEach((w) => (w.minimized = true));
       } else {
         const keep = target(s, s.focus ?? undefined) ?? live[0];
-        s.windows.forEach((w) => {
+        onSpace(s).forEach((w) => {
           if (w.id !== keep.id) w.minimized = true;
         });
         keep.minimized = false;
@@ -307,6 +375,58 @@ export function execute(
       break;
     }
 
+    case "space.switch": {
+      const byName = args.name
+        ? s.spaces.find((sp) => sp.name === String(args.name))
+        : undefined;
+      const byIndex =
+        typeof args.index === "number" ? s.spaces[(args.index as number) - 1] : undefined;
+      const next = byName ?? byIndex;
+      if (!next) {
+        ok = false;
+        note = "سطح غير موجود";
+        break;
+      }
+      s.space = next.id;
+      // التركيز يتبع السطح: أعلى نافذة فيه
+      s.focus = [...onSpace(s)].filter((w) => !w.minimized).sort((a, b) => b.z - a.z)[0]?.id ?? null;
+      note = `السطح: ${next.name}`;
+      break;
+    }
+
+    case "space.create": {
+      if (s.spaces.length >= 9) {
+        ok = false;
+        note = "بلغت الحد الأقصى للأسطح";
+        break;
+      }
+      const sp = {
+        id: nid("sp"),
+        name: String(args.name ?? `سطح ${s.spaces.length + 1}`),
+        icon: String(args.icon ?? "◰"),
+      };
+      s.spaces = [...s.spaces, sp];
+      s.space = sp.id;
+      s.focus = null;
+      note = `أُنشئ ${sp.name}`;
+      break;
+    }
+
+    case "space.send": {
+      const w = target(s, args.id as string | undefined);
+      const dest = s.spaces[(args.index as number) - 1];
+      if (!w || !dest) {
+        ok = false;
+        note = !w ? "لا نافذة لنقلها" : "سطح غير موجود";
+        break;
+      }
+      w.space = dest.id;
+      w.minimized = false;
+      if (s.focus === w.id) s.focus = null;
+      note = `نُقلت إلى ${dest.name}`;
+      break;
+    }
+
     case "fs.write": {
       const p = normalize(String(args.path));
       const content = String(args.content ?? "");
@@ -314,6 +434,7 @@ export function execute(
       const found = s.fs.find((f) => f.path === p);
       if (found) {
         found.content = content;
+        found.size = content.length;
         found.updatedAt = Date.now();
         if (tags.length) found.tags = Array.from(new Set([...found.tags, ...tags]));
         found.author = origin === "user" ? "user" : origin;
@@ -325,8 +446,9 @@ export function execute(
             path: p,
             kind: "file",
             content,
+            size: content.length,
             tags,
-            mime: p.endsWith(".md") ? "text/markdown" : "text/plain",
+            mime: mimeOf(p),
             updatedAt: Date.now(),
             author: origin === "user" ? "user" : origin,
           },
@@ -344,6 +466,25 @@ export function execute(
         Object.assign(s, fired.state);
         effects.push(...fired.effects);
       }
+      break;
+    }
+
+    case "fs.import": {
+      effects.push({ kind: "pick-files", dir: normalize(String(args.dir ?? "/بيتي/مستورد")) });
+      note = "انتظار اختيار الملفات";
+      break;
+    }
+
+    case "fs.export": {
+      const p2 = normalize(String(args.path));
+      const f = s.fs.find((x) => x.path === p2);
+      if (!f) {
+        ok = false;
+        note = "المسار غير موجود";
+        break;
+      }
+      effects.push({ kind: "download", path: f.path, content: f.content, mime: f.mime });
+      note = `تصدير ${basename(f.path)}`;
       break;
     }
 
@@ -517,6 +658,8 @@ export function execute(
         source: (args.source as never) ?? "reflex",
       };
       s.composed = [app, ...s.composed.filter((c) => c.id !== app.id)].slice(0, 20);
+      // يُثبَّت بأقل صلاحية تجعله مفيدًا؛ الباقي بموافقتك لحظة الحاجة
+      if (!s.grants[app.id]) s.grants = { ...s.grants, [app.id]: [...DEFAULT_COMPOSED_CAPS] };
       const opened = execute(s, { op: "win.open", args: { app: app.id } }, "kernel", false);
       Object.assign(s, opened.state);
       effects.push(...opened.effects);
@@ -576,12 +719,31 @@ export function execute(
         fresh.automations = s.automations;
         fresh.theme = s.theme;
         fresh.user = s.user;
+        fresh.spaces = s.spaces;
+        fresh.grants = s.grants;
         return { state: fresh, effects: [{ kind: "sound", tone: "boot" }], ok: true, note: "إعادة تشغيل" };
       } else {
         const arranged = execute(s, { op: "win.arrange", args: { mode: "focus" } }, "kernel", false);
         Object.assign(s, arranged.state);
         note = "وضع التركيز";
       }
+      break;
+    }
+
+    case "grant.add": {
+      const app = String(args.app);
+      const cap = String(args.cap);
+      const current = s.grants[app] ?? [];
+      if (!current.includes(cap)) s.grants = { ...s.grants, [app]: [...current, cap] };
+      note = `مُنحت ${cap} لـ ${app}`;
+      break;
+    }
+
+    case "grant.revoke": {
+      const app = String(args.app);
+      const cap = String(args.cap);
+      s.grants = { ...s.grants, [app]: (s.grants[app] ?? []).filter((c) => c !== cap) };
+      note = `سُحبت ${cap} من ${app}`;
       break;
     }
 
@@ -609,13 +771,14 @@ export function executePlan(
   state: NovaState,
   calls: SyscallCall[],
   origin: JournalEntry["origin"],
-  record = true
+  record = true,
+  actor?: string
 ): { state: NovaState; effects: Effect[]; notes: string[] } {
   let cur = state;
   const effects: Effect[] = [];
   const notes: string[] = [];
   for (const c of calls) {
-    const r = execute(cur, c, origin, record);
+    const r = execute(cur, c, origin, record, actor);
     cur = r.state;
     effects.push(...r.effects);
     if (r.note) notes.push(r.note);

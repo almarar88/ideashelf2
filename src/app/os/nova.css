@@ -527,6 +527,36 @@
 .intent-input::placeholder {
   color: var(--ink-faint);
 }
+.mic {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgb(var(--line) / 0.16);
+  background: rgb(var(--panel) / 0.08);
+  cursor: pointer;
+  color: var(--ink-dim);
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+.mic:hover {
+  color: var(--ink);
+  border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+}
+.mic.live {
+  background: color-mix(in oklab, var(--danger) 26%, transparent);
+  border-color: var(--danger);
+  color: #fff;
+  animation: mic-pulse 1.3s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in oklab, var(--danger) 18%, transparent);
+  }
+}
+
 .sugg {
   display: flex;
   gap: 7px;
@@ -691,6 +721,56 @@
   box-shadow: 0 0 8px var(--warn);
 }
 
+/* ── إفلات الملفات ────────────────────────────────────────── */
+.drop-veil {
+  position: absolute;
+  inset: 8px;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  border: 2px dashed color-mix(in oklab, var(--accent) 60%, transparent);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+  animation: fade 0.12s ease both;
+  pointer-events: none;
+}
+.drop-card {
+  text-align: center;
+  padding: 20px 28px;
+  border-radius: 16px;
+  display: grid;
+  gap: 6px;
+}
+
+/* ── الحوارات المشروطة ────────────────────────────────────── */
+.modal-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 78;
+  display: grid;
+  place-items: center;
+  background: rgba(4, 4, 10, 0.5);
+  backdrop-filter: blur(6px);
+  animation: fade 0.14s ease both;
+  padding: 16px;
+}
+.modal {
+  width: min(460px, 100%);
+  border-radius: 18px;
+  padding: 16px;
+  background: color-mix(in oklab, var(--bg1) 97%, transparent);
+  animation: modal-in 0.18s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+.nova[data-mode="dawn"] .modal {
+  background: #fdfdff;
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+
 /* ── قائمة السياق ─────────────────────────────────────────── */
 .ctx {
   position: absolute;
@@ -762,6 +842,50 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ── الأسطح ───────────────────────────────────────────────── */
+.spaces {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgb(var(--panel) / 0.08);
+}
+.space-pill {
+  position: relative;
+  width: 26px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink-dim);
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.space-pill:hover {
+  background: rgb(var(--panel) / 0.16);
+  color: var(--ink);
+}
+.space-pill.on {
+  background: color-mix(in oklab, var(--accent) 30%, transparent);
+  color: var(--ink);
+}
+.space-pill.add {
+  color: var(--ink-faint);
+}
+.space-dot {
+  position: absolute;
+  bottom: 1px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
 }
 
 /* ── مركز الإشعارات ──────────────────────────────────────── */

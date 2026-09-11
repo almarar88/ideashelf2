@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import AppHost from "./AppHost";
+import Consent from "./Consent";
 import ContextMenu from "./ContextMenu";
 import Switcher from "./Switcher";
 import { KernelProvider, useNova } from "./kernel-context";
@@ -33,7 +34,7 @@ export default function NovaOS({
 }
 
 function Desktop() {
-  const { state, run, deskRef, neural } = useNova();
+  const { state, run, deskRef, neural, importFiles, fileInputRef, pickDirRef } = useNova();
   const [intent, setIntent] = useState(false);
   const [bell, setBell] = useState(false);
   const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null);
@@ -41,6 +42,7 @@ function Desktop() {
   // مؤشر المبدّل يعيش في مرجع لا في مُحدِّث حالة: تنفيذ نداء نظام داخل
   // مُحدِّث setState يعني تعديل مكوّن أثناء تصيير آخر — وهو خطأ فعلي في React.
   const switchIdx = useRef<number | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   // ── اختصارات النظام
   useEffect(() => {
@@ -81,6 +83,13 @@ function Desktop() {
         e.preventDefault();
         run({ op: "power", args: { action: "lock" } });
       }
+      // Ctrl+رقم ينتقل بين الأسطح، ومع Shift ينقل النافذة النشطة إليها
+      if (/^[1-9]$/.test(e.key)) {
+        e.preventDefault();
+        const index = Number(e.key);
+        run(e.shiftKey ? { op: "space.send", args: { index } } : { op: "space.switch", args: { index } });
+        return;
+      }
       if (e.key.toLowerCase() === "w" && !inField) {
         e.preventDefault();
         run({ op: "win.close", args: {} });
@@ -106,7 +115,7 @@ function Desktop() {
     };
   }, [run, state.windows]);
 
-  const ordered = [...state.windows].sort((a, b) => a.z - b.z);
+  const ordered = state.windows.filter((w) => w.space === state.space).sort((a, b) => a.z - b.z);
 
   return (
     <div
@@ -138,6 +147,19 @@ function Desktop() {
               setBell(false);
               setCtx(null);
             }}
+            onDragOver={(e) => {
+              // السحب والإفلات: أبسط طريق يعرفه المستخدم لإدخال ملف إلى نظام
+              e.preventDefault();
+              if (!dragging) setDragging(true);
+            }}
+            onDragLeave={(e) => {
+              if (e.currentTarget === e.target) setDragging(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              if (e.dataTransfer?.files?.length) void importFiles(e.dataTransfer.files);
+            }}
             onContextMenu={(e) => {
               e.preventDefault();
               setIntent(false);
@@ -160,6 +182,18 @@ function Desktop() {
               </div>
             )}
 
+            {dragging && (
+              <div className="drop-veil">
+                <div className="drop-card glass">
+                  <div style={{ fontSize: 30 }}>⤓</div>
+                  <div style={{ fontWeight: 600 }}>أفلت الملفات لاستيرادها</div>
+                  <div className="faint" style={{ fontSize: 12 }}>
+                    نصوص وصور حتى 3 م.ب للملف · تُحفظ في /بيتي/مستورد
+                  </div>
+                </div>
+              </div>
+            )}
+
             {ordered.map((w) => (
               <WindowFrame key={w.id} win={w}>
                 <AppHost win={w} />
@@ -167,12 +201,26 @@ function Desktop() {
             ))}
           </div>
 
+          <Consent />
           {ctx && <ContextMenu x={ctx.x} y={ctx.y} onClose={() => setCtx(null)} />}
           {switching !== null && <Switcher index={switching} />}
           {intent && <IntentBar onClose={() => setIntent(false)} />}
           {bell && <NotifCenter onClose={() => setBell(false)} />}
           <Toasts />
           <Dock onIntent={() => setIntent((v) => !v)} />
+
+          {/* منتقي ملفات النظام: يفتحه نداء fs.import ولا يُرى إلا لحظة الاختيار */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            hidden
+            onChange={(e) => {
+              const files = e.target.files;
+              if (files?.length) void importFiles(files, pickDirRef.current ?? undefined);
+              e.target.value = "";
+            }}
+          />
         </>
       )}
     </div>

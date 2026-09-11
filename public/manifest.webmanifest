@@ -1,0 +1,34 @@
+{
+  "name": "NOVA OS — نظام تشغيل بالنيّة",
+  "short_name": "NOVA",
+  "description": "نظام تشغيل تُقاد كل حالته بالنيّة: نداءات نظام مُسجّلة، صلاحيات صريحة، وإرجاع زمني حقيقي.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/os",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
+  "background_color": "#07070d",
+  "theme_color": "#07070d",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/nova-icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/nova-icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "شريط النيّة", "url": "/os" },
+    { "name": "نبضة المزرعة", "url": "/os?app=pulse" },
+    { "name": "الصلاحيات", "url": "/os?app=guard" }
+  ]
+}

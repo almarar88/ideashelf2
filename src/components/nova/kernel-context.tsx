@@ -12,13 +12,13 @@ import {
 import { APP_MAP } from "@/lib/nova/apps";
 import { searchFs } from "@/lib/nova/fs";
 import { fetchPulse, pulseToMarkdown } from "@/lib/nova/pulse-client";
+import { IMPORT_LIMITS, clearSession, dataUrlToBlob, loadSession, readFile, saveSession } from "@/lib/nova/store";
 import { execute, executePlan, fireAutomations, initialState, replay } from "@/lib/nova/kernel";
 import { fold, reflexPlan } from "@/lib/nova/reflex";
 import { fallbackSpec, parseSpec } from "@/lib/nova/spec";
 import { sanitizePlan } from "@/lib/nova/syscalls";
 import type { Effect, JournalEntry, NovaState, Plan, SyscallCall } from "@/lib/nova/types";
 
-const STORE_KEY = "nova.os.v1";
 
 type NovaApi = {
   state: NovaState;
@@ -28,7 +28,13 @@ type NovaApi = {
   lastPlan: Plan | null;
   desk: { w: number; h: number };
   deskRef: React.RefObject<HTMLDivElement | null>;
-  run: (call: SyscallCall, origin?: JournalEntry["origin"]) => void;
+  run: (call: SyscallCall, origin?: JournalEntry["origin"], actor?: string) => void;
+  /** طلب صلاحية معلّق ينتظر قرار المستخدم */
+  consent: { app: string; cap: string; call: SyscallCall } | null;
+  importFiles: (files: FileList | File[], dir?: string) => Promise<void>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  pickDirRef: React.RefObject<string>;
+  decideConsent: (approve: boolean) => void;
   fireEvent: (when: string, ctx?: Record<string, string>) => void;
   runMany: (calls: SyscallCall[], origin?: JournalEntry["origin"]) => void;
   submit: (intent: string) => Promise<Plan | null>;
@@ -54,6 +60,7 @@ function persistable(s: NovaState) {
     fs: s.fs,
     automations: s.automations,
     composed: s.composed,
+    grants: s.grants,
     windows: s.windows,
     focus: s.focus,
     zTop: s.zTop,
@@ -77,27 +84,31 @@ function hydrate(neural: boolean, identity: Identity): NovaState {
   // الهوية تأتي من جلسة التطبيق لا من التخزين المحلي: من يجلس أمام النظام
   // حقيقةٌ يملكها الخادم، ولا يجوز أن يزيّفها تخزين المتصفح.
   fresh.user = { name: identity.name, handle: `${identity.handle} · ${ROLE_AR[identity.role] ?? identity.role}` };
-  try {
-    const raw = window.localStorage.getItem(STORE_KEY);
-    if (!raw) return fresh;
-    const saved = JSON.parse(raw) as Partial<NovaState>;
-    if (saved.version !== fresh.version) return fresh;
-    return {
-      ...fresh,
-      ...saved,
-      user: fresh.user,
-      // السجل والوكلاء والإشعارات لا تُستعاد: الإرجاع الزمني محلي للجلسة بقصد
-      journal: [],
-      seq: 0,
-      agents: [],
-      notifications: [],
-      phase: "boot",
-      cortex: fresh.cortex,
-    } as NovaState;
-  } catch {
-    // بيانات تالفة أو تخزين محجوب: نُقلع نظيفين بدل أن نفشل
-    return fresh;
-  }
+  return fresh;
+}
+
+/** يدمج جلسة محفوظة على حالة نظيفة، مع إسقاط ما لا يجوز استعادته */
+function merge(fresh: NovaState, saved: Partial<NovaState>): NovaState {
+  if (saved.version !== fresh.version) return fresh;
+  return {
+    ...fresh,
+    ...saved,
+    user: fresh.user,
+    // السجل والوكلاء والإشعارات لا تُستعاد: الإرجاع الزمني محلي للجلسة بقصد
+    journal: [],
+    seq: 0,
+    agents: [],
+    notifications: [],
+    phase: "live",
+    cortex: fresh.cortex,
+    // أسطح قديمة قد لا تحتوي السطح المحفوظ: نضمن سطحًا صالحًا دائمًا
+    spaces: saved.spaces?.length ? saved.spaces : fresh.spaces,
+    space:
+      saved.space && (saved.spaces ?? fresh.spaces).some((sp) => sp.id === saved.space)
+        ? saved.space
+        : (saved.spaces ?? fresh.spaces)[0].id,
+    grants: saved.grants ?? {},
+  } as NovaState;
 }
 
 export function KernelProvider({
@@ -115,12 +126,17 @@ export function KernelProvider({
   const [busy, setBusy] = useState(false);
   const [lastPlan, setLastPlan] = useState<Plan | null>(null);
   const [desk, setDesk] = useState({ w: 1440, h: 820 });
+  // طلب الصلاحية شأن واجهة عابر لا حالة نظام: لا يُسجّل ولا يُرجَع بالزمن.
+  const [consent, setConsent] = useState<{ app: string; cap: string; call: SyscallCall } | null>(null);
 
   const ref = useRef<NovaState>(state);
   const baseline = useRef<NovaState | null>(null);
   const deskRef = useRef<HTMLDivElement | null>(null);
   const timers = useRef<number[]>([]);
   const firedSlots = useRef<Set<string>>(new Set());
+  const warnedStorage = useRef(false);
+  const fileInput = useRef<HTMLInputElement | null>(null);
+  const pickDir = useRef<string>("/بيتي/مستورد");
 
   const commit = useCallback((next: NovaState) => {
     ref.current = next;
@@ -141,6 +157,39 @@ export function KernelProvider({
             consumeRef.current(r.effects);
           }, 700 + Math.random() * 900);
           timers.current.push(id);
+        }
+
+        if (fx.kind === "consent") {
+          setConsent({ app: fx.app, cap: fx.cap, call: fx.call });
+        }
+
+        if (fx.kind === "pick-files") {
+          pickDir.current = fx.dir;
+          fileInput.current?.click();
+        }
+
+        if (fx.kind === "download") {
+          // التنزيل من الذاكرة: لا خادم في المسار، والملف يخرج كما هو محفوظ
+          try {
+            const blob = fx.content.startsWith("data:")
+              ? dataUrlToBlob(fx.content)
+              : new Blob([fx.content], { type: `${fx.mime};charset=utf-8` });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = fx.path.split("/").pop() || "nova-file";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+          } catch {
+            const r = execute(
+              ref.current,
+              { op: "notify", args: { title: "تعذّر التصدير", level: "error" } },
+              "kernel"
+            );
+            commit(r.state);
+          }
         }
 
         if (fx.kind === "navigate") {
@@ -309,14 +358,14 @@ export function KernelProvider({
    * فلا يوجد نداء «يُفهَم في مكان ولا يُفهَم في آخر».
    */
   const dispatch = useCallback(
-    (calls: SyscallCall[], origin: JournalEntry["origin"] = "user") => {
+    (calls: SyscallCall[], origin: JournalEntry["origin"] = "user", actor?: string) => {
       let cur = ref.current;
       const effects: Effect[] = [];
       let batch: SyscallCall[] = [];
 
       const flush = () => {
         if (batch.length === 0) return;
-        const r = executePlan(cur, batch, origin);
+        const r = executePlan(cur, batch, origin, true, actor);
         cur = r.state;
         effects.push(...r.effects);
         batch = [];
@@ -359,8 +408,8 @@ export function KernelProvider({
   );
 
   const run = useCallback(
-    (call: SyscallCall, origin: JournalEntry["origin"] = "user") => {
-      dispatch([call], origin);
+    (call: SyscallCall, origin: JournalEntry["origin"] = "user", actor?: string) => {
+      dispatch([call], origin, actor);
     },
     [dispatch]
   );
@@ -463,6 +512,78 @@ export function KernelProvider({
     [run]
   );
 
+  const decideConsent = useCallback(
+    (approve: boolean) => {
+      const req = consent;
+      setConsent(null);
+      if (!req) return;
+      if (!approve) {
+        dispatch(
+          [
+            {
+              op: "notify",
+              args: { title: "رُفض الطلب", body: `لم تُمنح «${req.app}» صلاحية ${req.cap}`, level: "warn" },
+            },
+          ],
+          "user"
+        );
+        return;
+      }
+      // المنح نداء نظام من المستخدم (بلا actor)، ثم يُعاد النداء الأصلي بصفة التطبيق
+      dispatch([{ op: "grant.add", args: { app: req.app, cap: req.cap } }], "user");
+      dispatch([req.call], "neural", req.app);
+    },
+    [consent, dispatch]
+  );
+
+  /**
+   * استيراد ملفات حقيقية.
+   * يخدم مسارين: منتقي النظام، والسحب والإفلات على سطح المكتب — وكلاهما
+   * ينتهي إلى نداءات fs.write، فيُسجَّل الاستيراد ويمكن الرجوع عنه.
+   */
+  const importFiles = useCallback(
+    async (files: FileList | File[], dir = "/بيتي/مستورد") => {
+      const list = Array.from(files).slice(0, IMPORT_LIMITS.maxFiles);
+      const calls: SyscallCall[] = [];
+      let skipped = 0;
+
+      for (const file of list) {
+        const read = await readFile(file);
+        if (!read) {
+          skipped += 1;
+          continue;
+        }
+        const safe = file.name.replace(/[\\:*?"<>|]/g, "").slice(0, 80) || "ملف";
+        calls.push({
+          op: "fs.write",
+          args: {
+            path: `${dir}/${safe}`,
+            content: read.content,
+            tags: ["مستورد", read.kind === "image" ? "صورة" : "نص"],
+          },
+        });
+      }
+
+      if (calls.length) dispatch(calls, "user");
+      dispatch(
+        [
+          {
+            op: "notify",
+            args: {
+              title: calls.length ? `استُورد ${calls.length} ملفًا` : "لم يُستورد شيء",
+              body: skipped
+                ? `تُجوهل ${skipped} ملفًا (نوع غير مدعوم أو أكبر من 3 م.ب)`
+                : `إلى ${dir}`,
+              level: calls.length ? "ok" : "warn",
+            },
+          },
+        ],
+        "kernel"
+      );
+    },
+    [dispatch]
+  );
+
   const rewind = useCallback(
     (seq: number) => {
       dispatch([{ op: "journal.rewind", args: { seq } }], "user");
@@ -471,34 +592,38 @@ export function KernelProvider({
   );
 
   const reset = useCallback(() => {
-    try {
-      window.localStorage.removeItem(STORE_KEY);
-    } catch {
-      /* التخزين محجوب — لا يهم */
-    }
+    void clearSession();
     const fresh = initialState();
     fresh.phase = "live";
     baseline.current = { ...fresh, journal: [], seq: 0 };
     commit(fresh);
   }, [commit]);
 
-  // ── الإقلاع: تثبيت نقطة الأساس، ثم الانتقال إلى الحياة وتشغيل قواعد الإقلاع
+  // ── الإقلاع: قراءة الجلسة (غير متزامنة)، تثبيت نقطة الأساس، ثم قواعد الإقلاع
   useEffect(() => {
     consumeRef.current = consume;
     askRef.current = ask;
-    if (!baseline.current) {
-      baseline.current = { ...ref.current, phase: "live", journal: [], seq: 0 };
-    }
+    let alive = true;
 
-    const t = window.setTimeout(() => {
-      const live = { ...ref.current, phase: "live" as const };
-      const fired = fireAutomations(live, "boot", {}, (c) => c);
+    // نضمن زمنًا أدنى للإقلاع: قراءة الجلسة قد تكون فورية، وشاشة الإقلاع
+    // تعرض حالة النواة سطرًا سطرًا — قطعها في 40ms يُفقد المعنى لا يُسرّعه.
+    const minimum = new Promise<void>((resolve) => {
+      const t = window.setTimeout(resolve, 2200);
+      timers.current.push(t);
+    });
+
+    Promise.all([loadSession<Partial<NovaState>>(), minimum]).then(([saved]) => {
+      if (!alive) return;
+      const merged = saved ? merge(ref.current, saved) : { ...ref.current, phase: "live" as const };
+      baseline.current = { ...merged, phase: "live", journal: [], seq: 0 };
+      commit(merged);
+      const fired = fireAutomations(merged, "boot", {}, (c) => c);
       commit(fired.state);
       consumeRef.current(fired.effects);
-    }, 2600);
-    timers.current.push(t);
+    });
 
     return () => {
+      alive = false;
       timers.current.forEach((id) => window.clearTimeout(id));
       timers.current = [];
     };
@@ -523,18 +648,32 @@ export function KernelProvider({
     return () => window.clearInterval(id);
   }, [fireEvent, state.phase]);
 
-  // ── الحفظ التلقائي
+  // ── الحفظ التلقائي (IndexedDB مع احتياط localStorage)
   useEffect(() => {
-    if (state.phase === "boot") return;
+    if (state.phase === "boot") return undefined;
     const id = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(STORE_KEY, JSON.stringify(persistable(state)));
-      } catch {
-        /* ممتلئ أو محجوب */
-      }
-    }, 400);
+      void saveSession(persistable(state)).then((where) => {
+        if (where === "none" && !warnedStorage.current) {
+          warnedStorage.current = true;
+          // الصدق أولى من الصمت: المستخدم يجب أن يعرف أن جلسته لن تدوم
+          const r = execute(
+            ref.current,
+            {
+              op: "notify",
+              args: {
+                title: "تعذّر حفظ الجلسة",
+                body: "التخزين ممتلئ أو محجوب في هذا المتصفح. النظام يعمل، لكن ما تفعله لن يدوم بعد الإغلاق.",
+                level: "warn",
+              },
+            },
+            "kernel"
+          );
+          commit(r.state);
+        }
+      });
+    }, 500);
     return () => window.clearTimeout(id);
-  }, [state]);
+  }, [commit, state]);
 
   // ── قياس سطح المكتب الحقيقي
   useEffect(() => {
@@ -557,6 +696,11 @@ export function KernelProvider({
       desk,
       deskRef,
       run,
+      consent,
+      decideConsent,
+      importFiles,
+      fileInputRef: fileInput,
+      pickDirRef: pickDir,
       fireEvent,
       runMany,
       submit,
@@ -565,7 +709,25 @@ export function KernelProvider({
       rewind,
       reset,
     }),
-    [state, neural, model, busy, lastPlan, desk, run, fireEvent, runMany, submit, ask, compose, rewind, reset]
+    [
+      state,
+      neural,
+      model,
+      busy,
+      lastPlan,
+      desk,
+      run,
+      consent,
+      decideConsent,
+      importFiles,
+      fireEvent,
+      runMany,
+      submit,
+      ask,
+      compose,
+      rewind,
+      reset,
+    ]
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

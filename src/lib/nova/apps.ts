@@ -92,6 +92,15 @@ export const APPS: AppDef[] = [
     keywords: ["قواعد", "اتمتة", "أتمتة", "rules", "automation"],
   },
   {
+    key: "guard",
+    name: "الصلاحيات",
+    icon: "⛨",
+    hint: "من يملك ماذا في نظامك",
+    w: 640,
+    h: 520,
+    keywords: ["صلاحيات", "الصلاحيات", "امان", "أمان", "حمايه", "حماية", "permissions", "security", "guard"],
+  },
+  {
     key: "settings",
     name: "الهوية",
     icon: "⚙",

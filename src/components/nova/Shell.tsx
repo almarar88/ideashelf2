@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { APPS } from "@/lib/nova/apps";
+import { CAPS } from "@/lib/nova/caps";
+import {
+  getInstallSnapshot,
+  isStandalone,
+  promptInstall,
+  subscribeDisplayMode,
+  subscribeInstall,
+} from "@/lib/nova/install";
 import { SYSCALLS } from "@/lib/nova/syscalls";
+import { listen, voiceSupported, type VoiceSession } from "@/lib/nova/voice";
 import { iconOf, nameOf, useNova } from "./kernel-context";
 
 /* ══════════════════════════════════════════════════════════
@@ -20,12 +29,21 @@ const SUGGESTIONS = [
 ];
 
 export function IntentBar({ onClose }: { onClose: () => void }) {
-  const { submit, busy, lastPlan, neural, model } = useNova();
+  const { submit, busy, lastPlan, neural, model, run } = useNova();
   const [text, setText] = useState("");
+  const [hearing, setHearing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const session = useRef<VoiceSession | null>(null);
+  // الدعم قدرة يملكها المتصفح: تُقرأ عبر متجر خارجي لا بضبط حالة في أثر
+  const canHear = useSyncExternalStore(
+    () => () => {},
+    voiceSupported,
+    () => false
+  );
 
   useEffect(() => {
     inputRef.current?.focus();
+    return () => session.current?.stop();
   }, []);
 
   const send = async (value: string) => {
@@ -35,6 +53,32 @@ export function IntentBar({ onClose }: { onClose: () => void }) {
     const plan = await submit(v);
     // النوايا المعرفية تُبقي الشريط ليقرأ المستخدم الجواب؛ الأوامر تُغلقه
     if (plan && plan.calls.length > 0) onClose();
+  };
+
+  const toggleVoice = () => {
+    if (hearing) {
+      session.current?.stop();
+      session.current = null;
+      setHearing(false);
+      return;
+    }
+    setHearing(true);
+    session.current = listen({
+      onPartial: (partial) => setText(partial),
+      onFinal: (final) => {
+        setHearing(false);
+        session.current = null;
+        setText(final);
+        // ما يُقال يُنفّذ فورًا: الكلام هنا ليس إدخالًا بل أمرًا
+        void send(final);
+      },
+      onError: (reason) => {
+        setHearing(false);
+        session.current = null;
+        run({ op: "notify", args: { title: "الاستماع", body: reason, level: "warn" } });
+      },
+      onEnd: () => setHearing(false),
+    });
   };
 
   return (
@@ -54,8 +98,26 @@ export function IntentBar({ onClose }: { onClose: () => void }) {
             if (e.key === "Escape") onClose();
           }}
         />
+        {canHear && (
+          <button
+            className={`mic ${hearing ? "live" : ""}`}
+            onClick={toggleVoice}
+            title={hearing ? "أستمع… اضغط للإيقاف" : "تحدّث بنيّتك"}
+          >
+            ◉
+          </button>
+        )}
         <span className={`chip ${neural ? "on" : "warn"}`}>{neural ? "العصب" : "الانعكاس"}</span>
       </div>
+
+      {hearing && (
+        <div className="thinking">
+          <i />
+          <i />
+          <i />
+          <span>أستمع بالعربية…</span>
+        </div>
+      )}
 
       {busy && (
         <div className="thinking">
@@ -96,6 +158,42 @@ export function IntentBar({ onClose }: { onClose: () => void }) {
    الشريط العلوي
    ══════════════════════════════════════════════════════════ */
 
+/** زر تثبيت النظام — يظهر فقط حين يقبل المتصفح التثبيت فعلًا */
+function InstallPill() {
+  const { run } = useNova();
+  // حالتان يملكهما المتصفح لا React: قابلية التثبيت، ووضع العرض الحالي
+  const available = useSyncExternalStore(subscribeInstall, getInstallSnapshot, () => false);
+  const installed = useSyncExternalStore(subscribeDisplayMode, isStandalone, () => false);
+
+  if (installed) {
+    return (
+      <span className="pill" title="نوفا تعمل الآن كتطبيق مستقل لا كصفحة">
+        <i className="led" /> مثبّت
+      </span>
+    );
+  }
+  if (!available) return null;
+
+  return (
+    <span
+      className="pill"
+      onClick={() => {
+        void promptInstall().then((outcome) => {
+          if (outcome === "accepted") {
+            run({
+              op: "notify",
+              args: { title: "ثُبّتت نوفا", body: "شغّلها من قائمة تطبيقات جهازك", level: "ok" },
+            });
+          }
+        });
+      }}
+      title="ثبّت نوفا كتطبيق مستقل يعمل بلا متصفح"
+    >
+      ⤓ ثبّت النظام
+    </span>
+  );
+}
+
 export function TopBar({
   onIntent,
   onBell,
@@ -122,6 +220,29 @@ export function TopBar({
   return (
     <div className="topbar glass">
       <b className="accent">NOVA</b>
+      <span className="spaces">
+        {state.spaces.map((sp, i) => {
+          const count = state.windows.filter((w) => w.space === sp.id).length;
+          return (
+            <button
+              key={sp.id}
+              className={`space-pill ${state.space === sp.id ? "on" : ""}`}
+              title={`${sp.name} · ${count} نافذة · Ctrl+${i + 1}`}
+              onClick={() => run({ op: "space.switch", args: { index: i + 1 } })}
+            >
+              {sp.icon}
+              {count > 0 && <i className="space-dot" />}
+            </button>
+          );
+        })}
+        <button
+          className="space-pill add"
+          title="سطح جديد"
+          onClick={() => run({ op: "space.create", args: {} })}
+        >
+          +
+        </button>
+      </span>
       <span className="pill" onClick={onIntent} title="Ctrl + K">
         <span className="faint">⌘</span> نيّة جديدة
       </span>
@@ -129,13 +250,15 @@ export function TopBar({
         <i className={`led ${neural ? "" : "reflex"}`} />
         {neural ? "عصب" : "انعكاس"}
       </span>
+      <InstallPill />
       {running > 0 && (
         <span className="pill" onClick={() => run({ op: "win.open", args: { app: "monitor" } })}>
           ◎ {running} وكيل
         </span>
       )}
       <div className="grow" />
-      <span className="faint mono">{state.seq} نداء</span>
+      <span className="faint">{state.spaces.find((sp) => sp.id === state.space)?.name}</span>
+      <span className="faint mono ltr">{state.seq} نداء</span>
       <span className="pill" onClick={onBell}>
         ◔ {unread > 0 ? unread : ""}
       </span>
@@ -156,9 +279,10 @@ export function Dock({ onIntent }: { onIntent: () => void }) {
 
   const openMap = useMemo(() => {
     const m = new Map<string, string>();
-    state.windows.forEach((w) => m.set(w.app, w.id));
+    // مؤشّر «يعمل» يخصّ السطح المعروض: النافذة على سطح آخر ليست هنا
+    state.windows.filter((w) => w.space === state.space).forEach((w) => m.set(w.app, w.id));
     return m;
-  }, [state.windows]);
+  }, [state.space, state.windows]);
 
   const toggle = (app: string) => {
     const id = openMap.get(app);
@@ -288,14 +412,15 @@ export function NotifCenter({ onClose }: { onClose: () => void }) {
    ══════════════════════════════════════════════════════════ */
 
 const BOOT_LINES: [string, string][] = [
-  ["nova kernel 1.0 · syscall-driven", "جاهزة"],
-  // العدد يُقرأ من الجدول نفسه: لا رقم مكتوب باليد يتخلّف عن الكود
+  ["nova kernel 1.1 · syscall-driven", "جاهزة"],
+  // الأعداد تُقرأ من الجداول نفسها: لا رقم مكتوب باليد يتخلّف عن الكود
   ["جدول نداءات النظام", `${Object.keys(SYSCALLS).length} نداء`],
+  ["حاجز الصلاحيات", `${Object.keys(CAPS).length} قدرة`],
+  ["أسطح العمل", "3 أسطح"],
   ["نظام الملفات الدلالي", "مُثبّت"],
   ["مفسّر الواجهات المعلنة", "آمن"],
   ["طبقة الانعكاس المحلية", "تعمل"],
   ["طبقة العصب", "فحص…"],
-  ["القواعد الذكية", "نشطة"],
 ];
 
 export function BootScreen({ neural }: { neural: boolean }) {

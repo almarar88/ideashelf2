@@ -1,11 +1,13 @@
 /**
  * فحوص ثوابت النواة.
  *
- * هذه ليست تغطية تجميلية: النظام كله يقوم على ثلاث دعاوى، وكل واحدة منها
+ * هذه ليست تغطية تجميلية: النظام كله يقوم على أربع دعاوى، وكل واحدة منها
  * تُفحَص هنا لأن انكسارها بصمت يهدم ميزة كاملة:
- *   1) النواة دالة نقية → الإرجاع الزمني صحيح.
+ *   1) النواة دالة نقية → الإرجاع الزمني صحيح، وإعادة التشغيل متماثلة القوى.
  *   2) حاجز التحقق يرفض ما لا يطابق المخطط → الذكاء لا يملك أكثر من المستخدم.
  *   3) مواصفات الواجهات المولّدة تُفحَص قبل الرسم → لا يُشغّل كود مولّد.
+ *   4) حاجز الصلاحيات يرفض قدرةً لم تُمنح → التطبيق المولّد لا يلمس شيئًا
+ *      بلا موافقة صريحة، ولا يمنح نفسه.
  *
  * التشغيل: npm test
  */
@@ -16,8 +18,9 @@ import { execute, executePlan, initialState, replay } from "./kernel";
 import { reflexPlan } from "./reflex";
 import { fold, foldWithMap, related, stem } from "./text";
 import { searchFs, seedFs } from "./fs";
-import { appSpecSchema, parseSpec } from "./spec";
-import { sanitizePlan, syscallManual, validateCall } from "./syscalls";
+import { appSpecSchema, parseSpec, titleFromPrompt } from "./spec";
+import { SYSCALLS, capOf, sanitizePlan, syscallManual, validateCall } from "./syscalls";
+import { CAPS, DEFAULT_COMPOSED_CAPS } from "./caps";
 import type { NovaState } from "./types";
 
 function live(): NovaState {
@@ -255,4 +258,72 @@ test("النداء المتفرّع لا يترك قيدًا في السجل", (
   assert.equal(r.state.journal.length, 1, "قيد واحد فقط: النداء الأصلي");
   assert.equal(r.state.journal[0].call.op, "fs.search", "القيد يجب أن يحمل نيّة المستخدم لا الفرع");
   assert.equal(r.state.windows.length, 1);
+});
+
+test("التطبيق المولّد لا ينفّذ قدرة لم تُمنح له", () => {
+  let s = live();
+  s = execute(s, {
+    op: "app.install",
+    args: { id: "app_x", name: "تجربة", icon: "✧", prompt: "س", spec: {}, source: "reflex" },
+  }).state;
+
+  assert.deepEqual(s.grants["app_x"], DEFAULT_COMPOSED_CAPS, "يُثبَّت بأدنى صلاحية");
+
+  // محاولة الكتابة في ملفات المستخدم بصفة التطبيق
+  const denied = execute(s, { op: "fs.write", args: { path: "/سرقة.md", content: "x" } }, "neural", true, "app_x");
+  assert.equal(denied.ok, false);
+  assert.equal(denied.state.fs.some((f) => f.path === "/سرقة.md"), false, "لا شيء يُنفّذ قبل الموافقة");
+  assert.ok(denied.effects.some((e) => e.kind === "consent"), "يجب أن يُعرض الطلب على المستخدم");
+  assert.equal(denied.state.journal.at(-1)?.ok, false, "الرفض يُسجّل");
+
+  // بعد المنح
+  const granted = execute(denied.state, { op: "grant.add", args: { app: "app_x", cap: "files" } }, "user").state;
+  const allowed = execute(granted, { op: "fs.write", args: { path: "/سرقة.md", content: "x" } }, "neural", true, "app_x");
+  assert.equal(allowed.ok, true);
+  assert.ok(allowed.state.fs.some((f) => f.path === "/سرقة.md"));
+});
+
+test("لا تطبيق يمنح نفسه صلاحية", () => {
+  let s = live();
+  s = execute(s, {
+    op: "app.install",
+    args: { id: "app_y", name: "طامع", icon: "✧", prompt: "س", spec: {}, source: "neural" },
+  }).state;
+
+  const attempt = execute(s, { op: "grant.add", args: { app: "app_y", cap: "files" } }, "neural", true, "app_y");
+  assert.equal(attempt.ok, false);
+  assert.equal((attempt.state.grants["app_y"] ?? []).includes("files"), false, "المنح الذاتي يجب أن يفشل");
+  assert.equal(attempt.effects.length, 0, "ولا يُعرض حتى كطلب موافقة");
+});
+
+test("مكوّنات النظام لا تمرّ بحاجز الصلاحيات", () => {
+  const s = live();
+  // بلا actor: هذا هو النظام نفسه
+  const r = execute(s, { op: "fs.write", args: { path: "/نظام.md", content: "x" } }, "user");
+  assert.equal(r.ok, true);
+});
+
+test("كل نداء يعلن صلاحيته، ولا صلاحية مجهولة", () => {
+  const known = new Set(Object.keys(CAPS));
+  for (const op of Object.keys(SYSCALLS) as (keyof typeof SYSCALLS)[]) {
+    const cap = capOf(op);
+    assert.ok(known.has(cap), `النداء ${op} يعلن صلاحية غير معروفة: ${cap}`);
+  }
+});
+
+test("منح الصلاحيات محجوب عن المُخطِّط", () => {
+  const manual = syscallManual();
+  assert.ok(!manual.includes("grant.add"), "لا يجوز أن يرى الذكاء نداء المنح");
+  assert.ok(!manual.includes("grant.revoke"));
+});
+
+test("اسم التطبيق المولّد يُقشَّر من لام الجرّ", () => {
+  assert.equal(titleFromPrompt("لمتابعة شرب الماء"), "متابعة شرب الماء");
+  assert.equal(titleFromPrompt("لـ حساب الزكاة"), "حساب الزكاة");
+  assert.equal(titleFromPrompt("من أجل جدولة الريّ"), "جدولة الريّ");
+  // لا نبتر كلمة تبدأ بلام أصلية — «لوحة» ليست «وحة»
+  assert.equal(titleFromPrompt("لوحة مصاريف"), "لوحة مصاريف");
+  assert.equal(titleFromPrompt("لبن النخيل"), "لبن النخيل");
+  assert.equal(titleFromPrompt("لتسجيل الجرعات"), "تسجيل الجرعات");
+  assert.equal(titleFromPrompt(""), "تطبيق جديد");
 });

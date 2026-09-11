@@ -42,6 +42,36 @@ export function dirname(p: string): string {
   return parts.join("/") || "/";
 }
 
+const MIME: Record<string, string> = {
+  md: "text/markdown",
+  txt: "text/plain",
+  log: "text/plain",
+  json: "application/json",
+  csv: "text/csv",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  svg: "image/svg+xml",
+};
+
+/** نوع المحتوى من الامتداد — صار مهمًّا بعد أن قبِل النظام ملفات حقيقية */
+export function mimeOf(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  return MIME[ext] ?? "text/plain";
+}
+
+export function isImage(node: { mime: string }): boolean {
+  return node.mime.startsWith("image/");
+}
+
+export function humanSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} بايت`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} ك.ب`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} م.ب`;
+}
+
 export function seedFs(): FsNode[] {
   return [
     file(

@@ -25,6 +25,7 @@ export default function ContextMenu({
 
   const items: (Item | "sep")[] = [
     { label: "نبضة المزرعة", call: { op: "farm.pulse", args: {} } },
+    { label: "استورد ملفات", call: { op: "fs.import", args: {} } },
     { label: "شريط النيّة", call: { op: "win.open", args: { app: "oracle" } }, keys: "Ctrl+K" },
     { label: "المشغل — اصنع تطبيقًا", call: { op: "win.open", args: { app: "studio" } } },
     "sep",
@@ -33,6 +34,10 @@ export default function ContextMenu({
     { label: "وضع التركيز", call: { op: "power", args: { action: "zen" } } },
     { label: "صغّر الكل", call: { op: "win.minimize", args: { all: true } } },
     { label: "أغلق الكل", call: { op: "win.close", args: { all: true } } },
+    "sep",
+    { label: "سطح عمل جديد", call: { op: "space.create", args: {} } },
+    { label: "أرسل النافذة إلى السطح ٢", call: { op: "space.send", args: { index: 2 } }, keys: "Ctrl+⇧2" },
+    { label: "الصلاحيات", call: { op: "win.open", args: { app: "guard" } } },
     "sep",
     {
       label: state.theme.mode === "night" ? "وضع الفجر" : "وضع الليل",

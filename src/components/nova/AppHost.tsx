@@ -3,6 +3,7 @@
 import { parseSpec } from "@/lib/nova/spec";
 import type { NovaWindow } from "@/lib/nova/types";
 import Files from "./apps/Files";
+import Guard from "./apps/Guard";
 import Monitor from "./apps/Monitor";
 import Notes from "./apps/Notes";
 import Oracle from "./apps/Oracle";
@@ -38,12 +39,14 @@ export default function AppHost({ win }: { win: NovaWindow }) {
       return <Timeline />;
     case "rules":
       return <Rules />;
+    case "guard":
+      return <Guard />;
     case "settings":
       return <Settings />;
     default: {
       const made = state.composed.find((c) => c.id === win.app);
       const spec = made ? parseSpec(made.spec) : null;
-      if (spec) return <SpecRenderer spec={spec} />;
+      if (spec) return <SpecRenderer spec={spec} appId={win.app} />;
       return (
         <div className="empty">
           <div style={{ fontSize: 24 }}>◌</div>

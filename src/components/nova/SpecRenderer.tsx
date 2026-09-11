@@ -25,7 +25,7 @@ const toneVar: Record<string, string> = {
 
 const sizePx: Record<string, number> = { xs: 11.5, sm: 12.5, md: 14, lg: 18, xl: 26 };
 
-export default function SpecRenderer({ spec }: { spec: AppSpec }) {
+export default function SpecRenderer({ spec, appId }: { spec: AppSpec; appId: string }) {
   const { run } = useNova();
   const [local, setLocal] = useState<Local>(() => ({ ...(spec.state ?? {}) }) as Local);
 
@@ -46,8 +46,9 @@ export default function SpecRenderer({ spec }: { spec: AppSpec }) {
       if (a.clear) next[a.clear] = Array.isArray(next[a.clear]) ? [] : "";
       return next;
     });
-    // النداء يمر على حاجز التحقق نفسه الذي يمر عليه أي طلب من المستخدم
-    if (a.run?.op) run({ op: a.run.op, args: a.run.args }, "neural");
+    // النداء يمرّ على حاجزين: التحقّق من المخطط، ثم الصلاحيات — لأن هذا
+    // التطبيق كود مولّد لا مكوّن نظام. actor هو هويته أمام النواة.
+    if (a.run?.op) run({ op: a.run.op, args: a.run.args }, "neural", appId);
   };
 
   const txt = (v: string) => interpolate(v, local);

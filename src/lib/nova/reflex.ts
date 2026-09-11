@@ -230,6 +230,61 @@ export function reflexPlan(intent: string, state: NovaState): Plan {
   }
   if (calls.length) return done();
 
+  // ── الأسطح
+  {
+    const ordinals: [string[], number][] = [
+      [["الاول", "الاولى", "1", "١"], 1],
+      [["الثاني", "الثانيه", "2", "٢"], 2],
+      [["الثالث", "الثالثه", "3", "٣"], 3],
+      [["الرابع", "الرابعه", "4", "٤"], 4],
+      [["الخامس", "الخامسه", "5", "٥"], 5],
+    ];
+    if (has(t, "سطح جديد", "انشئ سطح", "اضف سطح", "new desktop", "new space")) {
+      calls.push({ op: "space.create", args: {} });
+      say = "أنشأت سطحًا جديدًا وانتقلت إليه.";
+      return done();
+    }
+    if (has(t, "سطح", "مساحه", "desktop", "space", "workspace")) {
+      const num = ordinals.find(([words]) => words.some((w) => t.includes(fold(w))))?.[1];
+      const named = state.spaces.find((sp) => t.includes(fold(sp.name)));
+      if (has(t, "انقل", "ارسل", "حرك", "move", "send")) {
+        if (num) {
+          calls.push({ op: "space.send", args: { index: num } });
+          say = `نقلت النافذة إلى السطح ${num}.`;
+          return done();
+        }
+      }
+      if (named) {
+        calls.push({ op: "space.switch", args: { name: named.name } });
+        say = `انتقلت إلى ${named.name}.`;
+        return done();
+      }
+      if (num) {
+        calls.push({ op: "space.switch", args: { index: num } });
+        say = `انتقلت إلى السطح ${num}.`;
+        return done();
+      }
+    }
+  }
+
+  // ── الملفات الحقيقية
+  if (has(t, "استورد", "ارفع ملف", "اضف ملف من", "import", "upload")) {
+    calls.push({ op: "fs.import", args: {} });
+    say = "اختر الملفات لاستيرادها.";
+    return done();
+  }
+  if (has(t, "صدر", "نزل ملف", "حمل ملف", "export", "download")) {
+    const name = quoted(raw) ?? after(raw, ["صدر", "نزل", "حمل", "export", "download"]);
+    const hit = name ? state.fs.find((f) => fold(f.path).includes(fold(name))) : undefined;
+    if (hit) {
+      calls.push({ op: "fs.export", args: { path: hit.path } });
+      say = `أنزلت ${hit.path}.`;
+    } else {
+      say = "أي ملف أصدّر؟ افتح «المحتوى» واختره، أو سمّه بدقة.";
+    }
+    return done();
+  }
+
   // ── ترتيب النوافذ
   if (has(t, "رتب", "نظم", "arrange", "tile")) {
     const mode = has(t, "تتالي", "cascade")
