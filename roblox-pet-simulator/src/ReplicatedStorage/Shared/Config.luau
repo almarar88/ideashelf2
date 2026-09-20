@@ -23,6 +23,7 @@ Config.Gamepasses = {
 	DoubleCoins = 0,
 	DoubleDiamonds = 0,
 	FastHatch = 0,
+	SeasonPass = 0,
 }
 
 Config.GamepassInfo = {
@@ -38,6 +39,7 @@ Config.GamepassInfo = {
 	{ Key = "PlusStorage", Name = "+100 Storage", Icon = "📦", Desc = "100 خانة إضافية في المخزن" },
 	{ Key = "DoubleCoins", Name = "2x Coins", Icon = "💰", Desc = "ضاعف كل العملات" },
 	{ Key = "DoubleDiamonds", Name = "2x Diamonds", Icon = "💎", Desc = "ضاعف كل الألماس من الصناديق" },
+	{ Key = "SeasonPass", Name = "Season Pass", Icon = "🎫", Desc = "يفتح مسار المكافآت المميز في باس الموسم (30 مكافأة إضافية)" },
 }
 
 Config.DevProducts = {
@@ -154,6 +156,153 @@ Config.Market = {
 Config.TitanicBossChance = 0.004
 Config.TitanicPets = { "titanic_dragon", "titanic_overlord", "titanic_cat", "titanic_phoenix" }
 
+-- باس الموسم
+Config.Season = {
+	Id = 1,
+	Name = "الموسم 1: مملكة الحيوانات",
+	Tiers = 30,
+	XPPerAction = { Hatch = 6, Break = 1, Boss = 250, Mission = 300, DungeonWave = 120, Fuse = 20, Golden = 40, Trade = 50, MarketSale = 30 },
+	Pets = { "season_fox", "season_dragon" },
+}
+function Config.SeasonXPForTier(tier: number): number
+	return math.floor(400 * (tier ^ 1.15))
+end
+-- مكافأة كل مستوى (مجانية ومميزة) تُولَّد بنمط ثابت
+function Config.SeasonReward(tier: number, premium: boolean): any
+	if premium then
+		if tier == 30 then
+			return { Pet = "season_dragon", Variant = "Rainbow", Diamonds = 5000 }
+		elseif tier == 15 then
+			return { Pet = "season_dragon", Diamonds = 1500 }
+		elseif tier % 5 == 0 then
+			return { Diamonds = 600 * (tier / 5), Gems = 100 * (tier / 5) }
+		elseif tier % 3 == 0 then
+			return { Potion = "Lucky", Count = 2, Diamonds = 150 }
+		else
+			return { Diamonds = 100 + tier * 20, Spins = 1 }
+		end
+	else
+		if tier == 30 then
+			return { Pet = "season_fox", Variant = "Golden", Diamonds = 1500 }
+		elseif tier == 10 or tier == 20 then
+			return { Pet = "season_fox", Diamonds = 300 }
+		elseif tier % 5 == 0 then
+			return { Diamonds = 200 * (tier / 5), Gems = 25 * (tier / 5) }
+		elseif tier % 4 == 0 then
+			return { Potion = "Coins" }
+		else
+			return { Diamonds = 40 + tier * 8 }
+		end
+	end
+end
+
+-- محطة التصنيع
+Config.Recipes = {
+	{ Id = "forged_dragon", Name = "Forged Dragon", Output = { Pet = "forged_dragon" }, Diamonds = 2000, Gems = 0,
+		Inputs = { { Rarity = "Legendary", Variant = "Golden", Count = 3 } } },
+	{ Id = "chaos_golem", Name = "Chaos Golem", Output = { Pet = "chaos_golem" }, Diamonds = 5000, Gems = 200,
+		Inputs = { { Rarity = "Mythical", Count = 2 }, { Rarity = "Legendary", Variant = "Rainbow", Count = 1 } } },
+	{ Id = "prime_overlord", Name = "Prime Overlord", Output = { Pet = "prime_overlord" }, Diamonds = 15000, Gems = 1000,
+		Inputs = { { Rarity = "Exclusive", Count = 1 }, { Rarity = "Mythical", Variant = "Golden", Count = 3 } } },
+	{ Id = "golden_huge", Name = "Golden HUGE Cat", Output = { Pet = "huge_cat", Variant = "Golden" }, Diamonds = 25000, Gems = 2500,
+		Inputs = { { Pet = "huge_cat", Count = 3 } } },
+	{ Id = "lucky_potion_pack", Name = "5 جرعات حظ", Output = { Potion = "Lucky", Count = 5 }, Diamonds = 0, Gems = 300,
+		Inputs = { { Rarity = "Rare", Count = 10 } } },
+	{ Id = "tokens", Name = "توكن ريبيرث", Output = { Tokens = 1 }, Diamonds = 10000, Gems = 500,
+		Inputs = { { Rarity = "Epic", Variant = "Golden", Count = 5 } } },
+}
+
+-- الإكسسوارات (بيضة تجميلية بالألماس)
+Config.CosmeticEggCost = 400
+Config.Accessories = {
+	{ Id = "party_hat", Name = "قبعة حفلة", Icon = "🎉", Chance = 30, Color = Color3.fromRGB(255, 90, 160) },
+	{ Id = "glasses", Name = "نظارة", Icon = "🕶️", Chance = 25, Color = Color3.fromRGB(20, 20, 20) },
+	{ Id = "bow", Name = "فيونكة", Icon = "🎀", Chance = 18, Color = Color3.fromRGB(255, 120, 200) },
+	{ Id = "tophat", Name = "قبعة فخمة", Icon = "🎩", Chance = 12, Color = Color3.fromRGB(30, 30, 30) },
+	{ Id = "wizard", Name = "قبعة ساحر", Icon = "🧙", Chance = 8, Color = Color3.fromRGB(90, 40, 160) },
+	{ Id = "halo", Name = "هالة", Icon = "😇", Chance = 4.5, Color = Color3.fromRGB(255, 230, 120) },
+	{ Id = "crown", Name = "تاج", Icon = "👑", Chance = 2, Color = Color3.fromRGB(255, 215, 0) },
+	{ Id = "dominus", Name = "دومينوس", Icon = "🕋", Chance = 0.5, Color = Color3.fromRGB(0, 0, 0) },
+}
+
+-- Shiny: نسخة لامعة بفرصة صغيرة من أي بيضة (+50% قوة)
+Config.Shiny = { Chance = 0.01, Mult = 1.5 }
+
+-- نظام الرحمة: بعد N فتحة بدون Legendary+ من نفس البيضة، الفتحة التالية مضمونة
+Config.Pity = { Threshold = 200 }
+
+-- متجر الريبيرث (بالتوكنات)
+Config.RebirthShop = {
+	{ Key = "RLuck", Name = "حظ الريبيرث", Icon = "🍀", Desc = "+15% حظ لكل مستوى", MaxLevel = 10, Cost = 1, CostStep = 1, PerLevel = 0.15 },
+	{ Key = "RCoins", Name = "عملات الريبيرث", Icon = "💰", Desc = "+25% عملات لكل مستوى", MaxLevel = 10, Cost = 1, CostStep = 1, PerLevel = 0.25 },
+	{ Key = "REquip", Name = "خانة تجهيز دائمة", Icon = "🐾", Desc = "+1 حيوان مجهز", MaxLevel = 3, Cost = 3, CostStep = 2, PerLevel = 1 },
+	{ Key = "RStorage", Name = "مخزن الريبيرث", Icon = "📦", Desc = "+50 خانة", MaxLevel = 5, Cost = 2, CostStep = 1, PerLevel = 50 },
+	{ Key = "RDamage", Name = "قوة الريبيرث", Icon = "⚔️", Desc = "+20% قوة لكل مستوى", MaxLevel = 10, Cost = 1, CostStep = 1, PerLevel = 0.20 },
+}
+
+-- الألقاب
+Config.Titles = {
+	{ Id = "", Name = "بدون لقب" },
+	{ Id = "hatcher", Name = "🥚 فاقس البيض", Achievement = "hatch_1000" },
+	{ Id = "legend", Name = "🌟 أسطورة البيض", Achievement = "hatch_10000" },
+	{ Id = "breaker", Name = "💥 المدمّر", Achievement = "break_2500" },
+	{ Id = "rich", Name = "💰 الملياردير", Achievement = "coins_1b" },
+	{ Id = "trillionaire", Name = "💎 التريليونير", Achievement = "coins_1t" },
+	{ Id = "alchemist", Name = "🔮 الخيميائي", Achievement = "fuse_10" },
+	{ Id = "bossslayer", Name = "👹 قاتل الزعماء", Achievement = "boss_5" },
+	{ Id = "merchant", Name = "🏪 تاجر السوق", Achievement = "sales_50" },
+	{ Id = "reborn", Name = "🔁 المولود من جديد", Achievement = "rebirth_1" },
+	{ Id = "immortal", Name = "♾️ الخالد", Achievement = "rebirth_5" },
+	{ Id = "huge", Name = "🎉 صاحب العملاق", Achievement = "huge_1" },
+	{ Id = "titanic", Name = "🌟 صاحب التايتانيك", Achievement = "titanic_1" },
+	{ Id = "rift", Name = "🌀 غازي الزنزانة", Stat = "DungeonClears", Target = 5 },
+}
+Config.RebirthRanks = { { 0, "" }, { 1, "⭐" }, { 3, "⭐⭐" }, { 5, "⭐⭐⭐" }, { 10, "💫" }, { 25, "☀️" }, { 50, "🌌" } }
+
+-- الزنزانة (Rift Dungeon)
+Config.Dungeon = {
+	Waves = 5,
+	CratesPerWave = 6,
+	CrateSecondsPerPower = 5, -- صحة الصندوق = مجموع قوة المشاركين × هذا الرقم / عدد الصناديق
+	BossSeconds = 35,
+	TimeLimit = 240,
+	Cooldown = 600,
+	WaveReward = { Diamonds = 15, Gems = 3 },
+	CoinsPerWaveScale = 400, -- × مضاعف أعلى منطقة
+	ClearReward = { Diamonds = 150, Gems = 40 },
+	PetChance = 0.08,
+	Pet = "rift_guardian",
+	BossPetChance = 0.01,
+}
+
+-- الكنز العشوائي
+Config.Treasure = { Interval = 240, Lifetime = 150, Diamonds = 120, Gems = 25, CoinsScale = 2000, PetChance = 0.05, Pet = "treasure_turtle" }
+
+-- الحارس (زعيم مصغر في كل منطقة)
+Config.Guardian = { HealthMult = 150, CoinsMult = 90, Diamonds = 6, Respawn = 480 }
+
+-- أرباح وقت الغياب
+Config.Offline = { MaxHours = 8, Rate = 0.35 } -- نسبة من معدل الكسب التقريبي
+
+-- مكافأة الأصدقاء
+Config.FriendLuckPerFriend = 0.05
+Config.FriendLuckMax = 0.25
+
+-- دورة الليل والنهار
+Config.DayNight = { Enabled = true, DayLength = 720 }
+
+-- مكافآت إكمال فهرس كل بيضة
+function Config.IndexReward(tier: number): any
+	return { Diamonds = 100 * tier, Gems = 10 * tier }
+end
+
+-- الزعماء
+Config.Bosses = {
+	{ Id = "slime_king", Name = "Slime King", Arabic = "ملك السلايم", Zone = 1, Color = Color3.fromRGB(50, 205, 50), Pet = "slime_king", HealthPerPower = 45 },
+	{ Id = "mecha_titan", Name = "Mecha Titan", Arabic = "التيتان الآلي", Zone = 11, Color = Color3.fromRGB(120, 130, 160), Pet = "mecha_titan_pet", HealthPerPower = 60 },
+	{ Id = "void_leviathan", Name = "Void Leviathan", Arabic = "لوياثان الفراغ", Zone = 16, Color = Color3.fromRGB(40, 0, 70), Pet = "void_leviathan_pet", HealthPerPower = 80 },
+}
+
 -- متطلبات الريبيرث لكل عالم
 Config.WorldRebirths = { [1] = 0, [2] = 1, [3] = 3 }
 
@@ -253,6 +402,11 @@ Config.Achievements = {
 	{ Id = "gems_1000", Name = "جامع الجواهر", Stat = "GemsEarned", Target = 1000, Reward = { Diamonds = 500 } },
 	{ Id = "huge_1", Name = "عملاق!", Stat = "Huges", Target = 1, Reward = { Diamonds = 2500, Gems = 500 } },
 	{ Id = "titanic_1", Name = "تايتانيك!!!", Stat = "Titanics", Target = 1, Reward = { Diamonds = 10000, Gems = 5000 } },
+	{ Id = "dungeon_1", Name = "أول زنزانة", Stat = "DungeonClears", Target = 1, Reward = { Diamonds = 300 } },
+	{ Id = "dungeon_10", Name = "سيد الزنزانة", Stat = "DungeonClears", Target = 10, Reward = { Diamonds = 2000, Gems = 300 } },
+	{ Id = "craft_1", Name = "حرفي", Stat = "Crafts", Target = 1, Reward = { Diamonds = 400 } },
+	{ Id = "shiny_1", Name = "لامع!", Stat = "Shinies", Target = 1, Reward = { Diamonds = 500 } },
+	{ Id = "treasure_3", Name = "صائد الكنوز", Stat = "Treasures", Target = 3, Reward = { Gems = 200 } },
 }
 
 -- الدليل التعليمي للمبتدئين (خطوات متسلسلة)
@@ -284,6 +438,8 @@ Config.Codes = {
 	TECHWORLD = { Diamonds = 750 },
 	MARKET = { Gems = 100 },
 	TITANIC = { Diamonds = 2000, Gems = 250 },
+	SEASON1 = { Diamonds = 300, SeasonXP = 500 },
+	SHINY = { Diamonds = 400 },
 }
 
 Config.DailyRewards = {
@@ -331,6 +487,7 @@ Config.Map = {
 	MarketOffset = Vector3.new(-750, 0, 700),
 	World2Offset = Vector3.new(1500, 0, 0),
 	World3Offset = Vector3.new(3000, 0, 0),
+	DungeonOffset = Vector3.new(-750, 0, 1500),
 }
 
 -- أثناء التجربة في Studio: اعتبر كل الجيم باس مملوكة (عطّلها قبل النشر)
@@ -351,6 +508,8 @@ Config.Sounds = {
 	Boss = 0,
 	Sell = 0,
 	Firework = 0,
+	Wave = 0,
+	Craft = 0,
 }
 
 return Config

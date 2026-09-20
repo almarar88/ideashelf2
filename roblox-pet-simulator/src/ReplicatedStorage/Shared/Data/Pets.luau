@@ -289,6 +289,19 @@ egg("Titanic", 12, 50000000, {
 	{ "titanic_phoenix", "TITANIC Phoenix", "Titanic", "bird", "FFFFFF", "FFA500" },
 })
 
+-- حيوانات الأنظمة الجديدة: الزنزانة، الكنز، التصنيع، الموسم، الزعماء
+egg("Special", 9, 3000000, {
+	{ "rift_guardian", "Rift Guardian", "Mythical", "golem", "20003A", "9D00FF" },
+	{ "treasure_turtle", "Treasure Turtle", "Legendary", "blob", "2E8B57", "FFD700" },
+	{ "forged_dragon", "Forged Dragon", "Mythical", "dragon", "B87333", "FF4500" },
+	{ "chaos_golem", "Chaos Golem", "Exclusive", "golem", "FF00FF", "00FFFF" },
+	{ "prime_overlord", "Prime Overlord", "Exclusive", "demon", "FFFFFF", "FF0000" },
+	{ "season_fox", "Season Fox", "Legendary", "fox", "FF8C00", "FFFFFF" },
+	{ "season_dragon", "Season Dragon", "Mythical", "dragon", "1E90FF", "FFD700" },
+	{ "mecha_titan_pet", "Mecha Titan", "Mythical", "robot", "8A8A9A", "FF3C3C" },
+	{ "void_leviathan_pet", "Void Leviathan", "Exclusive", "fish", "1A0030", "9D00FF" },
+})
+
 -- بيضة الريبيرث (تشترى بتوكنات الريبيرث)
 egg("RebirthEgg", 8, 500000, {
 	{ "reborn_cat", "Reborn Cat", "Epic", "cat", "FFFFFF", "FF4500" },

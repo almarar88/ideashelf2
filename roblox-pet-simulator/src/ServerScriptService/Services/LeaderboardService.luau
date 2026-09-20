@@ -11,6 +11,8 @@ local DataService = require(script.Parent.DataService)
 local MapBuilder = require(script.Parent.MapBuilder)
 
 local LeaderboardService = {}
+local Remotes = require(Shared.Remotes)
+local cached: { [string]: { any } } = {}
 
 local stores = {
 	Coins = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Coins"),
@@ -35,6 +37,7 @@ local function refresh()
 			local ok, pages = pcall(store.GetSortedAsync, store, false, 10)
 			if ok then
 				local lines = {}
+				local rows = {}
 				for i, entry in ipairs(pages:GetCurrentPage()) do
 					local name = "???"
 					local okName, res = pcall(Players.GetNameFromUserIdAsync, Players, tonumber(entry.key) :: number)
@@ -42,7 +45,9 @@ local function refresh()
 						name = res
 					end
 					table.insert(lines, string.format("%d. %s  -  %s", i, name, Format.Number(entry.value)))
+					table.insert(rows, { Rank = i, Name = name, Value = entry.value, UserId = tonumber(entry.key) })
 				end
+				cached[key] = rows
 				label.Text = #lines > 0 and table.concat(lines, "\n") or "لا يوجد بيانات بعد"
 			end
 		end
@@ -50,6 +55,9 @@ local function refresh()
 end
 
 function LeaderboardService.Init()
+	Remotes.Function("GetLeaderboards").OnServerInvoke = function()
+		return cached
+	end
 	task.spawn(function()
 		task.wait(5)
 		while true do

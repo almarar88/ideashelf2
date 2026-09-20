@@ -91,6 +91,7 @@ function MissionService.ClaimMission(player: Player, index: number): { ok: boole
 	end
 	m.Claimed = true
 	Rewards.Grant(player, m.Reward)
+	Hooks.Fire(player, "Mission", 1)
 	DataService.Notify(player, "✅ مهمة مكتملة: " .. Rewards.Describe(m.Reward), Color3.fromRGB(120, 255, 140))
 	return { ok = true }
 end

@@ -308,13 +308,63 @@ SHAPES.demon = function(m, c1, c2)
 	return body
 end
 
--- يبني النموذج. variant: Normal/Golden/Rainbow/DarkMatter
-function Builder.Build(petId: string, variant: string?): Model?
+-- الإكسسوارات فوق الرأس
+local function accessory(model: Model, body: BasePart, id: string, color: Color3)
+	local top = body.CFrame * CFrame.new(0, body.Size.Y / 2, 0)
+	if id == "party_hat" then
+		part(model, "Acc", Vector3.new(1.2, 1.8, 1.2), top * CFrame.new(0, 0.8, 0), color, "cone")
+		part(model, "AccTop", Vector3.new(0.4, 0.4, 0.4), top * CFrame.new(0, 1.8, 0), Color3.fromRGB(255, 255, 120), "ball", Enum.Material.Neon)
+	elseif id == "glasses" then
+		local eyeCf = body.CFrame * CFrame.new(0, 0.25, -body.Size.Z / 2)
+		for _, sx in ipairs({ -1, 1 }) do
+			local lens = part(model, "Acc", Vector3.new(0.7, 0.55, 0.15), eyeCf * CFrame.new(sx * 0.45, 0, -0.1), color, nil, Enum.Material.Glass)
+			lens.Transparency = 0.3
+		end
+		part(model, "Acc", Vector3.new(0.25, 0.1, 0.12), eyeCf * CFrame.new(0, 0, -0.1), color)
+	elseif id == "bow" then
+		for _, sx in ipairs({ -1, 1 }) do
+			part(model, "Acc", Vector3.new(0.7, 0.5, 0.3), top * CFrame.new(sx * 0.4 + 0.3, 0.2, 0) * CFrame.Angles(0, 0, sx * 0.4), color, "ball")
+		end
+		part(model, "Acc", Vector3.new(0.3, 0.3, 0.3), top * CFrame.new(0.3, 0.2, 0), color, "ball")
+	elseif id == "tophat" then
+		part(model, "Acc", Vector3.new(0.3, 2.2, 2.2), top * CFrame.new(0, 0.1, 0) * CFrame.Angles(0, 0, math.pi / 2), color, "cyl")
+		part(model, "Acc", Vector3.new(1.4, 1.5, 1.5), top * CFrame.new(0, 0.9, 0) * CFrame.Angles(0, 0, math.pi / 2), color, "cyl")
+		part(model, "AccBand", Vector3.new(0.3, 1.55, 1.55), top * CFrame.new(0, 0.4, 0) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(200, 40, 40), "cyl")
+	elseif id == "wizard" then
+		part(model, "Acc", Vector3.new(0.3, 2.6, 2.6), top * CFrame.new(0, 0.1, 0) * CFrame.Angles(0, 0, math.pi / 2), color, "cyl")
+		part(model, "Acc", Vector3.new(1.4, 2.4, 1.4), top * CFrame.new(0, 1.2, 0) * CFrame.Angles(0.15, 0, 0), color, "cone")
+		part(model, "AccStar", Vector3.new(0.4, 0.4, 0.4), top * CFrame.new(0.4, 1.2, -0.5), Color3.fromRGB(255, 230, 80), "ball", Enum.Material.Neon)
+	elseif id == "halo" then
+		local ring = part(model, "Acc", Vector3.new(0.2, 1.6, 1.6), top * CFrame.new(0, 0.9, 0) * CFrame.Angles(0, 0, math.pi / 2), color, "cyl", Enum.Material.Neon)
+		ring.CFrame = top * CFrame.new(0, 0.9, 0) * CFrame.Angles(math.pi / 2, 0, 0) * CFrame.Angles(0, 0, math.pi / 2)
+		local light = Instance.new("PointLight")
+		light.Color = color
+		light.Range = 6
+		light.Parent = ring
+	elseif id == "crown" then
+		part(model, "Acc", Vector3.new(0.5, 1.5, 1.5), top * CFrame.new(0, 0.25, 0) * CFrame.Angles(0, 0, math.pi / 2), color, "cyl", Enum.Material.Metal)
+		for i = 1, 5 do
+			local ang = (i / 5) * math.pi * 2
+			part(model, "Acc", Vector3.new(0.3, 0.7, 0.3), top * CFrame.new(math.cos(ang) * 0.65, 0.75, math.sin(ang) * 0.65), color, "cone", Enum.Material.Metal)
+		end
+		part(model, "AccGem", Vector3.new(0.35, 0.35, 0.35), top * CFrame.new(0, 0.5, -0.75), Color3.fromRGB(255, 40, 80), "ball", Enum.Material.Neon)
+	elseif id == "dominus" then
+		part(model, "Acc", Vector3.new(1.9, 0.5, 1.9), top * CFrame.new(0, 0.2, 0), color, nil, Enum.Material.Metal)
+		part(model, "Acc", Vector3.new(1.3, 1.6, 1.3), top * CFrame.new(0, 1.0, 0), color, "cone", Enum.Material.Metal)
+		for _, sx in ipairs({ -1, 1 }) do
+			part(model, "Acc", Vector3.new(0.25, 1.4, 0.25), top * CFrame.new(sx * 0.9, 0.6, 0) * CFrame.Angles(0, 0, -sx * 0.5), Color3.fromRGB(255, 215, 0), "cone", Enum.Material.Neon)
+		end
+	end
+end
+
+-- يبني النموذج. variant: Normal/Golden/Rainbow/DarkMatter، opts: {Shiny, Accessory}
+function Builder.Build(petId: string, variant: string?, opts: { Shiny: boolean?, Accessory: string? }?): Model?
 	local def = Pets.Get(petId)
 	if not def then
 		return nil
 	end
 	variant = variant or "Normal"
+	opts = opts or {}
 	local c1, c2 = def.Primary, def.Secondary
 	if variant == "Golden" then
 		c1, c2 = GOLD, GOLD2
@@ -330,6 +380,34 @@ function Builder.Build(petId: string, variant: string?): Model?
 	model:SetAttribute("PetId", petId)
 	model:SetAttribute("Variant", variant)
 	model:SetAttribute("Scale", def.Scale or 1)
+	if opts.Accessory and opts.Accessory ~= "" then
+		local ReplicatedStorage2 = game:GetService("ReplicatedStorage")
+		local Config = require(ReplicatedStorage2:WaitForChild("Shared").Config)
+		for _, a in ipairs(Config.Accessories) do
+			if a.Id == opts.Accessory then
+				accessory(model, body, a.Id, a.Color)
+			end
+		end
+	end
+	if opts.Shiny then
+		local attach = Instance.new("Attachment")
+		attach.Parent = body
+		local pe = Instance.new("ParticleEmitter")
+		pe.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(255, 240, 150))
+		pe.Size = NumberSequence.new(0.35, 0)
+		pe.Transparency = NumberSequence.new(0, 1)
+		pe.Lifetime = NumberRange.new(0.5, 1)
+		pe.Rate = 10
+		pe.Speed = NumberRange.new(1, 3)
+		pe.SpreadAngle = Vector2.new(180, 180)
+		pe.LightEmission = 1
+		pe.Parent = attach
+		for _, p in ipairs(model:GetDescendants()) do
+			if p:IsA("BasePart") and p.Name == "Body" then
+				p.Reflectance = math.max(p.Reflectance, 0.35)
+			end
+		end
+	end
 	if (def.Scale or 1) ~= 1 then
 		model:ScaleTo(def.Scale)
 	end

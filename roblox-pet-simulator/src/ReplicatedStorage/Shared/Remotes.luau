@@ -21,6 +21,7 @@ Remotes.Events = {
 	"TradeUpdate",     -- S->C: state أو nil
 	"EventEffect",     -- S->C all: {Type, ...} تأثيرات بصرية
 	"BossUpdate",      -- S->C all: {Active, Health, MaxHealth, Ends}
+	"DungeonUpdate",   -- S->C all: {Active, Wave, Ends, Text}
 }
 
 Remotes.Functions = {
@@ -45,6 +46,13 @@ Remotes.Functions = {
 	"ClaimVIPDaily",  -- () -> {ok, error?}
 	"Admin",          -- (command, payload) -> {ok, error?}
 	"Market",         -- (action, payload) -> {ok, error?, ...} السوق: Browse/List/Buy/Cancel/SellNPC/Booth
+	"Season",         -- (action, payload) -> {ok, error?} Claim tier
+	"Craft",          -- (recipeId) -> {ok, error?}
+	"Cosmetic",       -- (action, payload) -> {ok, error?, result?} Hatch / Equip / Unequip
+	"Dungeon",        -- (action) -> {ok, error?} Start
+	"Title",          -- (titleId) -> {ok, error?}
+	"RebirthShop",    -- (key) -> {ok, error?}
+	"GetLeaderboards", -- () -> {Coins={...}, ...}
 }
 
 local folder: Folder
@@ -69,6 +77,8 @@ function Remotes.Init(): Folder
 		state:SetAttribute("EventId", "")
 		state:SetAttribute("EventEnds", 0)
 		state:SetAttribute("NextEvent", 0)
+		state:SetAttribute("DungeonWave", 0)
+		state:SetAttribute("DungeonEnds", 0)
 		state.Parent = ReplicatedStorage
 	else
 		folder = ReplicatedStorage:WaitForChild("Remotes") :: Folder

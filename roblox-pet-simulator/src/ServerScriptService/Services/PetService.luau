@@ -13,6 +13,8 @@ local Remotes = require(Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local RateLimit = require(script.Parent.RateLimit)
 local Hooks = require(script.Parent.Hooks)
+local Format = require(Shared.Modules.Format)
+local TextService = game:GetService("TextService")
 
 local PetService = {}
 
@@ -26,7 +28,7 @@ function PetService.StorageCapacity(player: Player): number
 	if not p then
 		return 0
 	end
-	local cap = Config.BaseStorage + (p.Upgrades.Storage or 0) * 25
+	local cap = Config.BaseStorage + (p.Upgrades.Storage or 0) * 25 + (p.RebirthUpgrades.RStorage or 0) * 50
 	if DataService.HasGamepass(player, "PlusStorage") then
 		cap += Config.GamepassStorageBonus
 	end
@@ -38,7 +40,7 @@ function PetService.EquipCapacity(player: Player): number
 	if not p then
 		return 0
 	end
-	local cap = Config.BaseEquip + (p.Upgrades.Equip or 0)
+	local cap = Config.BaseEquip + (p.Upgrades.Equip or 0) + (p.RebirthUpgrades.REquip or 0)
 	if DataService.HasGamepass(player, "PlusEquip") then
 		cap += Config.GamepassEquipBonus
 	end
@@ -94,7 +96,7 @@ function PetService.UpdateEquippedAttribute(player: Player)
 	local list = {}
 	for _, pet in ipairs(p.Pets) do
 		if pet.Equipped then
-			table.insert(list, { Uid = pet.Uid, Id = pet.Id, Variant = pet.Variant })
+			table.insert(list, { Uid = pet.Uid, Id = pet.Id, Variant = pet.Variant, Shiny = pet.Shiny == true, Accessory = pet.Accessory or "" })
 		end
 	end
 	player:SetAttribute("EquippedPets", HttpService:JSONEncode(list))
@@ -115,7 +117,7 @@ function PetService.GetPower(player: Player): number
 	return total * DataService.DamageMultiplier(player)
 end
 
-function PetService.Add(player: Player, petId: string, variant: string?, ignoreCapacity: boolean?): PetInstance?
+function PetService.Add(player: Player, petId: string, variant: string?, ignoreCapacity: boolean?, shiny: boolean?): PetInstance?
 	local p = DataService.Get(player)
 	local def = Pets.Get(petId)
 	if not p or not def then
@@ -134,7 +136,11 @@ function PetService.Add(player: Player, petId: string, variant: string?, ignoreC
 		Level = 1,
 		XP = 0,
 		Enchants = {},
+		Shiny = shiny == true or nil,
 	}
+	if shiny then
+		p.Stats.Shinies += 1
+	end
 	table.insert(p.Pets, inst)
 	p.Index[petId] = true
 	if def.Rarity == "Huge" then
@@ -254,6 +260,59 @@ function PetService.Action(player: Player, action: string, payload: any): { ok: 
 		for i = 1, math.min(cap, #sorted) do
 			sorted[i].Equipped = true
 		end
+	elseif action == "Nick" then
+		local pet = find(p, tostring(payload.Uid))
+		if not pet then
+			return { ok = false, error = "الحيوان غير موجود" }
+		end
+		local raw = tostring(payload.Nick or ""):sub(1, 20)
+		if raw == "" then
+			pet.Nick = nil
+		else
+			local ok, filtered = pcall(function()
+				local result = TextService:FilterStringAsync(raw, player.UserId)
+				return result:GetNonChatStringForBroadcastAsync()
+			end)
+			pet.Nick = ok and filtered or nil
+		end
+	elseif action == "Accessory" then
+		local pet = find(p, tostring(payload.Uid))
+		if not pet then
+			return { ok = false, error = "الحيوان غير موجود" }
+		end
+		local id = tostring(payload.Id or "")
+		-- إعادة الإكسسوار الحالي للحقيبة
+		if pet.Accessory and pet.Accessory ~= "" then
+			p.Accessories[pet.Accessory] = (p.Accessories[pet.Accessory] or 0) + 1
+			pet.Accessory = nil
+		end
+		if id ~= "" then
+			if (p.Accessories[id] or 0) <= 0 then
+				return { ok = false, error = "لا تملك هذا الإكسسوار" }
+			end
+			p.Accessories[id] -= 1
+			pet.Accessory = id
+		end
+	elseif action == "ClaimIndex" then
+		local eggId = tostring(payload.EggId)
+		local egg = Eggs.Get(eggId)
+		if not egg then
+			return { ok = false, error = "بيضة غير موجودة" }
+		end
+		if p.IndexClaimed[eggId] then
+			return { ok = false, error = "تم الاستلام" }
+		end
+		for _, entry in ipairs(egg.Pets) do
+			if not p.Index[entry.Pet] then
+				return { ok = false, error = "أكمل فهرس البيضة أولاً" }
+			end
+		end
+		p.IndexClaimed[eggId] = true
+		local tier = math.max(1, egg.Zone)
+		local reward = Config.IndexReward(tier)
+		DataService.AddDiamonds(player, reward.Diamonds or 0)
+		DataService.AddGems(player, reward.Gems or 0, true)
+		DataService.Notify(player, "📖 أكملت فهرس " .. egg.Name .. "! 💎 " .. Format.Number(reward.Diamonds or 0) .. "  💠 " .. Format.Number(reward.Gems or 0), Color3.fromRGB(200, 140, 255))
 	elseif action == "Setting" then
 		local k = tostring(payload.Key)
 		if p.Settings[k] == nil then

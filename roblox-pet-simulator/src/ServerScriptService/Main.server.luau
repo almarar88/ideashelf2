@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
+local Config = require(Shared.Config)
 
 local Services = script.Parent:WaitForChild("Services")
 
@@ -26,6 +27,14 @@ local MerchantService = require(Services.MerchantService)
 local HoverboardService = require(Services.HoverboardService)
 local AdminService = require(Services.AdminService)
 local MarketService = require(Services.MarketService)
+local SeasonService = require(Services.SeasonService)
+local CraftService = require(Services.CraftService)
+local CosmeticService = require(Services.CosmeticService)
+local DungeonService = require(Services.DungeonService)
+local TreasureService = require(Services.TreasureService)
+local TitleService = require(Services.TitleService)
+local OfflineService = require(Services.OfflineService)
+local FriendService = require(Services.FriendService)
 
 MapBuilder.Build()
 
@@ -51,7 +60,27 @@ MerchantService.Init()
 HoverboardService.Init()
 AdminService.Init()
 MarketService.Init()
+SeasonService.Init()
+CraftService.Init()
+CosmeticService.Init()
+DungeonService.Init()
+TreasureService.Init()
+TitleService.Init()
+OfflineService.Init()
+FriendService.Init()
 LeaderboardService.Init()
 DataService.Init()
+
+-- دورة الليل والنهار
+if Config.DayNight.Enabled then
+	task.spawn(function()
+		local Lighting = game:GetService("Lighting")
+		while true do
+			local t = (os.clock() % Config.DayNight.DayLength) / Config.DayNight.DayLength
+			Lighting.ClockTime = 6 + t * 24
+			task.wait(2)
+		end
+	end)
+end
 
 print("[PetKingdom] Server ready")

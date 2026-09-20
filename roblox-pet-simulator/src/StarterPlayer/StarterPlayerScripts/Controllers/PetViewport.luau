@@ -7,14 +7,14 @@ local PetModelBuilder = require(Shared.Modules.PetModelBuilder)
 
 local PetViewport = {}
 
-function PetViewport.Create(parent: Instance, petId: string, variant: string?, spin: boolean?): ViewportFrame
+function PetViewport.Create(parent: Instance, petId: string, variant: string?, spin: boolean?, opts: any?): ViewportFrame
 	local vp = Instance.new("ViewportFrame")
 	vp.Size = UDim2.fromScale(1, 1)
 	vp.BackgroundTransparency = 1
 	vp.Ambient = Color3.fromRGB(200, 200, 200)
 	vp.LightColor = Color3.fromRGB(255, 255, 255)
 	vp.LightDirection = Vector3.new(-1, -1, -1)
-	local model = PetModelBuilder.Build(petId, variant)
+	local model = PetModelBuilder.Build(petId, variant, opts)
 	if model then
 		model:PivotTo(CFrame.new())
 		model.Parent = vp

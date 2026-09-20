@@ -93,17 +93,44 @@ function EggService.Hatch(player: Player, eggId: string, count: number, variant:
 		local petId = Luck.Roll(eggId, luck, rng) or egg.Pets[1].Pet
 		local def = Pets.Get(petId)
 		local rank = def and Rarities.Rank(def.Rarity) or 1
+		-- نظام الرحمة
+		p.Pity[eggId] = (p.Pity[eggId] or 0) + 1
+		if rank < 5 and p.Pity[eggId] >= Config.Pity.Threshold then
+			local pool = {}
+			for _, entry in ipairs(egg.Pets) do
+				local d = Pets.Get(entry.Pet)
+				if d and Rarities.Rank(d.Rarity) >= 5 and Rarities.Rank(d.Rarity) <= 6 then
+					table.insert(pool, entry.Pet)
+				end
+			end
+			if #pool > 0 then
+				petId = pool[rng:NextInteger(1, #pool)]
+				def = Pets.Get(petId)
+				rank = def and Rarities.Rank(def.Rarity) or 1
+				DataService.Notify(player, "🎁 الرحمة: حيوان أسطوري مضمون!", Color3.fromRGB(255, 200, 40))
+			end
+		end
+		if rank >= 5 then
+			p.Pity[eggId] = 0
+		end
+		local shiny = rng:NextNumber() < Config.Shiny.Chance
 		local deleted = autoDelete > 0 and rank <= autoDelete and variant == "Normal"
 		if not deleted and PetService.FreeSlots(player) <= 0 then
 			deleted = true
 		end
+		if shiny then
+			deleted = false
+		end
 		local inst = nil
 		if not deleted then
-			inst = PetService.Add(player, petId, variant, true)
+			inst = PetService.Add(player, petId, variant, true, shiny)
 		else
 			p.Index[petId] = true
 		end
-		table.insert(results, { Uid = inst and inst.Uid or "", Id = petId, Variant = variant, Deleted = deleted })
+		table.insert(results, { Uid = inst and inst.Uid or "", Id = petId, Variant = variant, Deleted = deleted, Shiny = shiny })
+		if shiny then
+			DataService.Notify(player, "✨ حيوان لامع (Shiny)! +50% قوة", Color3.fromRGB(255, 240, 150))
+		end
 		if def and rank >= 5 then
 			Remotes.Event("HatchBroadcast"):FireAllClients({ Player = player.Name, PetId = petId, Variant = variant, Rarity = def.Rarity })
 			if rank >= 9 then

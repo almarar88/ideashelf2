@@ -43,6 +43,14 @@ export type Profile = {
 	Merchant: { Rotation: number, Bought: { [string]: number } },
 	SpinDay: number,
 	MyListings: { [string]: any },
+	Season: { Id: number, XP: number, Claimed: { [string]: boolean }, PremiumClaimed: { [string]: boolean } },
+	Pity: { [string]: number },
+	RebirthUpgrades: { [string]: number },
+	Title: string,
+	Accessories: { [string]: number },
+	LastSeen: number,
+	DungeonCooldown: number,
+	IndexClaimed: { [string]: boolean },
 }
 
 local function template(): Profile
@@ -56,7 +64,7 @@ local function template(): Profile
 		Pets = {},
 		UnlockedZones = { ["1"] = true },
 		Upgrades = { Storage = 0, Equip = 0, Coins = 0, Luck = 0, Damage = 0, Speed = 0, Diamonds = 0, XP = 0 },
-		Stats = { Hatches = 0, Breaks = 0, CoinsEarned = 0, DiamondsEarned = 0, Damage = 0, Playtime = 0, BestPet = 0, Fusions = 0, Goldens = 0, Rainbows = 0, DarkMatters = 0, Rebirths = 0, BossKills = 0, Trades = 0, Enchants = 0, Spins = 0, MarketSales = 0, GemsEarned = 0, Huges = 0, Titanics = 0 },
+		Stats = { Hatches = 0, Breaks = 0, CoinsEarned = 0, DiamondsEarned = 0, Damage = 0, Playtime = 0, BestPet = 0, Fusions = 0, Goldens = 0, Rainbows = 0, DarkMatters = 0, Rebirths = 0, BossKills = 0, Trades = 0, Enchants = 0, Spins = 0, MarketSales = 0, GemsEarned = 0, Huges = 0, Titanics = 0, DungeonClears = 0, Crafts = 0, Shinies = 0, Treasures = 0 },
 		Daily = { LastClaim = 0, Streak = 0 },
 		VIPDaily = 0,
 		Codes = {},
@@ -77,6 +85,14 @@ local function template(): Profile
 		Merchant = { Rotation = 0, Bought = {} },
 		SpinDay = 0,
 		MyListings = {},
+		Season = { Id = Config.Season.Id, XP = 0, Claimed = {}, PremiumClaimed = {} },
+		Pity = {},
+		RebirthUpgrades = { RLuck = 0, RCoins = 0, REquip = 0, RStorage = 0, RDamage = 0 },
+		Title = "",
+		Accessories = {},
+		LastSeen = 0,
+		DungeonCooldown = 0,
+		IndexClaimed = {},
 	}
 end
 
@@ -116,6 +132,10 @@ local function reconcile(data: any): Profile
 		pet.Level = pet.Level or 1
 		pet.XP = pet.XP or 0
 		pet.Enchants = pet.Enchants or {}
+	end
+	-- موسم جديد → تصفير التقدم
+	if type(data.Season) == "table" and data.Season.Id ~= Config.Season.Id then
+		data.Season = { Id = Config.Season.Id, XP = 0, Claimed = {}, PremiumClaimed = {} }
 	end
 	return data :: Profile
 end
@@ -176,6 +196,7 @@ local function save(player: Player, remove: boolean?)
 	snapshot.InGroup = nil :: any
 	snapshot.Stats = table.clone(profile.Stats)
 	snapshot.Stats.Playtime = (profile.Stats.Playtime or 0) + (os.time() - profile.SessionStart)
+	snapshot.LastSeen = os.time()
 	local ok = retry(function()
 		return store:UpdateAsync(key(player), function()
 			return snapshot
@@ -397,7 +418,7 @@ function DataService.LuckMultiplier(player: Player): number
 	local b = bonuses(player)
 	local add = (p.Upgrades.Luck or 0) * 0.10 + (p.InGroup and Config.GroupBonus.Luck or 0)
 		+ (player.MembershipType == Enum.MembershipType.Premium and Config.PremiumBonus.Luck or 0)
-		+ p.Rebirths * Config.Rebirth.LuckPerRebirth + b.Luck
+		+ p.Rebirths * Config.Rebirth.LuckPerRebirth + b.Luck + (p.RebirthUpgrades.RLuck or 0) * 0.15
 	local mult = 1 + add
 	if DataService.HasGamepass(player, "Lucky") then
 		mult *= 2
@@ -419,7 +440,7 @@ function DataService.CoinMultiplier(player: Player): number
 	local b = bonuses(player)
 	local add = (p.Upgrades.Coins or 0) * 0.05 + (p.InGroup and Config.GroupBonus.Coins or 0)
 		+ (player.MembershipType == Enum.MembershipType.Premium and Config.PremiumBonus.Coins or 0)
-		+ p.Rebirths * Config.Rebirth.CoinsPerRebirth + b.Coins
+		+ p.Rebirths * Config.Rebirth.CoinsPerRebirth + b.Coins + (p.RebirthUpgrades.RCoins or 0) * 0.25
 	local mult = 1 + add
 	if DataService.HasGamepass(player, "VIP") then
 		mult *= Config.VIPCoinMultiplier
@@ -439,7 +460,7 @@ function DataService.DamageMultiplier(player: Player): number
 		return 1
 	end
 	local b = bonuses(player)
-	local mult = 1 + (p.Upgrades.Damage or 0) * 0.05 + p.Rebirths * Config.Rebirth.DamagePerRebirth + b.Damage
+	local mult = 1 + (p.Upgrades.Damage or 0) * 0.05 + p.Rebirths * Config.Rebirth.DamagePerRebirth + b.Damage + (p.RebirthUpgrades.RDamage or 0) * 0.20
 	if DataService.PotionActive(player, "Damage") then
 		mult *= Config.Potions.Damage.Mult
 	end

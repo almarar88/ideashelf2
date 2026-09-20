@@ -54,8 +54,8 @@ function ZoneService.Teleport(player: Player, index: number): boolean
 		if not DataService.HasGamepass(player, "VIP") then
 			return false
 		end
-	elseif index == -1 then
-		-- السوق متاح للجميع
+	elseif index == -1 or index == -2 then
+		-- السوق والزنزانة متاحان للجميع
 	elseif not p.UnlockedZones[tostring(index)] then
 		return false
 	elseif p.Rebirths < Zones.RebirthRequired(index) then
@@ -135,7 +135,9 @@ local function onPortalTouched(kind: string, hit: BasePart)
 		ZoneService.Teleport(player, Zones.WorldStart[3] - 1)
 	elseif kind == "Market" then
 		ZoneService.Teleport(player, -1)
-	elseif kind == "MarketReturn" then
+	elseif kind == "Dungeon" then
+		ZoneService.Teleport(player, -2)
+	elseif kind == "MarketReturn" or kind == "DungeonReturn" then
 		ZoneService.Teleport(player, 1)
 	else
 		ZoneService.Teleport(player, 1)

@@ -9,6 +9,7 @@ local Remotes = require(Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local PetService = require(script.Parent.PetService)
 local RateLimit = require(script.Parent.RateLimit)
+local Hooks = require(script.Parent.Hooks)
 
 local TradeService = {}
 
@@ -119,6 +120,8 @@ local function execute(t: Trade)
 	end
 	pa.Stats.Trades += 1
 	pb.Stats.Trades += 1
+	Hooks.Fire(t.A, "Trade", 1)
+	Hooks.Fire(t.B, "Trade", 1)
 	DataService.MarkDirty(t.A)
 	DataService.MarkDirty(t.B)
 	PetService.UpdateEquippedAttribute(t.A)

@@ -51,7 +51,7 @@ local function rebuild(player: Player)
 			end
 		end
 		if not exists then
-			local model = PetModelBuilder.Build(w.Id, w.Variant)
+			local model = PetModelBuilder.Build(w.Id, w.Variant, { Shiny = w.Shiny == true, Accessory = w.Accessory })
 			if model then
 				model.Name = player.Name .. "_" .. w.Uid
 				local char = player.Character

@@ -1,12 +1,12 @@
 <roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
-<Item class="Folder" referent="RBX000063"><Properties><string name="Name">PetKingdomSimulator</string></Properties>
-<Item class="StringValue" referent="RBX000064"><Properties><string name="Name">README</string><string name="Value">PET KINGDOM SIMULATOR - التركيب
+<Item class="Folder" referent="RBX000075"><Properties><string name="Name">PetKingdomSimulator</string></Properties>
+<Item class="StringValue" referent="RBX000076"><Properties><string name="Name">README</string><string name="Value">PET KINGDOM SIMULATOR - التركيب
 1) اسحب هذا الملف إلى نافذة Roblox Studio (أو Insert from file).
 2) افتح View &gt; Command Bar والصق السطر التالي ثم Enter:
 local m = workspace.PetKingdomSimulator m.Shared.Parent = game.ReplicatedStorage m.Server.Parent = game.ServerScriptService m.Client.Parent = game.StarterPlayer.StarterPlayerScripts m:Destroy()
 3) فعّل Game Settings &gt; Security &gt; Enable Studio Access to API Services (لحفظ البيانات).
 4) اضغط Play.</string></Properties></Item>
-<Item class="Script" referent="RBX000065"><Properties><string name="Name">AutoInstall</string><ProtectedString name="Source"><![CDATA[-- تركيب تلقائي: ينقل المجلدات لأماكنها الصحيحة عند تشغيل اللعبة ثم يحذف نفسه.
+<Item class="Script" referent="RBX000077"><Properties><string name="Name">AutoInstall</string><ProtectedString name="Source"><![CDATA[-- تركيب تلقائي: ينقل المجلدات لأماكنها الصحيحة عند تشغيل اللعبة ثم يحذف نفسه.
 -- الأفضل تشغيل سطر التركيب من شريط الأوامر (انظر README) ليصبح التركيب دائماً.
 local root = script.Parent
 local RS = game:GetService("ReplicatedStorage")
@@ -42,6 +42,7 @@ Config.Gamepasses = {
 	DoubleCoins = 0,
 	DoubleDiamonds = 0,
 	FastHatch = 0,
+	SeasonPass = 0,
 }
 
 Config.GamepassInfo = {
@@ -57,6 +58,7 @@ Config.GamepassInfo = {
 	{ Key = "PlusStorage", Name = "+100 Storage", Icon = "📦", Desc = "100 خانة إضافية في المخزن" },
 	{ Key = "DoubleCoins", Name = "2x Coins", Icon = "💰", Desc = "ضاعف كل العملات" },
 	{ Key = "DoubleDiamonds", Name = "2x Diamonds", Icon = "💎", Desc = "ضاعف كل الألماس من الصناديق" },
+	{ Key = "SeasonPass", Name = "Season Pass", Icon = "🎫", Desc = "يفتح مسار المكافآت المميز في باس الموسم (30 مكافأة إضافية)" },
 }
 
 Config.DevProducts = {
@@ -173,6 +175,153 @@ Config.Market = {
 Config.TitanicBossChance = 0.004
 Config.TitanicPets = { "titanic_dragon", "titanic_overlord", "titanic_cat", "titanic_phoenix" }
 
+-- باس الموسم
+Config.Season = {
+	Id = 1,
+	Name = "الموسم 1: مملكة الحيوانات",
+	Tiers = 30,
+	XPPerAction = { Hatch = 6, Break = 1, Boss = 250, Mission = 300, DungeonWave = 120, Fuse = 20, Golden = 40, Trade = 50, MarketSale = 30 },
+	Pets = { "season_fox", "season_dragon" },
+}
+function Config.SeasonXPForTier(tier: number): number
+	return math.floor(400 * (tier ^ 1.15))
+end
+-- مكافأة كل مستوى (مجانية ومميزة) تُولَّد بنمط ثابت
+function Config.SeasonReward(tier: number, premium: boolean): any
+	if premium then
+		if tier == 30 then
+			return { Pet = "season_dragon", Variant = "Rainbow", Diamonds = 5000 }
+		elseif tier == 15 then
+			return { Pet = "season_dragon", Diamonds = 1500 }
+		elseif tier % 5 == 0 then
+			return { Diamonds = 600 * (tier / 5), Gems = 100 * (tier / 5) }
+		elseif tier % 3 == 0 then
+			return { Potion = "Lucky", Count = 2, Diamonds = 150 }
+		else
+			return { Diamonds = 100 + tier * 20, Spins = 1 }
+		end
+	else
+		if tier == 30 then
+			return { Pet = "season_fox", Variant = "Golden", Diamonds = 1500 }
+		elseif tier == 10 or tier == 20 then
+			return { Pet = "season_fox", Diamonds = 300 }
+		elseif tier % 5 == 0 then
+			return { Diamonds = 200 * (tier / 5), Gems = 25 * (tier / 5) }
+		elseif tier % 4 == 0 then
+			return { Potion = "Coins" }
+		else
+			return { Diamonds = 40 + tier * 8 }
+		end
+	end
+end
+
+-- محطة التصنيع
+Config.Recipes = {
+	{ Id = "forged_dragon", Name = "Forged Dragon", Output = { Pet = "forged_dragon" }, Diamonds = 2000, Gems = 0,
+		Inputs = { { Rarity = "Legendary", Variant = "Golden", Count = 3 } } },
+	{ Id = "chaos_golem", Name = "Chaos Golem", Output = { Pet = "chaos_golem" }, Diamonds = 5000, Gems = 200,
+		Inputs = { { Rarity = "Mythical", Count = 2 }, { Rarity = "Legendary", Variant = "Rainbow", Count = 1 } } },
+	{ Id = "prime_overlord", Name = "Prime Overlord", Output = { Pet = "prime_overlord" }, Diamonds = 15000, Gems = 1000,
+		Inputs = { { Rarity = "Exclusive", Count = 1 }, { Rarity = "Mythical", Variant = "Golden", Count = 3 } } },
+	{ Id = "golden_huge", Name = "Golden HUGE Cat", Output = { Pet = "huge_cat", Variant = "Golden" }, Diamonds = 25000, Gems = 2500,
+		Inputs = { { Pet = "huge_cat", Count = 3 } } },
+	{ Id = "lucky_potion_pack", Name = "5 جرعات حظ", Output = { Potion = "Lucky", Count = 5 }, Diamonds = 0, Gems = 300,
+		Inputs = { { Rarity = "Rare", Count = 10 } } },
+	{ Id = "tokens", Name = "توكن ريبيرث", Output = { Tokens = 1 }, Diamonds = 10000, Gems = 500,
+		Inputs = { { Rarity = "Epic", Variant = "Golden", Count = 5 } } },
+}
+
+-- الإكسسوارات (بيضة تجميلية بالألماس)
+Config.CosmeticEggCost = 400
+Config.Accessories = {
+	{ Id = "party_hat", Name = "قبعة حفلة", Icon = "🎉", Chance = 30, Color = Color3.fromRGB(255, 90, 160) },
+	{ Id = "glasses", Name = "نظارة", Icon = "🕶️", Chance = 25, Color = Color3.fromRGB(20, 20, 20) },
+	{ Id = "bow", Name = "فيونكة", Icon = "🎀", Chance = 18, Color = Color3.fromRGB(255, 120, 200) },
+	{ Id = "tophat", Name = "قبعة فخمة", Icon = "🎩", Chance = 12, Color = Color3.fromRGB(30, 30, 30) },
+	{ Id = "wizard", Name = "قبعة ساحر", Icon = "🧙", Chance = 8, Color = Color3.fromRGB(90, 40, 160) },
+	{ Id = "halo", Name = "هالة", Icon = "😇", Chance = 4.5, Color = Color3.fromRGB(255, 230, 120) },
+	{ Id = "crown", Name = "تاج", Icon = "👑", Chance = 2, Color = Color3.fromRGB(255, 215, 0) },
+	{ Id = "dominus", Name = "دومينوس", Icon = "🕋", Chance = 0.5, Color = Color3.fromRGB(0, 0, 0) },
+}
+
+-- Shiny: نسخة لامعة بفرصة صغيرة من أي بيضة (+50% قوة)
+Config.Shiny = { Chance = 0.01, Mult = 1.5 }
+
+-- نظام الرحمة: بعد N فتحة بدون Legendary+ من نفس البيضة، الفتحة التالية مضمونة
+Config.Pity = { Threshold = 200 }
+
+-- متجر الريبيرث (بالتوكنات)
+Config.RebirthShop = {
+	{ Key = "RLuck", Name = "حظ الريبيرث", Icon = "🍀", Desc = "+15% حظ لكل مستوى", MaxLevel = 10, Cost = 1, CostStep = 1, PerLevel = 0.15 },
+	{ Key = "RCoins", Name = "عملات الريبيرث", Icon = "💰", Desc = "+25% عملات لكل مستوى", MaxLevel = 10, Cost = 1, CostStep = 1, PerLevel = 0.25 },
+	{ Key = "REquip", Name = "خانة تجهيز دائمة", Icon = "🐾", Desc = "+1 حيوان مجهز", MaxLevel = 3, Cost = 3, CostStep = 2, PerLevel = 1 },
+	{ Key = "RStorage", Name = "مخزن الريبيرث", Icon = "📦", Desc = "+50 خانة", MaxLevel = 5, Cost = 2, CostStep = 1, PerLevel = 50 },
+	{ Key = "RDamage", Name = "قوة الريبيرث", Icon = "⚔️", Desc = "+20% قوة لكل مستوى", MaxLevel = 10, Cost = 1, CostStep = 1, PerLevel = 0.20 },
+}
+
+-- الألقاب
+Config.Titles = {
+	{ Id = "", Name = "بدون لقب" },
+	{ Id = "hatcher", Name = "🥚 فاقس البيض", Achievement = "hatch_1000" },
+	{ Id = "legend", Name = "🌟 أسطورة البيض", Achievement = "hatch_10000" },
+	{ Id = "breaker", Name = "💥 المدمّر", Achievement = "break_2500" },
+	{ Id = "rich", Name = "💰 الملياردير", Achievement = "coins_1b" },
+	{ Id = "trillionaire", Name = "💎 التريليونير", Achievement = "coins_1t" },
+	{ Id = "alchemist", Name = "🔮 الخيميائي", Achievement = "fuse_10" },
+	{ Id = "bossslayer", Name = "👹 قاتل الزعماء", Achievement = "boss_5" },
+	{ Id = "merchant", Name = "🏪 تاجر السوق", Achievement = "sales_50" },
+	{ Id = "reborn", Name = "🔁 المولود من جديد", Achievement = "rebirth_1" },
+	{ Id = "immortal", Name = "♾️ الخالد", Achievement = "rebirth_5" },
+	{ Id = "huge", Name = "🎉 صاحب العملاق", Achievement = "huge_1" },
+	{ Id = "titanic", Name = "🌟 صاحب التايتانيك", Achievement = "titanic_1" },
+	{ Id = "rift", Name = "🌀 غازي الزنزانة", Stat = "DungeonClears", Target = 5 },
+}
+Config.RebirthRanks = { { 0, "" }, { 1, "⭐" }, { 3, "⭐⭐" }, { 5, "⭐⭐⭐" }, { 10, "💫" }, { 25, "☀️" }, { 50, "🌌" } }
+
+-- الزنزانة (Rift Dungeon)
+Config.Dungeon = {
+	Waves = 5,
+	CratesPerWave = 6,
+	CrateSecondsPerPower = 5, -- صحة الصندوق = مجموع قوة المشاركين × هذا الرقم / عدد الصناديق
+	BossSeconds = 35,
+	TimeLimit = 240,
+	Cooldown = 600,
+	WaveReward = { Diamonds = 15, Gems = 3 },
+	CoinsPerWaveScale = 400, -- × مضاعف أعلى منطقة
+	ClearReward = { Diamonds = 150, Gems = 40 },
+	PetChance = 0.08,
+	Pet = "rift_guardian",
+	BossPetChance = 0.01,
+}
+
+-- الكنز العشوائي
+Config.Treasure = { Interval = 240, Lifetime = 150, Diamonds = 120, Gems = 25, CoinsScale = 2000, PetChance = 0.05, Pet = "treasure_turtle" }
+
+-- الحارس (زعيم مصغر في كل منطقة)
+Config.Guardian = { HealthMult = 150, CoinsMult = 90, Diamonds = 6, Respawn = 480 }
+
+-- أرباح وقت الغياب
+Config.Offline = { MaxHours = 8, Rate = 0.35 } -- نسبة من معدل الكسب التقريبي
+
+-- مكافأة الأصدقاء
+Config.FriendLuckPerFriend = 0.05
+Config.FriendLuckMax = 0.25
+
+-- دورة الليل والنهار
+Config.DayNight = { Enabled = true, DayLength = 720 }
+
+-- مكافآت إكمال فهرس كل بيضة
+function Config.IndexReward(tier: number): any
+	return { Diamonds = 100 * tier, Gems = 10 * tier }
+end
+
+-- الزعماء
+Config.Bosses = {
+	{ Id = "slime_king", Name = "Slime King", Arabic = "ملك السلايم", Zone = 1, Color = Color3.fromRGB(50, 205, 50), Pet = "slime_king", HealthPerPower = 45 },
+	{ Id = "mecha_titan", Name = "Mecha Titan", Arabic = "التيتان الآلي", Zone = 11, Color = Color3.fromRGB(120, 130, 160), Pet = "mecha_titan_pet", HealthPerPower = 60 },
+	{ Id = "void_leviathan", Name = "Void Leviathan", Arabic = "لوياثان الفراغ", Zone = 16, Color = Color3.fromRGB(40, 0, 70), Pet = "void_leviathan_pet", HealthPerPower = 80 },
+}
+
 -- متطلبات الريبيرث لكل عالم
 Config.WorldRebirths = { [1] = 0, [2] = 1, [3] = 3 }
 
@@ -272,6 +421,11 @@ Config.Achievements = {
 	{ Id = "gems_1000", Name = "جامع الجواهر", Stat = "GemsEarned", Target = 1000, Reward = { Diamonds = 500 } },
 	{ Id = "huge_1", Name = "عملاق!", Stat = "Huges", Target = 1, Reward = { Diamonds = 2500, Gems = 500 } },
 	{ Id = "titanic_1", Name = "تايتانيك!!!", Stat = "Titanics", Target = 1, Reward = { Diamonds = 10000, Gems = 5000 } },
+	{ Id = "dungeon_1", Name = "أول زنزانة", Stat = "DungeonClears", Target = 1, Reward = { Diamonds = 300 } },
+	{ Id = "dungeon_10", Name = "سيد الزنزانة", Stat = "DungeonClears", Target = 10, Reward = { Diamonds = 2000, Gems = 300 } },
+	{ Id = "craft_1", Name = "حرفي", Stat = "Crafts", Target = 1, Reward = { Diamonds = 400 } },
+	{ Id = "shiny_1", Name = "لامع!", Stat = "Shinies", Target = 1, Reward = { Diamonds = 500 } },
+	{ Id = "treasure_3", Name = "صائد الكنوز", Stat = "Treasures", Target = 3, Reward = { Gems = 200 } },
 }
 
 -- الدليل التعليمي للمبتدئين (خطوات متسلسلة)
@@ -303,6 +457,8 @@ Config.Codes = {
 	TECHWORLD = { Diamonds = 750 },
 	MARKET = { Gems = 100 },
 	TITANIC = { Diamonds = 2000, Gems = 250 },
+	SEASON1 = { Diamonds = 300, SeasonXP = 500 },
+	SHINY = { Diamonds = 400 },
 }
 
 Config.DailyRewards = {
@@ -350,6 +506,7 @@ Config.Map = {
 	MarketOffset = Vector3.new(-750, 0, 700),
 	World2Offset = Vector3.new(1500, 0, 0),
 	World3Offset = Vector3.new(3000, 0, 0),
+	DungeonOffset = Vector3.new(-750, 0, 1500),
 }
 
 -- أثناء التجربة في Studio: اعتبر كل الجيم باس مملوكة (عطّلها قبل النشر)
@@ -370,6 +527,8 @@ Config.Sounds = {
 	Boss = 0,
 	Sell = 0,
 	Firework = 0,
+	Wave = 0,
+	Craft = 0,
 }
 
 return Config
@@ -410,6 +569,14 @@ Breakables.Types = {
 		Size = Vector3.new(4, 4, 4), Color = Color3.fromRGB(120, 60, 200), Shape = "crystal", Material = Enum.Material.Glass },
 	MagicOrb = { Name = "Magic Orb", Arabic = "كرة سحرية", Health = 32, Coins = 15, Diamonds = 0, Respawn = 4,
 		Size = Vector3.new(4, 4, 4), Color = Color3.fromRGB(255, 120, 255), Shape = "orb", Material = Enum.Material.Neon },
+	Guardian = { Name = "Zone Guardian", Arabic = "حارس المنطقة", Health = 25 * 150, Coins = 12 * 90, Diamonds = 6, Respawn = 480,
+		Size = Vector3.new(9, 9, 9), Color = Color3.fromRGB(80, 80, 120), Shape = "golem", Material = Enum.Material.Slate },
+	Treasure = { Name = "Treasure Chest", Arabic = "صندوق الكنز", Health = 3000, Coins = 2000, Diamonds = 120, Gems = 25, Respawn = 999999,
+		Size = Vector3.new(7, 6, 6), Color = Color3.fromRGB(255, 215, 0), Shape = "chest", Material = Enum.Material.Metal },
+	RiftCrate = { Name = "Rift Crate", Arabic = "صندوق الشق", Health = 100, Coins = 100, Diamonds = 0, Respawn = 999999,
+		Size = Vector3.new(4.5, 4.5, 4.5), Color = Color3.fromRGB(120, 0, 200), Shape = "gift", Material = Enum.Material.Neon },
+	RiftBoss = { Name = "Rift Warden", Arabic = "حارس الشق", Health = 1000, Coins = 1000, Diamonds = 0, Respawn = 999999,
+		Size = Vector3.new(14, 12, 14), Color = Color3.fromRGB(60, 0, 120), Shape = "boss", Material = Enum.Material.Neon },
 	MysteryBox = { Name = "Mystery Box", Arabic = "صندوق الغموض", Health = 5000, Coins = 2000, Diamonds = 25, Respawn = 240,
 		Size = Vector3.new(6, 6, 6), Color = Color3.fromRGB(80, 60, 200), Shape = "gift", Material = Enum.Material.Neon },
 }
@@ -858,6 +1025,19 @@ egg("Titanic", 12, 50000000, {
 	{ "titanic_phoenix", "TITANIC Phoenix", "Titanic", "bird", "FFFFFF", "FFA500" },
 })
 
+-- حيوانات الأنظمة الجديدة: الزنزانة، الكنز، التصنيع، الموسم، الزعماء
+egg("Special", 9, 3000000, {
+	{ "rift_guardian", "Rift Guardian", "Mythical", "golem", "20003A", "9D00FF" },
+	{ "treasure_turtle", "Treasure Turtle", "Legendary", "blob", "2E8B57", "FFD700" },
+	{ "forged_dragon", "Forged Dragon", "Mythical", "dragon", "B87333", "FF4500" },
+	{ "chaos_golem", "Chaos Golem", "Exclusive", "golem", "FF00FF", "00FFFF" },
+	{ "prime_overlord", "Prime Overlord", "Exclusive", "demon", "FFFFFF", "FF0000" },
+	{ "season_fox", "Season Fox", "Legendary", "fox", "FF8C00", "FFFFFF" },
+	{ "season_dragon", "Season Dragon", "Mythical", "dragon", "1E90FF", "FFD700" },
+	{ "mecha_titan_pet", "Mecha Titan", "Mythical", "robot", "8A8A9A", "FF3C3C" },
+	{ "void_leviathan_pet", "Void Leviathan", "Exclusive", "fish", "1A0030", "9D00FF" },
+})
+
 -- بيضة الريبيرث (تشترى بتوكنات الريبيرث)
 egg("RebirthEgg", 8, 500000, {
 	{ "reborn_cat", "Reborn Cat", "Epic", "cat", "FFFFFF", "FF4500" },
@@ -1037,6 +1217,10 @@ Zones.Market = { Index = -1, Id = "Market", Name = "Grand Bazaar", Arabic = "ا�
 	Material = Enum.Material.Cobblestone, Decor = "market",
 	Breakables = { { Type = "GemOre", Count = 10 }, { Type = "CoinPile", Count = 6 } } }
 
+Zones.Dungeon = { Index = -2, Id = "Dungeon", Name = "Rift Dungeon", Arabic = "زنزانة الشق", Cost = 0, Multiplier = 1, World = 1,
+	Ground = Color3.fromRGB(25, 10, 40), Accent = Color3.fromRGB(157, 0, 255), Sky = Color3.fromRGB(0, 0, 0),
+	Material = Enum.Material.Basalt, Decor = "voidorbs", Breakables = {} }
+
 Zones.WorldStart = { [1] = 1, [2] = 11, [3] = 16 }
 
 function Zones.IsWorldStart(index: number): boolean
@@ -1077,6 +1261,8 @@ function Zones.Get(index: number): ZoneDef?
 		return Zones.VIP
 	elseif index == -1 then
 		return Zones.Market
+	elseif index == -2 then
+		return Zones.Dungeon
 	end
 	return Zones.List[index]
 end
@@ -1588,13 +1774,63 @@ SHAPES.demon = function(m, c1, c2)
 	return body
 end
 
--- يبني النموذج. variant: Normal/Golden/Rainbow/DarkMatter
-function Builder.Build(petId: string, variant: string?): Model?
+-- الإكسسوارات فوق الرأس
+local function accessory(model: Model, body: BasePart, id: string, color: Color3)
+	local top = body.CFrame * CFrame.new(0, body.Size.Y / 2, 0)
+	if id == "party_hat" then
+		part(model, "Acc", Vector3.new(1.2, 1.8, 1.2), top * CFrame.new(0, 0.8, 0), color, "cone")
+		part(model, "AccTop", Vector3.new(0.4, 0.4, 0.4), top * CFrame.new(0, 1.8, 0), Color3.fromRGB(255, 255, 120), "ball", Enum.Material.Neon)
+	elseif id == "glasses" then
+		local eyeCf = body.CFrame * CFrame.new(0, 0.25, -body.Size.Z / 2)
+		for _, sx in ipairs({ -1, 1 }) do
+			local lens = part(model, "Acc", Vector3.new(0.7, 0.55, 0.15), eyeCf * CFrame.new(sx * 0.45, 0, -0.1), color, nil, Enum.Material.Glass)
+			lens.Transparency = 0.3
+		end
+		part(model, "Acc", Vector3.new(0.25, 0.1, 0.12), eyeCf * CFrame.new(0, 0, -0.1), color)
+	elseif id == "bow" then
+		for _, sx in ipairs({ -1, 1 }) do
+			part(model, "Acc", Vector3.new(0.7, 0.5, 0.3), top * CFrame.new(sx * 0.4 + 0.3, 0.2, 0) * CFrame.Angles(0, 0, sx * 0.4), color, "ball")
+		end
+		part(model, "Acc", Vector3.new(0.3, 0.3, 0.3), top * CFrame.new(0.3, 0.2, 0), color, "ball")
+	elseif id == "tophat" then
+		part(model, "Acc", Vector3.new(0.3, 2.2, 2.2), top * CFrame.new(0, 0.1, 0) * CFrame.Angles(0, 0, math.pi / 2), color, "cyl")
+		part(model, "Acc", Vector3.new(1.4, 1.5, 1.5), top * CFrame.new(0, 0.9, 0) * CFrame.Angles(0, 0, math.pi / 2), color, "cyl")
+		part(model, "AccBand", Vector3.new(0.3, 1.55, 1.55), top * CFrame.new(0, 0.4, 0) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(200, 40, 40), "cyl")
+	elseif id == "wizard" then
+		part(model, "Acc", Vector3.new(0.3, 2.6, 2.6), top * CFrame.new(0, 0.1, 0) * CFrame.Angles(0, 0, math.pi / 2), color, "cyl")
+		part(model, "Acc", Vector3.new(1.4, 2.4, 1.4), top * CFrame.new(0, 1.2, 0) * CFrame.Angles(0.15, 0, 0), color, "cone")
+		part(model, "AccStar", Vector3.new(0.4, 0.4, 0.4), top * CFrame.new(0.4, 1.2, -0.5), Color3.fromRGB(255, 230, 80), "ball", Enum.Material.Neon)
+	elseif id == "halo" then
+		local ring = part(model, "Acc", Vector3.new(0.2, 1.6, 1.6), top * CFrame.new(0, 0.9, 0) * CFrame.Angles(0, 0, math.pi / 2), color, "cyl", Enum.Material.Neon)
+		ring.CFrame = top * CFrame.new(0, 0.9, 0) * CFrame.Angles(math.pi / 2, 0, 0) * CFrame.Angles(0, 0, math.pi / 2)
+		local light = Instance.new("PointLight")
+		light.Color = color
+		light.Range = 6
+		light.Parent = ring
+	elseif id == "crown" then
+		part(model, "Acc", Vector3.new(0.5, 1.5, 1.5), top * CFrame.new(0, 0.25, 0) * CFrame.Angles(0, 0, math.pi / 2), color, "cyl", Enum.Material.Metal)
+		for i = 1, 5 do
+			local ang = (i / 5) * math.pi * 2
+			part(model, "Acc", Vector3.new(0.3, 0.7, 0.3), top * CFrame.new(math.cos(ang) * 0.65, 0.75, math.sin(ang) * 0.65), color, "cone", Enum.Material.Metal)
+		end
+		part(model, "AccGem", Vector3.new(0.35, 0.35, 0.35), top * CFrame.new(0, 0.5, -0.75), Color3.fromRGB(255, 40, 80), "ball", Enum.Material.Neon)
+	elseif id == "dominus" then
+		part(model, "Acc", Vector3.new(1.9, 0.5, 1.9), top * CFrame.new(0, 0.2, 0), color, nil, Enum.Material.Metal)
+		part(model, "Acc", Vector3.new(1.3, 1.6, 1.3), top * CFrame.new(0, 1.0, 0), color, "cone", Enum.Material.Metal)
+		for _, sx in ipairs({ -1, 1 }) do
+			part(model, "Acc", Vector3.new(0.25, 1.4, 0.25), top * CFrame.new(sx * 0.9, 0.6, 0) * CFrame.Angles(0, 0, -sx * 0.5), Color3.fromRGB(255, 215, 0), "cone", Enum.Material.Neon)
+		end
+	end
+end
+
+-- يبني النموذج. variant: Normal/Golden/Rainbow/DarkMatter، opts: {Shiny, Accessory}
+function Builder.Build(petId: string, variant: string?, opts: { Shiny: boolean?, Accessory: string? }?): Model?
 	local def = Pets.Get(petId)
 	if not def then
 		return nil
 	end
 	variant = variant or "Normal"
+	opts = opts or {}
 	local c1, c2 = def.Primary, def.Secondary
 	if variant == "Golden" then
 		c1, c2 = GOLD, GOLD2
@@ -1610,6 +1846,34 @@ function Builder.Build(petId: string, variant: string?): Model?
 	model:SetAttribute("PetId", petId)
 	model:SetAttribute("Variant", variant)
 	model:SetAttribute("Scale", def.Scale or 1)
+	if opts.Accessory and opts.Accessory ~= "" then
+		local ReplicatedStorage2 = game:GetService("ReplicatedStorage")
+		local Config = require(ReplicatedStorage2:WaitForChild("Shared").Config)
+		for _, a in ipairs(Config.Accessories) do
+			if a.Id == opts.Accessory then
+				accessory(model, body, a.Id, a.Color)
+			end
+		end
+	end
+	if opts.Shiny then
+		local attach = Instance.new("Attachment")
+		attach.Parent = body
+		local pe = Instance.new("ParticleEmitter")
+		pe.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(255, 240, 150))
+		pe.Size = NumberSequence.new(0.35, 0)
+		pe.Transparency = NumberSequence.new(0, 1)
+		pe.Lifetime = NumberRange.new(0.5, 1)
+		pe.Rate = 10
+		pe.Speed = NumberRange.new(1, 3)
+		pe.SpreadAngle = Vector2.new(180, 180)
+		pe.LightEmission = 1
+		pe.Parent = attach
+		for _, p in ipairs(model:GetDescendants()) do
+			if p:IsA("BasePart") and p.Name == "Body" then
+				p.Reflectance = math.max(p.Reflectance, 0.35)
+			end
+		end
+	end
 	if (def.Scale or 1) ~= 1 then
 		model:ScaleTo(def.Scale)
 	end
@@ -1755,6 +2019,9 @@ export type PetInstance = {
 	Level: number,
 	XP: number,
 	Enchants: { Enchant },
+	Shiny: boolean?,
+	Accessory: string?,
+	Nick: string?,
 }
 
 function PetUtil.Level(inst: PetInstance): number
@@ -1768,13 +2035,17 @@ function PetUtil.BasePower(inst: PetInstance): number
 	end
 	local mult = Config.VariantMultipliers[inst.Variant] or 1
 	local levelMult = 1 + (PetUtil.Level(inst) - 1) * Config.PetLevelPowerPerLevel
-	return math.floor(def.Power * mult * levelMult + 0.5)
+	local shiny = inst.Shiny and Config.Shiny.Mult or 1
+	return math.floor(def.Power * mult * levelMult * shiny + 0.5)
 end
 
 function PetUtil.DisplayName(inst: PetInstance): string
 	local def = Pets.Get(inst.Id)
+	if inst.Nick and inst.Nick ~= "" then
+		return inst.Nick
+	end
 	local prefix = Config.VariantNames[inst.Variant] or ""
-	return prefix .. (def and def.Name or inst.Id)
+	return (inst.Shiny and "✨ " or "") .. prefix .. (def and def.Name or inst.Id)
 end
 
 function PetUtil.RarityColor(inst: PetInstance): Color3
@@ -1868,6 +2139,7 @@ Remotes.Events = {
 	"TradeUpdate",     -- S->C: state أو nil
 	"EventEffect",     -- S->C all: {Type, ...} تأثيرات بصرية
 	"BossUpdate",      -- S->C all: {Active, Health, MaxHealth, Ends}
+	"DungeonUpdate",   -- S->C all: {Active, Wave, Ends, Text}
 }
 
 Remotes.Functions = {
@@ -1892,6 +2164,13 @@ Remotes.Functions = {
 	"ClaimVIPDaily",  -- () -> {ok, error?}
 	"Admin",          -- (command, payload) -> {ok, error?}
 	"Market",         -- (action, payload) -> {ok, error?, ...} السوق: Browse/List/Buy/Cancel/SellNPC/Booth
+	"Season",         -- (action, payload) -> {ok, error?} Claim tier
+	"Craft",          -- (recipeId) -> {ok, error?}
+	"Cosmetic",       -- (action, payload) -> {ok, error?, result?} Hatch / Equip / Unequip
+	"Dungeon",        -- (action) -> {ok, error?} Start
+	"Title",          -- (titleId) -> {ok, error?}
+	"RebirthShop",    -- (key) -> {ok, error?}
+	"GetLeaderboards", -- () -> {Coins={...}, ...}
 }
 
 local folder: Folder
@@ -1916,6 +2195,8 @@ function Remotes.Init(): Folder
 		state:SetAttribute("EventId", "")
 		state:SetAttribute("EventEnds", 0)
 		state:SetAttribute("NextEvent", 0)
+		state:SetAttribute("DungeonWave", 0)
+		state:SetAttribute("DungeonEnds", 0)
 		state.Parent = ReplicatedStorage
 	else
 		folder = ReplicatedStorage:WaitForChild("Remotes") :: Folder
@@ -1943,11 +2224,12 @@ end
 
 return Remotes
 ]]></ProtectedString></Properties></Item></Item>
-<Item class="Folder" referent="RBX000039"><Properties><string name="Name">Server</string></Properties><Item class="Script" referent="RBX000016"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[--!strict
+<Item class="Folder" referent="RBX000047"><Properties><string name="Name">Server</string></Properties><Item class="Script" referent="RBX000016"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[--!strict
 -- نقطة تشغيل السيرفر
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
+local Config = require(Shared.Config)
 
 local Services = script.Parent:WaitForChild("Services")
 
@@ -1971,6 +2253,14 @@ local MerchantService = require(Services.MerchantService)
 local HoverboardService = require(Services.HoverboardService)
 local AdminService = require(Services.AdminService)
 local MarketService = require(Services.MarketService)
+local SeasonService = require(Services.SeasonService)
+local CraftService = require(Services.CraftService)
+local CosmeticService = require(Services.CosmeticService)
+local DungeonService = require(Services.DungeonService)
+local TreasureService = require(Services.TreasureService)
+local TitleService = require(Services.TitleService)
+local OfflineService = require(Services.OfflineService)
+local FriendService = require(Services.FriendService)
 
 MapBuilder.Build()
 
@@ -1996,11 +2286,31 @@ MerchantService.Init()
 HoverboardService.Init()
 AdminService.Init()
 MarketService.Init()
+SeasonService.Init()
+CraftService.Init()
+CosmeticService.Init()
+DungeonService.Init()
+TreasureService.Init()
+TitleService.Init()
+OfflineService.Init()
+FriendService.Init()
 LeaderboardService.Init()
 DataService.Init()
 
+-- دورة الليل والنهار
+if Config.DayNight.Enabled then
+	task.spawn(function()
+		local Lighting = game:GetService("Lighting")
+		while true do
+			local t = (os.clock() % Config.DayNight.DayLength) / Config.DayNight.DayLength
+			Lighting.ClockTime = 6 + t * 24
+			task.wait(2)
+		end
+	end)
+end
+
 print("[PetKingdom] Server ready")
-]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX000038"><Properties><string name="Name">Services</string></Properties><Item class="ModuleScript" referent="RBX000017"><Properties><string name="Name">AdminService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX000046"><Properties><string name="Name">Services</string></Properties><Item class="ModuleScript" referent="RBX000017"><Properties><string name="Name">AdminService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- أوامر الأدمن (للاختبار والإدارة)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -2105,6 +2415,9 @@ type Breakable = {
 	Model: Model,
 	Special: boolean,
 	Boss: boolean,
+	OnBroken: ((contributors: { [Player]: number }) -> ())?,
+	Dynamic: boolean?,
+	RewardScale: number?,
 }
 
 local breakables: { [string]: Breakable } = {}
@@ -2114,6 +2427,7 @@ local folder: Folder
 local counter = 0
 local rng = Random.new()
 local boss: Breakable? = nil
+local bossName = "Boss"
 BreakableService.OnBossKilled = nil :: ((contributors: { [Player]: number }) -> ())?
 
 local function canUseZone(player: Player, zone: number): boolean
@@ -2123,7 +2437,7 @@ local function canUseZone(player: Player, zone: number): boolean
 	end
 	if zone == 0 then
 		return DataService.HasGamepass(player, "VIP")
-	elseif zone == -1 then
+	elseif zone == -1 or zone == -2 then
 		return true
 	end
 	local required = Zones.RebirthRequired(zone)
@@ -2162,7 +2476,7 @@ local function tryTarget(player: Player, b: Breakable, maxDist: number): boolean
 end
 
 local function respawn(b: Breakable)
-	if b.Boss then
+	if b.Boss or b.Dynamic then
 		return
 	end
 	b.Health = b.MaxHealth
@@ -2203,7 +2517,7 @@ local function breakIt(b: Breakable)
 		local p = DataService.Get(player)
 		if player.Parent == Players and p then
 			local share = d / total
-			local mult = b.Boss and highestZoneMult(player) or b.Mult
+			local mult = (b.Boss or b.RewardScale) and highestZoneMult(player) * (b.RewardScale or 1) or b.Mult
 			local coins, diamonds = 0, 0
 			if b.Def.Coins > 0 then
 				coins = math.max(1, math.floor(b.Def.Coins * mult * share * DataService.CoinMultiplier(player) + 0.5))
@@ -2256,6 +2570,12 @@ local function breakIt(b: Breakable)
 		if BreakableService.OnBossKilled then
 			BreakableService.OnBossKilled(contributors)
 		end
+	elseif b.Dynamic then
+		breakables[b.Id] = nil
+		b.Model:Destroy()
+		if b.OnBroken then
+			task.spawn(b.OnBroken, contributors)
+		end
 	else
 		task.delay(b.Def.Respawn, respawn, b)
 	end
@@ -2278,7 +2598,7 @@ local function applyDamage(b: Breakable, player: Player, amount: number, crit: b
 	b.Model:SetAttribute("LastDamage", amount)
 	b.Model:SetAttribute("LastCrit", crit == true)
 	if b.Boss then
-		Remotes.Event("BossUpdate"):FireAllClients({ Active = true, Health = math.max(0, b.Health), MaxHealth = b.MaxHealth })
+		Remotes.Event("BossUpdate"):FireAllClients({ Active = true, Health = math.max(0, b.Health), MaxHealth = b.MaxHealth, Name = bossName })
 	end
 	if b.Health <= 0 then
 		breakIt(b)
@@ -2395,17 +2715,78 @@ local function tick()
 end
 
 -- ===== الزعيم =====
-function BreakableService.SpawnBoss(health: number): Breakable?
+function BreakableService.SpawnBoss(health: number, def: any?): Breakable?
 	if boss then
 		return boss
 	end
-	local pos = MapBuilder.Specials.BossArena
-	local b = spawnBreakable("Boss", 1, 1, pos, true, true, health)
+	local zone = def and def.Zone or 1
+	local pos = MapBuilder.BossPosition(zone)
+	local b = spawnBreakable("Boss", zone, 1, pos, true, true, health)
 	boss = b
 	if b then
-		Remotes.Event("BossUpdate"):FireAllClients({ Active = true, Health = b.Health, MaxHealth = b.MaxHealth })
+		bossName = def and def.Name or "Boss"
+		b.Model:SetAttribute("BossName", bossName)
+		if def then
+			for _, part in ipairs(b.Model:GetChildren()) do
+				if part:IsA("BasePart") and part.Name == "Base" then
+					part.Color = def.Color
+				end
+			end
+			local bb = b.Model:FindFirstChildOfClass("BillboardGui", true)
+			local label = bb and bb:FindFirstChildOfClass("TextLabel")
+			if label then
+				label.Text = "👹 " .. def.Name
+			end
+		end
+		Remotes.Event("BossUpdate"):FireAllClients({ Active = true, Health = b.Health, MaxHealth = b.MaxHealth, Name = bossName })
 	end
 	return b
+end
+
+-- ===== الصناديق الديناميكية (الزنزانة، الكنز) =====
+function BreakableService.SpawnDynamic(typeName: string, zone: number, pos: Vector3, opts: { Health: number?, RewardScale: number?, OnBroken: ((contributors: { [Player]: number }) -> ())?, Lifetime: number?, Name: string? }): string?
+	local b = spawnBreakable(typeName, zone, 1, pos, true, false, opts.Health)
+	if not b then
+		return nil
+	end
+	b.Dynamic = true
+	b.OnBroken = opts.OnBroken
+	b.RewardScale = opts.RewardScale
+	if opts.Name then
+		local bb = b.Model:FindFirstChildOfClass("BillboardGui", true)
+		local label = bb and bb:FindFirstChildOfClass("TextLabel")
+		if label then
+			label.Text = opts.Name
+		end
+	end
+	if opts.Lifetime then
+		task.delay(opts.Lifetime, function()
+			if breakables[b.Id] and b.Alive then
+				BreakableService.Remove(b.Id)
+			end
+		end)
+	end
+	return b.Id
+end
+
+function BreakableService.Remove(id: string)
+	local b = breakables[id]
+	if not b then
+		return
+	end
+	b.Alive = false
+	for player, tid in pairs(targets) do
+		if tid == id then
+			setTarget(player, nil)
+		end
+	end
+	b.Model:Destroy()
+	breakables[id] = nil
+end
+
+function BreakableService.IsAlive(id: string): boolean
+	local b = breakables[id]
+	return b ~= nil and b.Alive
 end
 
 function BreakableService.RemoveBoss()
@@ -2451,6 +2832,15 @@ function BreakableService.Init()
 	end
 	spawnBreakable("GiantChest", 1, 1, MapBuilder.Specials.GiantChest, true)
 	spawnBreakable("MysteryBox", 1, 1, MapBuilder.Specials.MysteryBox, true)
+	-- حارس لكل منطقة
+	for index, layout in pairs(MapBuilder.Zones) do
+		if index >= 1 and layout.Spots[#layout.Spots] then
+			local zone = Zones.Get(index)
+			if zone then
+				spawnBreakable("Guardian", index, zone.Multiplier, layout.Spots[#layout.Spots], true)
+			end
+		end
+	end
 
 	Remotes.Event("SetTarget").OnServerEvent:Connect(function(player, id)
 		if id == nil then
@@ -2482,7 +2872,160 @@ function BreakableService.Init()
 end
 
 return BreakableService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000019"><Properties><string name="Name">DataService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000019"><Properties><string name="Name">CosmeticService</string><ProtectedString name="Source"><![CDATA[--!strict
+-- البيضة التجميلية: إكسسوارات للحيوانات
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Remotes = require(Shared.Remotes)
+local DataService = require(script.Parent.DataService)
+local RateLimit = require(script.Parent.RateLimit)
+
+local CosmeticService = {}
+local rng = Random.new()
+
+function CosmeticService.Hatch(player: Player): { ok: boolean, error: string?, result: string? }
+	local p = DataService.Get(player)
+	if not p then
+		return { ok = false, error = "لم يتم تحميل البيانات" }
+	end
+	if not DataService.Spend(player, "Diamonds", Config.CosmeticEggCost) then
+		return { ok = false, error = "تحتاج 💎 " .. Config.CosmeticEggCost }
+	end
+	local total = 0
+	for _, a in ipairs(Config.Accessories) do
+		total += a.Chance
+	end
+	local r = rng:NextNumber() * total
+	local chosen = Config.Accessories[1]
+	for _, a in ipairs(Config.Accessories) do
+		r -= a.Chance
+		if r <= 0 then
+			chosen = a
+			break
+		end
+	end
+	p.Accessories[chosen.Id] = (p.Accessories[chosen.Id] or 0) + 1
+	DataService.MarkDirty(player)
+	DataService.Notify(player, chosen.Icon .. " حصلت على " .. chosen.Name .. "!", Color3.fromRGB(255, 120, 200))
+	return { ok = true, result = chosen.Id }
+end
+
+function CosmeticService.Init()
+	Remotes.Function("Cosmetic").OnServerInvoke = function(player, action)
+		if not RateLimit.Check(player, "Cosmetic", 3) then
+			return { ok = false, error = "ببطء!" }
+		end
+		if action == "Hatch" then
+			return CosmeticService.Hatch(player)
+		end
+		return { ok = false, error = "إجراء غير معروف" }
+	end
+end
+
+return CosmeticService
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000020"><Properties><string name="Name">CraftService</string><ProtectedString name="Source"><![CDATA[--!strict
+-- محطة التصنيع: وصفات تحوّل حيوانات + عملات إلى حيوانات حصرية أو عناصر
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Pets = require(Shared.Data.Pets)
+local Remotes = require(Shared.Remotes)
+local DataService = require(script.Parent.DataService)
+local PetService = require(script.Parent.PetService)
+local Rewards = require(script.Parent.Rewards)
+local Hooks = require(script.Parent.Hooks)
+local RateLimit = require(script.Parent.RateLimit)
+
+local CraftService = {}
+
+-- يختار الحيوانات المطابقة لمدخل الوصفة (الأقل قوة أولاً، غير مقفولة)
+local function pick(p: DataService.Profile, input: any, used: { [string]: boolean }): { any }?
+	local candidates = {}
+	for _, pet in ipairs(p.Pets) do
+		if not pet.Locked and not used[pet.Uid] then
+			local def = Pets.Get(pet.Id)
+			local okPet = input.Pet == nil or pet.Id == input.Pet
+			local okRarity = input.Rarity == nil or (def and def.Rarity == input.Rarity)
+			local okVariant = (input.Variant or "Normal") == pet.Variant
+			if okPet and okRarity and okVariant then
+				table.insert(candidates, pet)
+			end
+		end
+	end
+	if #candidates < input.Count then
+		return nil
+	end
+	table.sort(candidates, function(a, b)
+		return (a.Level or 1) < (b.Level or 1)
+	end)
+	local out = {}
+	for i = 1, input.Count do
+		table.insert(out, candidates[i])
+		used[candidates[i].Uid] = true
+	end
+	return out
+end
+
+function CraftService.Craft(player: Player, recipeId: string): { ok: boolean, error: string? }
+	local p = DataService.Get(player)
+	if not p then
+		return { ok = false, error = "لم يتم تحميل البيانات" }
+	end
+	local recipe
+	for _, r in ipairs(Config.Recipes) do
+		if r.Id == recipeId then
+			recipe = r
+		end
+	end
+	if not recipe then
+		return { ok = false, error = "وصفة غير موجودة" }
+	end
+	if p.Diamonds < (recipe.Diamonds or 0) then
+		return { ok = false, error = "تحتاج 💎 " .. recipe.Diamonds }
+	end
+	if p.Gems < (recipe.Gems or 0) then
+		return { ok = false, error = "تحتاج 💠 " .. recipe.Gems }
+	end
+	local used = {}
+	local toRemove = {}
+	for _, input in ipairs(recipe.Inputs) do
+		local pets = pick(p, input, used)
+		if not pets then
+			return { ok = false, error = "ينقصك: " .. input.Count .. " × " .. (input.Pet or input.Rarity or "?") .. " (" .. (input.Variant or "Normal") .. ")" }
+		end
+		for _, pet in ipairs(pets) do
+			table.insert(toRemove, pet.Uid)
+		end
+	end
+	if recipe.Output.Pet and PetService.FreeSlots(player) <= 0 then
+		return { ok = false, error = "المخزن ممتلئ" }
+	end
+	DataService.Spend(player, "Diamonds", recipe.Diamonds or 0)
+	DataService.Spend(player, "Gems", recipe.Gems or 0)
+	for _, uid in ipairs(toRemove) do
+		PetService.Remove(p, uid)
+	end
+	Rewards.Grant(player, recipe.Output)
+	p.Stats.Crafts += 1
+	Hooks.Fire(player, "Craft", 1)
+	DataService.MarkDirty(player)
+	PetService.UpdateEquippedAttribute(player)
+	DataService.Notify(player, "🔨 صنعت: " .. Rewards.Describe(recipe.Output), Color3.fromRGB(255, 180, 80))
+	return { ok = true }
+end
+
+function CraftService.Init()
+	Remotes.Function("Craft").OnServerInvoke = function(player, recipeId)
+		if not RateLimit.Check(player, "Craft", 3) then
+			return { ok = false, error = "ببطء!" }
+		end
+		return CraftService.Craft(player, tostring(recipeId))
+	end
+end
+
+return CraftService
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000021"><Properties><string name="Name">DataService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- تحميل وحفظ بيانات اللاعبين + العملات + المضاعفات + إرسال الملف للعميل
 local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
@@ -2527,6 +3070,14 @@ export type Profile = {
 	Merchant: { Rotation: number, Bought: { [string]: number } },
 	SpinDay: number,
 	MyListings: { [string]: any },
+	Season: { Id: number, XP: number, Claimed: { [string]: boolean }, PremiumClaimed: { [string]: boolean } },
+	Pity: { [string]: number },
+	RebirthUpgrades: { [string]: number },
+	Title: string,
+	Accessories: { [string]: number },
+	LastSeen: number,
+	DungeonCooldown: number,
+	IndexClaimed: { [string]: boolean },
 }
 
 local function template(): Profile
@@ -2540,7 +3091,7 @@ local function template(): Profile
 		Pets = {},
 		UnlockedZones = { ["1"] = true },
 		Upgrades = { Storage = 0, Equip = 0, Coins = 0, Luck = 0, Damage = 0, Speed = 0, Diamonds = 0, XP = 0 },
-		Stats = { Hatches = 0, Breaks = 0, CoinsEarned = 0, DiamondsEarned = 0, Damage = 0, Playtime = 0, BestPet = 0, Fusions = 0, Goldens = 0, Rainbows = 0, DarkMatters = 0, Rebirths = 0, BossKills = 0, Trades = 0, Enchants = 0, Spins = 0, MarketSales = 0, GemsEarned = 0, Huges = 0, Titanics = 0 },
+		Stats = { Hatches = 0, Breaks = 0, CoinsEarned = 0, DiamondsEarned = 0, Damage = 0, Playtime = 0, BestPet = 0, Fusions = 0, Goldens = 0, Rainbows = 0, DarkMatters = 0, Rebirths = 0, BossKills = 0, Trades = 0, Enchants = 0, Spins = 0, MarketSales = 0, GemsEarned = 0, Huges = 0, Titanics = 0, DungeonClears = 0, Crafts = 0, Shinies = 0, Treasures = 0 },
 		Daily = { LastClaim = 0, Streak = 0 },
 		VIPDaily = 0,
 		Codes = {},
@@ -2561,6 +3112,14 @@ local function template(): Profile
 		Merchant = { Rotation = 0, Bought = {} },
 		SpinDay = 0,
 		MyListings = {},
+		Season = { Id = Config.Season.Id, XP = 0, Claimed = {}, PremiumClaimed = {} },
+		Pity = {},
+		RebirthUpgrades = { RLuck = 0, RCoins = 0, REquip = 0, RStorage = 0, RDamage = 0 },
+		Title = "",
+		Accessories = {},
+		LastSeen = 0,
+		DungeonCooldown = 0,
+		IndexClaimed = {},
 	}
 end
 
@@ -2600,6 +3159,10 @@ local function reconcile(data: any): Profile
 		pet.Level = pet.Level or 1
 		pet.XP = pet.XP or 0
 		pet.Enchants = pet.Enchants or {}
+	end
+	-- موسم جديد → تصفير التقدم
+	if type(data.Season) == "table" and data.Season.Id ~= Config.Season.Id then
+		data.Season = { Id = Config.Season.Id, XP = 0, Claimed = {}, PremiumClaimed = {} }
 	end
 	return data :: Profile
 end
@@ -2660,6 +3223,7 @@ local function save(player: Player, remove: boolean?)
 	snapshot.InGroup = nil :: any
 	snapshot.Stats = table.clone(profile.Stats)
 	snapshot.Stats.Playtime = (profile.Stats.Playtime or 0) + (os.time() - profile.SessionStart)
+	snapshot.LastSeen = os.time()
 	local ok = retry(function()
 		return store:UpdateAsync(key(player), function()
 			return snapshot
@@ -2881,7 +3445,7 @@ function DataService.LuckMultiplier(player: Player): number
 	local b = bonuses(player)
 	local add = (p.Upgrades.Luck or 0) * 0.10 + (p.InGroup and Config.GroupBonus.Luck or 0)
 		+ (player.MembershipType == Enum.MembershipType.Premium and Config.PremiumBonus.Luck or 0)
-		+ p.Rebirths * Config.Rebirth.LuckPerRebirth + b.Luck
+		+ p.Rebirths * Config.Rebirth.LuckPerRebirth + b.Luck + (p.RebirthUpgrades.RLuck or 0) * 0.15
 	local mult = 1 + add
 	if DataService.HasGamepass(player, "Lucky") then
 		mult *= 2
@@ -2903,7 +3467,7 @@ function DataService.CoinMultiplier(player: Player): number
 	local b = bonuses(player)
 	local add = (p.Upgrades.Coins or 0) * 0.05 + (p.InGroup and Config.GroupBonus.Coins or 0)
 		+ (player.MembershipType == Enum.MembershipType.Premium and Config.PremiumBonus.Coins or 0)
-		+ p.Rebirths * Config.Rebirth.CoinsPerRebirth + b.Coins
+		+ p.Rebirths * Config.Rebirth.CoinsPerRebirth + b.Coins + (p.RebirthUpgrades.RCoins or 0) * 0.25
 	local mult = 1 + add
 	if DataService.HasGamepass(player, "VIP") then
 		mult *= Config.VIPCoinMultiplier
@@ -2923,7 +3487,7 @@ function DataService.DamageMultiplier(player: Player): number
 		return 1
 	end
 	local b = bonuses(player)
-	local mult = 1 + (p.Upgrades.Damage or 0) * 0.05 + p.Rebirths * Config.Rebirth.DamagePerRebirth + b.Damage
+	local mult = 1 + (p.Upgrades.Damage or 0) * 0.05 + p.Rebirths * Config.Rebirth.DamagePerRebirth + b.Damage + (p.RebirthUpgrades.RDamage or 0) * 0.20
 	if DataService.PotionActive(player, "Damage") then
 		mult *= Config.Potions.Damage.Mult
 	end
@@ -3035,7 +3599,219 @@ function DataService.Init()
 end
 
 return DataService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000020"><Properties><string name="Name">EggService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000022"><Properties><string name="Name">DungeonService</string><ProtectedString name="Source"><![CDATA[--!strict
+-- زنزانة الشق: موجات من الصناديق تنتهي بحارس، مشتركة لكل من في الجزيرة
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Zones = require(Shared.Data.Zones)
+local Remotes = require(Shared.Remotes)
+local DataService = require(script.Parent.DataService)
+local PetService = require(script.Parent.PetService)
+local BreakableService = require(script.Parent.BreakableService)
+local Rewards = require(script.Parent.Rewards)
+local Hooks = require(script.Parent.Hooks)
+
+local DungeonService = {}
+
+local running = false
+local wave = 0
+local ends = 0
+local alive: { [string]: boolean } = {}
+local rng = Random.new()
+
+local function state()
+	return Remotes.State()
+end
+
+local function participants(): { Player }
+	local out = {}
+	local center = Config.Map.DungeonOffset
+	for _, pl in ipairs(Players:GetPlayers()) do
+		local char = pl.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if hrp and (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - Vector3.new(center.X, 0, center.Z)).Magnitude < 160 and DataService.Get(pl) then
+			table.insert(out, pl)
+		end
+	end
+	return out
+end
+
+local function highestMult(player: Player): number
+	local p = DataService.Get(player)
+	local best = 1
+	if p then
+		for k in pairs(p.UnlockedZones) do
+			local z = Zones.Get(tonumber(k) or 1)
+			if z then
+				best = math.max(best, z.Multiplier)
+			end
+		end
+	end
+	return best
+end
+
+local function broadcast(text: string)
+	Remotes.Event("DungeonUpdate"):FireAllClients({ Active = running, Wave = wave, Ends = ends, Text = text })
+	local s = state()
+	s:SetAttribute("DungeonWave", wave)
+	s:SetAttribute("DungeonEnds", ends)
+end
+
+local function finish(success: boolean)
+	running = false
+	for id in pairs(alive) do
+		BreakableService.Remove(id)
+	end
+	alive = {}
+	local players = participants()
+	if success then
+		for _, pl in ipairs(players) do
+			local p = DataService.Get(pl) :: DataService.Profile
+			Rewards.Grant(pl, Config.Dungeon.ClearReward)
+			DataService.AddCoins(pl, math.floor(Config.Dungeon.CoinsPerWaveScale * highestMult(pl) * 3 * DataService.CoinMultiplier(pl)))
+			p.Stats.DungeonClears += 1
+			p.DungeonCooldown = os.time() + Config.Dungeon.Cooldown
+			if rng:NextNumber() < Config.Dungeon.PetChance then
+				PetService.Add(pl, Config.Dungeon.Pet, "Normal", true)
+				DataService.Notify(pl, "🌀 حصلت على Rift Guardian!", Color3.fromRGB(157, 0, 255))
+			end
+			Hooks.Fire(pl, "Dungeon", 1)
+			DataService.Notify(pl, "🏆 أنهيت الزنزانة! " .. Rewards.Describe(Config.Dungeon.ClearReward), Color3.fromRGB(120, 255, 140))
+			DataService.MarkDirty(pl)
+		end
+		Remotes.Event("EventEffect"):FireAllClients({ Type = "DungeonClear" })
+	else
+		for _, pl in ipairs(players) do
+			local p = DataService.Get(pl) :: DataService.Profile
+			p.DungeonCooldown = os.time() + math.floor(Config.Dungeon.Cooldown / 2)
+			DataService.MarkDirty(pl)
+		end
+	end
+	wave = 0
+	ends = 0
+	broadcast(success and "🏆 اكتملت الزنزانة!" or "⏳ انتهى الوقت")
+end
+
+local function spawnWave()
+	wave += 1
+	alive = {}
+	local players = participants()
+	if #players == 0 then
+		finish(false)
+		return
+	end
+	local totalPower = 0
+	for _, pl in ipairs(players) do
+		totalPower += math.max(1, PetService.GetPower(pl))
+	end
+	local center = Config.Map.DungeonOffset
+	local isBoss = wave > Config.Dungeon.Waves
+	if isBoss then
+		local health = math.max(3000, math.floor(totalPower * Config.Dungeon.BossSeconds))
+		local id = BreakableService.SpawnDynamic("RiftBoss", -2, center + Vector3.new(0, 0, 30), {
+			Health = health,
+			RewardScale = 3,
+			Name = "👹 Rift Warden",
+			OnBroken = function(contributors)
+				for pl in pairs(contributors) do
+					if pl.Parent == Players and rng:NextNumber() < Config.Dungeon.BossPetChance then
+						PetService.Add(pl, "titanic_overlord", "Normal", true)
+						DataService.NotifyAll("🌟 " .. pl.Name .. " حصل على TITANIC Overlord من الزنزانة!!!", Color3.new(1, 1, 1))
+					end
+				end
+				finish(true)
+			end,
+		})
+		if id then
+			alive[id] = true
+		end
+		broadcast("👹 الموجة الأخيرة: حارس الشق!")
+		Remotes.Event("EventEffect"):FireAllClients({ Type = "DungeonBoss" })
+		return
+	end
+	local n = Config.Dungeon.CratesPerWave
+	local health = math.max(50, math.floor(totalPower * Config.Dungeon.CrateSecondsPerPower * (1 + wave * 0.3) / n))
+	for i = 1, n do
+		local ang = (i / n) * math.pi * 2
+		local pos = center + Vector3.new(math.cos(ang) * 32, 0, math.sin(ang) * 32)
+		local id = BreakableService.SpawnDynamic("RiftCrate", -2, pos, {
+			Health = health,
+			RewardScale = 0.05 * wave,
+			OnBroken = function()
+				local remaining = 0
+				for aid in pairs(alive) do
+					if BreakableService.IsAlive(aid) then
+						remaining += 1
+					end
+				end
+				if running and remaining == 0 then
+					for _, pl in ipairs(participants()) do
+						Rewards.Grant(pl, { Diamonds = Config.Dungeon.WaveReward.Diamonds * wave, Gems = Config.Dungeon.WaveReward.Gems * wave })
+						DataService.AddCoins(pl, math.floor(Config.Dungeon.CoinsPerWaveScale * highestMult(pl) * wave * 0.2 * DataService.CoinMultiplier(pl)))
+						Hooks.Fire(pl, "DungeonWave", 1)
+					end
+					task.delay(2, function()
+						if running then
+							spawnWave()
+						end
+					end)
+				end
+			end,
+		})
+		if id then
+			alive[id] = true
+		end
+	end
+	broadcast("🌀 الموجة " .. wave .. " / " .. Config.Dungeon.Waves)
+	Remotes.Event("EventEffect"):FireAllClients({ Type = "DungeonWave", Wave = wave })
+end
+
+function DungeonService.Start(player: Player): { ok: boolean, error: string? }
+	local p = DataService.Get(player)
+	if not p then
+		return { ok = false, error = "لم يتم تحميل البيانات" }
+	end
+	if running then
+		return { ok = false, error = "الزنزانة جارية الآن، انضم للقتال!" }
+	end
+	if os.time() < (p.DungeonCooldown or 0) then
+		return { ok = false, error = "انتظر " .. (p.DungeonCooldown - os.time()) .. " ثانية" }
+	end
+	local inside = false
+	for _, pl in ipairs(participants()) do
+		if pl == player then
+			inside = true
+		end
+	end
+	if not inside then
+		return { ok = false, error = "ادخل الزنزانة أولاً" }
+	end
+	running = true
+	wave = 0
+	ends = os.time() + Config.Dungeon.TimeLimit
+	DataService.NotifyAll("🌀 " .. player.Name .. " بدأ زنزانة الشق! انضموا من بوابة البلدة", Color3.fromRGB(157, 0, 255))
+	spawnWave()
+	task.delay(Config.Dungeon.TimeLimit, function()
+		if running and os.time() >= ends then
+			finish(false)
+		end
+	end)
+	return { ok = true }
+end
+
+function DungeonService.Init()
+	Remotes.Function("Dungeon").OnServerInvoke = function(player, action)
+		if action == "Start" then
+			return DungeonService.Start(player)
+		end
+		return { ok = false, error = "إجراء غير معروف" }
+	end
+end
+
+return DungeonService
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000023"><Properties><string name="Name">EggService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- فتح البيض: عادي/ذهبي/قوس قزح، 1/3/8، الحظ، الحذف التلقائي، إعلانات Huge
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -3130,17 +3906,44 @@ function EggService.Hatch(player: Player, eggId: string, count: number, variant:
 		local petId = Luck.Roll(eggId, luck, rng) or egg.Pets[1].Pet
 		local def = Pets.Get(petId)
 		local rank = def and Rarities.Rank(def.Rarity) or 1
+		-- نظام الرحمة
+		p.Pity[eggId] = (p.Pity[eggId] or 0) + 1
+		if rank < 5 and p.Pity[eggId] >= Config.Pity.Threshold then
+			local pool = {}
+			for _, entry in ipairs(egg.Pets) do
+				local d = Pets.Get(entry.Pet)
+				if d and Rarities.Rank(d.Rarity) >= 5 and Rarities.Rank(d.Rarity) <= 6 then
+					table.insert(pool, entry.Pet)
+				end
+			end
+			if #pool > 0 then
+				petId = pool[rng:NextInteger(1, #pool)]
+				def = Pets.Get(petId)
+				rank = def and Rarities.Rank(def.Rarity) or 1
+				DataService.Notify(player, "🎁 الرحمة: حيوان أسطوري مضمون!", Color3.fromRGB(255, 200, 40))
+			end
+		end
+		if rank >= 5 then
+			p.Pity[eggId] = 0
+		end
+		local shiny = rng:NextNumber() < Config.Shiny.Chance
 		local deleted = autoDelete > 0 and rank <= autoDelete and variant == "Normal"
 		if not deleted and PetService.FreeSlots(player) <= 0 then
 			deleted = true
 		end
+		if shiny then
+			deleted = false
+		end
 		local inst = nil
 		if not deleted then
-			inst = PetService.Add(player, petId, variant, true)
+			inst = PetService.Add(player, petId, variant, true, shiny)
 		else
 			p.Index[petId] = true
 		end
-		table.insert(results, { Uid = inst and inst.Uid or "", Id = petId, Variant = variant, Deleted = deleted })
+		table.insert(results, { Uid = inst and inst.Uid or "", Id = petId, Variant = variant, Deleted = deleted, Shiny = shiny })
+		if shiny then
+			DataService.Notify(player, "✨ حيوان لامع (Shiny)! +50% قوة", Color3.fromRGB(255, 240, 150))
+		end
 		if def and rank >= 5 then
 			Remotes.Event("HatchBroadcast"):FireAllClients({ Player = player.Name, PetId = petId, Variant = variant, Rarity = def.Rarity })
 			if rank >= 9 then
@@ -3169,7 +3972,7 @@ function EggService.Init()
 end
 
 return EggService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000021"><Properties><string name="Name">EventService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000024"><Properties><string name="Name">EventService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- الأحداث العالمية الدورية: Coin Rush، Lucky Time، Diamond Rain، XP Fever، غارة الزعيم
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -3185,6 +3988,7 @@ local Hooks = require(script.Parent.Hooks)
 local EventService = {}
 
 local active: any = nil
+local activeBoss: any = nil
 local activeEnds = 0
 local lastId = ""
 local rng = Random.new()
@@ -3237,12 +4041,25 @@ function EventService.Start(id: string): boolean
 	DataService.NotifyAll("🎉 حدث: " .. e.Name .. " — " .. e.Arabic, Color3.fromRGB(255, 220, 90))
 	Remotes.Event("EventEffect"):FireAllClients({ Type = "EventStart", Id = id })
 	if e.Boss then
+		-- اختيار زعيم يمكن لأحد اللاعبين الوصول لمنطقته
+		local candidates = {}
+		for _, bd in ipairs(Config.Bosses) do
+			for _, pl in ipairs(Players:GetPlayers()) do
+				local p = DataService.Get(pl)
+				if p and (bd.Zone == 1 or p.UnlockedZones[tostring(bd.Zone)]) then
+					table.insert(candidates, bd)
+					break
+				end
+			end
+		end
+		activeBoss = candidates[rng:NextInteger(1, math.max(1, #candidates))] or Config.Bosses[1]
 		local totalPower = 0
 		for _, pl in ipairs(Players:GetPlayers()) do
 			totalPower += PetService.GetPower(pl)
 		end
-		local health = math.max(5000, math.floor(totalPower * Config.Events.Boss.HealthPerPower))
-		BreakableService.SpawnBoss(health)
+		local health = math.max(5000, math.floor(totalPower * (activeBoss.HealthPerPower or 45)))
+		BreakableService.SpawnBoss(health, activeBoss)
+		DataService.NotifyAll("👹 " .. activeBoss.Name .. " (" .. activeBoss.Arabic .. ") ظهر في " .. (require(Shared.Data.Zones).Get(activeBoss.Zone) or { Name = "?" }).Name .. "!", Color3.fromRGB(255, 90, 90))
 	end
 	task.delay(activeEnds - os.time(), function()
 		if active == e and os.time() >= activeEnds then
@@ -3253,7 +4070,11 @@ function EventService.Start(id: string): boolean
 end
 
 local function onBossKilled(contributors: { [Player]: number })
-	local bossCfg = Config.Events.Boss
+	local bossCfg = table.clone(Config.Events.Boss)
+	if activeBoss then
+		bossCfg.Name = activeBoss.Name
+		bossCfg.Pet = activeBoss.Pet
+	end
 	DataService.NotifyAll("🏆 تم هزيمة " .. bossCfg.Name .. "! المكافآت وُزعت على المشاركين", Color3.fromRGB(120, 255, 140))
 	for player in pairs(contributors) do
 		local p = DataService.Get(player)
@@ -3312,7 +4133,54 @@ function EventService.Init()
 end
 
 return EventService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000022"><Properties><string name="Name">Hooks</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000025"><Properties><string name="Name">FriendService</string><ProtectedString name="Source"><![CDATA[--!strict
+-- مكافأة حظ عند اللعب مع الأصدقاء
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local DataService = require(script.Parent.DataService)
+
+local FriendService = {}
+local friendsOnline: { [Player]: number } = {}
+
+local function recompute()
+	local list = Players:GetPlayers()
+	for _, a in ipairs(list) do
+		local n = 0
+		for _, b in ipairs(list) do
+			if a ~= b then
+				local ok, isFriend = pcall(a.IsFriendsWith, a, b.UserId)
+				if ok and isFriend then
+					n += 1
+				end
+			end
+		end
+		friendsOnline[a] = n
+		a:SetAttribute("FriendsOnline", n)
+	end
+end
+
+function FriendService.Init()
+	table.insert(DataService.BonusProviders, function(player)
+		local n = friendsOnline[player] or 0
+		if n <= 0 then
+			return nil
+		end
+		return { Luck = math.min(Config.FriendLuckMax, n * Config.FriendLuckPerFriend) }
+	end)
+	Players.PlayerAdded:Connect(function()
+		task.delay(1, recompute)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		friendsOnline[player] = nil
+		task.delay(1, recompute)
+	end)
+	task.spawn(recompute)
+end
+
+return FriendService
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000026"><Properties><string name="Name">Hooks</string><ProtectedString name="Source"><![CDATA[--!strict
 -- قناة أحداث داخلية بين الخدمات (للمهام والإنجازات والدليل التعليمي)
 local Hooks = {}
 Hooks.Listeners = {} :: { (Player, string, number) -> () }
@@ -3328,7 +4196,7 @@ function Hooks.Listen(fn: (Player, string, number) -> ())
 end
 
 return Hooks
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000023"><Properties><string name="Name">HoverboardService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000027"><Properties><string name="Name">HoverboardService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- الهوفربورد: شراء، تجهيز، ركوب (لوح ملحوم تحت اللاعب + سرعة)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -3466,7 +4334,7 @@ function HoverboardService.Init()
 end
 
 return HoverboardService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000024"><Properties><string name="Name">LeaderboardService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000028"><Properties><string name="Name">LeaderboardService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- لوحات المتصدرين العالمية (OrderedDataStore)
 local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
@@ -3479,6 +4347,8 @@ local DataService = require(script.Parent.DataService)
 local MapBuilder = require(script.Parent.MapBuilder)
 
 local LeaderboardService = {}
+local Remotes = require(Shared.Remotes)
+local cached: { [string]: { any } } = {}
 
 local stores = {
 	Coins = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Coins"),
@@ -3503,6 +4373,7 @@ local function refresh()
 			local ok, pages = pcall(store.GetSortedAsync, store, false, 10)
 			if ok then
 				local lines = {}
+				local rows = {}
 				for i, entry in ipairs(pages:GetCurrentPage()) do
 					local name = "???"
 					local okName, res = pcall(Players.GetNameFromUserIdAsync, Players, tonumber(entry.key) :: number)
@@ -3510,7 +4381,9 @@ local function refresh()
 						name = res
 					end
 					table.insert(lines, string.format("%d. %s  -  %s", i, name, Format.Number(entry.value)))
+					table.insert(rows, { Rank = i, Name = name, Value = entry.value, UserId = tonumber(entry.key) })
 				end
+				cached[key] = rows
 				label.Text = #lines > 0 and table.concat(lines, "\n") or "لا يوجد بيانات بعد"
 			end
 		end
@@ -3518,6 +4391,9 @@ local function refresh()
 end
 
 function LeaderboardService.Init()
+	Remotes.Function("GetLeaderboards").OnServerInvoke = function()
+		return cached
+	end
 	task.spawn(function()
 		task.wait(5)
 		while true do
@@ -3528,7 +4404,7 @@ function LeaderboardService.Init()
 end
 
 return LeaderboardService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000025"><Properties><string name="Name">MapBuilder</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000029"><Properties><string name="Name">MapBuilder</string><ProtectedString name="Source"><![CDATA[--!strict
 -- يبني العالم كاملاً بالكود: الجزر، الجسور، البوابات، البيض، الآلات، الزينة، منطقة VIP، اللوحات.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
@@ -3998,6 +4874,20 @@ function MapBuilder.BuildBreakable(typeName: string, pos: Vector3, scale: number
 		light.Color = def.Color
 		light.Range = 12
 		light.Parent = base
+	elseif def.Shape == "golem" then
+		base = part(model, "Base", Vector3.new(size.X, size.Y * 0.7, size.Z * 0.8), CFrame.new(pos + Vector3.new(0, size.Y * 0.55, 0)), def.Color, def.Material)
+		part(model, "Head", Vector3.new(size.X * 0.5, size.Y * 0.35, size.Z * 0.5), CFrame.new(pos + Vector3.new(0, size.Y * 1.05, 0)), def.Color, def.Material).CanCollide = false
+		for _, sx in ipairs({ -1, 1 }) do
+			part(model, "Arm", Vector3.new(size.X * 0.3, size.Y * 0.7, size.Z * 0.3), CFrame.new(pos + Vector3.new(sx * size.X * 0.68, size.Y * 0.5, 0)), def.Color, def.Material).CanCollide = false
+			part(model, "Eye", Vector3.new(size.X * 0.12, size.X * 0.12, size.X * 0.12), CFrame.new(pos + Vector3.new(sx * size.X * 0.12, size.Y * 1.1, -size.Z * 0.26)), Color3.fromRGB(255, 60, 60), Enum.Material.Neon, "ball").CanCollide = false
+		end
+		local core = part(model, "Core", Vector3.new(size.X * 0.3, size.X * 0.3, size.X * 0.3), CFrame.new(pos + Vector3.new(0, size.Y * 0.6, -size.Z * 0.42)), Color3.fromRGB(255, 200, 40), Enum.Material.Neon, "ball")
+		core.CanCollide = false
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 200, 40)
+		light.Range = 20
+		light.Parent = core
+		billboard(base, "🛡️ " .. def.Name, UDim2.fromScale(16, 4), Color3.fromRGB(255, 200, 40), size.Y * 0.9)
 	elseif def.Shape == "orb" then
 		base = part(model, "Base", size, CFrame.new(pos + Vector3.new(0, size.Y * 0.7, 0)), def.Color, def.Material, "ball")
 		base.Transparency = 0.15
@@ -4516,6 +5406,35 @@ local function buildAuctionHouse(parent: Instance, pos: Vector3): Model
 	return model
 end
 
+local function buildPad(parent: Instance, pos: Vector3, kind: string, text: string, color: Color3): Model
+	local model = Instance.new("Model")
+	model.Name = kind .. "Pad"
+	model:SetAttribute("Machine", kind)
+	local base = part(model, "Base", Vector3.new(1, 8, 8), CFrame.new(pos + Vector3.new(0, 0.3, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(40, 40, 60), Enum.Material.Metal, "cyl")
+	local ring = part(model, "Ring", Vector3.new(0.4, 7, 7), CFrame.new(pos + Vector3.new(0, 0.7, 0)) * CFrame.Angles(0, 0, math.pi / 2), color, Enum.Material.Neon, "cyl")
+	ring.CanCollide = false
+	local beam = part(model, "Beam", Vector3.new(1.2, 10, 1.2), CFrame.new(pos + Vector3.new(0, 5.5, 0)), color, Enum.Material.Neon)
+	beam.Transparency = 0.6
+	beam.CanCollide = false
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "فتح"
+	prompt.ObjectText = text
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = base
+	billboard(beam, text, UDim2.fromScale(12, 3), color, 6)
+	model.PrimaryPart = base
+	model.Parent = parent
+	return model
+end
+
+function MapBuilder.BossPosition(zoneIndex: number): Vector3
+	local layout = MapBuilder.Zones[zoneIndex] or MapBuilder.Zones[1]
+	local half = ISLAND / 2
+	return layout.Center + Vector3.new(-half * 0.66, 0, half * 0.64)
+end
+
 function MapBuilder.Build()
 	setupLighting()
 	local existing = Workspace:FindFirstChild("Map")
@@ -4536,6 +5455,7 @@ function MapBuilder.Build()
 		local layout = buildIsland(zone, center, ISLAND, map, rng)
 		ambient(layout.Folder, center, ISLAND, zone.Decor)
 		MapBuilder.Zones[i] = layout
+		buildPad(layout.Folder, center + Vector3.new(-40, 0, -ISLAND / 2 * 0.78), "Zones", "🗺️ منصة التنقل", Color3.fromRGB(80, 200, 255))
 		local prevZone = Zones.List[i - 1]
 		if prevZone and prevZone.World == zone.World then
 			local prev = MapBuilder.Zones[i - 1]
@@ -4602,6 +5522,31 @@ function MapBuilder.Build()
 	portalParticles(MapBuilder.VIPReturnPortal, Color3.fromRGB(120, 200, 255))
 	ambient(vipLayout.Folder, vipCenter, 200, "gold")
 
+	-- زنزانة الشق
+	local dCenter = Config.Map.DungeonOffset
+	local dLayout = buildIsland(Zones.Dungeon, dCenter, 220, map, rng)
+	ambient(dLayout.Folder, dCenter, 220, "voidorbs")
+	MapBuilder.Zones[-2] = dLayout
+	dLayout.Spots = {}
+	local df = dLayout.Folder
+	for i = 1, 8 do
+		local ang = (i / 8) * math.pi * 2
+		part(df, "RiftPillar", Vector3.new(4, 26, 4), CFrame.new(dCenter + Vector3.new(math.cos(ang) * 55, 13, math.sin(ang) * 55)), Color3.fromRGB(30, 10, 50), Enum.Material.Basalt)
+		local top = part(df, "RiftTop", Vector3.new(3, 3, 3), CFrame.new(dCenter + Vector3.new(math.cos(ang) * 55, 28, math.sin(ang) * 55)), Color3.fromRGB(157, 0, 255), Enum.Material.Neon, "ball")
+		top.CanCollide = false
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(157, 0, 255)
+		light.Range = 30
+		light.Parent = top
+	end
+	local rift = part(df, "Rift", Vector3.new(0.5, 40, 40), CFrame.new(dCenter + Vector3.new(0, 35, 60)) * CFrame.Angles(0, math.pi / 2, 0), Color3.fromRGB(157, 0, 255), Enum.Material.Neon, "cyl")
+	rift.Transparency = 0.5
+	rift.CanCollide = false
+	local dStart = buildPad(df, dCenter + Vector3.new(0, 0, -30), "Dungeon", "🌀 ابدأ الزنزانة", Color3.fromRGB(157, 0, 255))
+	dStart.Name = "DungeonStart"
+	MapBuilder.Portals.DungeonReturn = buildPortal(df, dCenter + Vector3.new(0, 0, -85), Color3.fromRGB(120, 200, 255), "🏠 العودة للبلدة")
+	portalParticles(MapBuilder.Portals.DungeonReturn, Color3.fromRGB(120, 200, 255))
+
 	-- البلدة
 	local town = MapBuilder.Zones[1]
 	local tf = town.Folder
@@ -4630,6 +5575,10 @@ function MapBuilder.Build()
 	portalParticles(MapBuilder.VIPPortal, Color3.fromRGB(255, 215, 0))
 	MapBuilder.Portals.Market = buildPortal(tf, town.Center + Vector3.new(-118, 0, -80), Color3.fromRGB(255, 140, 60), "🏪 السوق الكبير\nبيع واشترِ الحيوانات")
 	portalParticles(MapBuilder.Portals.Market, Color3.fromRGB(255, 140, 60))
+	MapBuilder.Portals.Dungeon = buildPortal(tf, town.Center + Vector3.new(-118, 0, -48), Color3.fromRGB(157, 0, 255), "🌀 زنزانة الشق\nموجات + زعيم")
+	portalParticles(MapBuilder.Portals.Dungeon, Color3.fromRGB(157, 0, 255))
+	MapBuilder.Machines.Craft = buildStall(tf, town.Center + Vector3.new(118, 0, 92), "Craft", "🔨 محطة التصنيع", Color3.fromRGB(255, 160, 60))
+	MapBuilder.Machines.Cosmetic = buildStall(tf, town.Center + Vector3.new(118, 0, 124), "Cosmetic", "🎩 البيضة التجميلية", Color3.fromRGB(255, 120, 200))
 
 	-- الأكشاك والعجلة والمذبح والنافورة
 	MapBuilder.Machines.Merchant = buildStall(tf, town.Center + Vector3.new(-62, 0, -116), "Merchant", "🧳 التاجر المتجول", Color3.fromRGB(200, 60, 60))
@@ -4661,7 +5610,7 @@ function MapBuilder.Build()
 end
 
 return MapBuilder
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000026"><Properties><string name="Name">MarketService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000030"><Properties><string name="Name">MarketService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- السوق العالمي: عروض بيع عبر السيرفرات (MemoryStore) + صندوق بريد للبائع (DataStore) + أكشاك + بيع للتاجر
 local Players = game:GetService("Players")
 local MemoryStoreService = game:GetService("MemoryStoreService")
@@ -5108,7 +6057,7 @@ function MarketService.Init()
 end
 
 return MarketService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000027"><Properties><string name="Name">MerchantService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000031"><Properties><string name="Name">MerchantService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- التاجر المتجول: مخزون يتغير كل ساعة، حدود شراء لكل لاعب
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -5167,7 +6116,7 @@ function MerchantService.Init()
 end
 
 return MerchantService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000028"><Properties><string name="Name">MissionService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000032"><Properties><string name="Name">MissionService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- المهام اليومية + الإنجازات + الدليل التعليمي
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -5260,6 +6209,7 @@ function MissionService.ClaimMission(player: Player, index: number): { ok: boole
 	end
 	m.Claimed = true
 	Rewards.Grant(player, m.Reward)
+	Hooks.Fire(player, "Mission", 1)
 	DataService.Notify(player, "✅ مهمة مكتملة: " .. Rewards.Describe(m.Reward), Color3.fromRGB(120, 255, 140))
 	return { ok = true }
 end
@@ -5346,7 +6296,62 @@ function MissionService.Init()
 end
 
 return MissionService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000029"><Properties><string name="Name">PetService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000033"><Properties><string name="Name">OfflineService</string><ProtectedString name="Source"><![CDATA[--!strict
+-- أرباح وقت الغياب: عند العودة يحصل اللاعب على عملات تقريبية حسب قوته ومدة غيابه
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Zones = require(Shared.Data.Zones)
+local Breakables = require(Shared.Data.Breakables)
+local Remotes = require(Shared.Remotes)
+local DataService = require(script.Parent.DataService)
+local PetService = require(script.Parent.PetService)
+
+local OfflineService = {}
+
+function OfflineService.Init()
+	DataService.Loaded:Connect(function(player, profile)
+		task.delay(2, function()
+			local p = DataService.Get(player)
+			if not p or p ~= profile then
+				return
+			end
+			local last = p.LastSeen or 0
+			if last <= 0 then
+				return
+			end
+			local elapsed = math.min(os.time() - last, Config.Offline.MaxHours * 3600)
+			if elapsed < 300 then
+				return
+			end
+			local power = PetService.GetPower(player)
+			if power <= 0 then
+				return
+			end
+			local best = Zones.List[1]
+			for k in pairs(p.UnlockedZones) do
+				local z = Zones.Get(tonumber(k) or 1)
+				if z and z.Multiplier > best.Multiplier then
+					best = z
+				end
+			end
+			local pile = Breakables.Get("CoinPile") :: Breakables.BreakableDef
+			local pileHealth = pile.Health * best.Multiplier
+			local pileCoins = pile.Coins * best.Multiplier
+			local perSecond = math.min(power / pileHealth, 1) * pileCoins
+			local coins = math.floor(perSecond * elapsed * Config.Offline.Rate * DataService.CoinMultiplier(player))
+			if coins <= 0 then
+				return
+			end
+			DataService.AddCoins(player, coins)
+			DataService.MarkDirty(player)
+			Remotes.Event("EventEffect"):FireClient(player, { Type = "WelcomeBack", Coins = coins, Seconds = elapsed })
+		end)
+	end)
+end
+
+return OfflineService
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000034"><Properties><string name="Name">PetService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- المخزن، التجهيز، الحذف، القفل، المستويات/الخبرة، الإنشانتات، والآلات
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -5361,6 +6366,8 @@ local Remotes = require(Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local RateLimit = require(script.Parent.RateLimit)
 local Hooks = require(script.Parent.Hooks)
+local Format = require(Shared.Modules.Format)
+local TextService = game:GetService("TextService")
 
 local PetService = {}
 
@@ -5374,7 +6381,7 @@ function PetService.StorageCapacity(player: Player): number
 	if not p then
 		return 0
 	end
-	local cap = Config.BaseStorage + (p.Upgrades.Storage or 0) * 25
+	local cap = Config.BaseStorage + (p.Upgrades.Storage or 0) * 25 + (p.RebirthUpgrades.RStorage or 0) * 50
 	if DataService.HasGamepass(player, "PlusStorage") then
 		cap += Config.GamepassStorageBonus
 	end
@@ -5386,7 +6393,7 @@ function PetService.EquipCapacity(player: Player): number
 	if not p then
 		return 0
 	end
-	local cap = Config.BaseEquip + (p.Upgrades.Equip or 0)
+	local cap = Config.BaseEquip + (p.Upgrades.Equip or 0) + (p.RebirthUpgrades.REquip or 0)
 	if DataService.HasGamepass(player, "PlusEquip") then
 		cap += Config.GamepassEquipBonus
 	end
@@ -5442,7 +6449,7 @@ function PetService.UpdateEquippedAttribute(player: Player)
 	local list = {}
 	for _, pet in ipairs(p.Pets) do
 		if pet.Equipped then
-			table.insert(list, { Uid = pet.Uid, Id = pet.Id, Variant = pet.Variant })
+			table.insert(list, { Uid = pet.Uid, Id = pet.Id, Variant = pet.Variant, Shiny = pet.Shiny == true, Accessory = pet.Accessory or "" })
 		end
 	end
 	player:SetAttribute("EquippedPets", HttpService:JSONEncode(list))
@@ -5463,7 +6470,7 @@ function PetService.GetPower(player: Player): number
 	return total * DataService.DamageMultiplier(player)
 end
 
-function PetService.Add(player: Player, petId: string, variant: string?, ignoreCapacity: boolean?): PetInstance?
+function PetService.Add(player: Player, petId: string, variant: string?, ignoreCapacity: boolean?, shiny: boolean?): PetInstance?
 	local p = DataService.Get(player)
 	local def = Pets.Get(petId)
 	if not p or not def then
@@ -5482,7 +6489,11 @@ function PetService.Add(player: Player, petId: string, variant: string?, ignoreC
 		Level = 1,
 		XP = 0,
 		Enchants = {},
+		Shiny = shiny == true or nil,
 	}
+	if shiny then
+		p.Stats.Shinies += 1
+	end
 	table.insert(p.Pets, inst)
 	p.Index[petId] = true
 	if def.Rarity == "Huge" then
@@ -5602,6 +6613,59 @@ function PetService.Action(player: Player, action: string, payload: any): { ok: 
 		for i = 1, math.min(cap, #sorted) do
 			sorted[i].Equipped = true
 		end
+	elseif action == "Nick" then
+		local pet = find(p, tostring(payload.Uid))
+		if not pet then
+			return { ok = false, error = "الحيوان غير موجود" }
+		end
+		local raw = tostring(payload.Nick or ""):sub(1, 20)
+		if raw == "" then
+			pet.Nick = nil
+		else
+			local ok, filtered = pcall(function()
+				local result = TextService:FilterStringAsync(raw, player.UserId)
+				return result:GetNonChatStringForBroadcastAsync()
+			end)
+			pet.Nick = ok and filtered or nil
+		end
+	elseif action == "Accessory" then
+		local pet = find(p, tostring(payload.Uid))
+		if not pet then
+			return { ok = false, error = "الحيوان غير موجود" }
+		end
+		local id = tostring(payload.Id or "")
+		-- إعادة الإكسسوار الحالي للحقيبة
+		if pet.Accessory and pet.Accessory ~= "" then
+			p.Accessories[pet.Accessory] = (p.Accessories[pet.Accessory] or 0) + 1
+			pet.Accessory = nil
+		end
+		if id ~= "" then
+			if (p.Accessories[id] or 0) <= 0 then
+				return { ok = false, error = "لا تملك هذا الإكسسوار" }
+			end
+			p.Accessories[id] -= 1
+			pet.Accessory = id
+		end
+	elseif action == "ClaimIndex" then
+		local eggId = tostring(payload.EggId)
+		local egg = Eggs.Get(eggId)
+		if not egg then
+			return { ok = false, error = "بيضة غير موجودة" }
+		end
+		if p.IndexClaimed[eggId] then
+			return { ok = false, error = "تم الاستلام" }
+		end
+		for _, entry in ipairs(egg.Pets) do
+			if not p.Index[entry.Pet] then
+				return { ok = false, error = "أكمل فهرس البيضة أولاً" }
+			end
+		end
+		p.IndexClaimed[eggId] = true
+		local tier = math.max(1, egg.Zone)
+		local reward = Config.IndexReward(tier)
+		DataService.AddDiamonds(player, reward.Diamonds or 0)
+		DataService.AddGems(player, reward.Gems or 0, true)
+		DataService.Notify(player, "📖 أكملت فهرس " .. egg.Name .. "! 💎 " .. Format.Number(reward.Diamonds or 0) .. "  💠 " .. Format.Number(reward.Gems or 0), Color3.fromRGB(200, 140, 255))
 	elseif action == "Setting" then
 		local k = tostring(payload.Key)
 		if p.Settings[k] == nil then
@@ -5841,7 +6905,7 @@ function PetService.Init()
 end
 
 return PetService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000030"><Properties><string name="Name">RateLimit</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000035"><Properties><string name="Name">RateLimit</string><ProtectedString name="Source"><![CDATA[--!strict
 -- حد المعدل لكل لاعب لكل مفتاح (حماية من الإرسال المفرط)
 local Players = game:GetService("Players")
 
@@ -5870,7 +6934,7 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 return RateLimit
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000031"><Properties><string name="Name">RebirthService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000036"><Properties><string name="Name">RebirthService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- الريبيرث: إعادة العملات والمناطق مقابل مضاعفات دائمة + توكنات
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -5913,9 +6977,35 @@ function RebirthService.Rebirth(player: Player): { ok: boolean, error: string? }
 	return { ok = true }
 end
 
+function RebirthService.BuyUpgrade(player: Player, key: string): { ok: boolean, error: string? }
+	local p = DataService.Get(player)
+	if not p then
+		return { ok = false, error = "لم يتم تحميل البيانات" }
+	end
+	for _, u in ipairs(Config.RebirthShop) do
+		if u.Key == key then
+			local level = p.RebirthUpgrades[key] or 0
+			if level >= u.MaxLevel then
+				return { ok = false, error = "الحد الأقصى" }
+			end
+			local cost = u.Cost + u.CostStep * level
+			if not DataService.Spend(player, "Tokens", cost) then
+				return { ok = false, error = "تحتاج 🔁 " .. cost .. " توكن" }
+			end
+			p.RebirthUpgrades[key] = level + 1
+			DataService.MarkDirty(player)
+			return { ok = true }
+		end
+	end
+	return { ok = false, error = "ترقية غير موجودة" }
+end
+
 function RebirthService.Init()
 	Remotes.Function("Rebirth").OnServerInvoke = function(player)
 		return RebirthService.Rebirth(player)
+	end
+	Remotes.Function("RebirthShop").OnServerInvoke = function(player, key)
+		return RebirthService.BuyUpgrade(player, tostring(key))
 	end
 	table.insert(DataService.Extenders, function(player, payload)
 		payload.RebirthCost = RebirthService.Cost(payload.Rebirths or 0)
@@ -5923,7 +7013,7 @@ function RebirthService.Init()
 end
 
 return RebirthService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000032"><Properties><string name="Name">RewardService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000037"><Properties><string name="Name">RewardService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- المكافآت اليومية، مكافآت وقت اللعب، الأكواد، مكافأة المجموعة
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -6046,7 +7136,7 @@ function RewardService.Init()
 end
 
 return RewardService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000033"><Properties><string name="Name">Rewards</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000038"><Properties><string name="Name">Rewards</string><ProtectedString name="Source"><![CDATA[--!strict
 -- منح المكافآت بصيغة موحدة { Coins, Diamonds, Potion, Count, Pet, Variant, Spins, Tokens }
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -6111,7 +7201,110 @@ function Rewards.Describe(reward: any, coinScale: number?): string
 end
 
 return Rewards
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000034"><Properties><string name="Name">ShopService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000039"><Properties><string name="Name">SeasonService</string><ProtectedString name="Source"><![CDATA[--!strict
+-- باس الموسم: خبرة من الأنشطة + 30 مستوى بمسارين
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Remotes = require(Shared.Remotes)
+local DataService = require(script.Parent.DataService)
+local Rewards = require(script.Parent.Rewards)
+local Hooks = require(script.Parent.Hooks)
+local RateLimit = require(script.Parent.RateLimit)
+
+local SeasonService = {}
+
+function SeasonService.Tier(xp: number): (number, number, number)
+	local tier = 0
+	local acc = 0
+	while tier < Config.Season.Tiers and xp >= acc + Config.SeasonXPForTier(tier + 1) do
+		acc += Config.SeasonXPForTier(tier + 1)
+		tier += 1
+	end
+	local into = xp - acc
+	local needed = tier < Config.Season.Tiers and Config.SeasonXPForTier(tier + 1) or 0
+	return tier, into, needed
+end
+
+function SeasonService.AddXP(player: Player, amount: number)
+	local p = DataService.Get(player)
+	if not p or amount <= 0 then
+		return
+	end
+	local before = SeasonService.Tier(p.Season.XP)
+	p.Season.XP += amount
+	local after = SeasonService.Tier(p.Season.XP)
+	if after > before then
+		DataService.Notify(player, "🎫 باس الموسم: المستوى " .. after .. "! استلم مكافأتك", Color3.fromRGB(255, 200, 80))
+	end
+	DataService.MarkDirty(player)
+end
+
+function SeasonService.Claim(player: Player, tier: number, premium: boolean): { ok: boolean, error: string? }
+	local p = DataService.Get(player)
+	if not p then
+		return { ok = false, error = "لم يتم تحميل البيانات" }
+	end
+	tier = math.floor(tier)
+	if tier < 1 or tier > Config.Season.Tiers then
+		return { ok = false, error = "مستوى غير صحيح" }
+	end
+	local current = SeasonService.Tier(p.Season.XP)
+	if tier > current then
+		return { ok = false, error = "لم تصل لهذا المستوى بعد" }
+	end
+	if premium and not DataService.HasGamepass(player, "SeasonPass") then
+		return { ok = false, error = "تحتاج Season Pass" }
+	end
+	local store = premium and p.Season.PremiumClaimed or p.Season.Claimed
+	if store[tostring(tier)] then
+		return { ok = false, error = "تم الاستلام" }
+	end
+	store[tostring(tier)] = true
+	local reward = Config.SeasonReward(tier, premium)
+	Rewards.Grant(player, reward)
+	DataService.Notify(player, "🎫 مستوى " .. tier .. ": " .. Rewards.Describe(reward), Color3.fromRGB(255, 200, 80))
+	return { ok = true }
+end
+
+function SeasonService.Init()
+	Hooks.Listen(function(player, kind, amount)
+		local xp = Config.Season.XPPerAction[kind]
+		if xp then
+			SeasonService.AddXP(player, xp * amount)
+		end
+	end)
+	Remotes.Function("Season").OnServerInvoke = function(player, action, payload)
+		if not RateLimit.Check(player, "Season", 5) then
+			return { ok = false, error = "ببطء!" }
+		end
+		payload = type(payload) == "table" and payload or {}
+		if action == "Claim" then
+			return SeasonService.Claim(player, tonumber(payload.Tier) or 0, payload.Premium == true)
+		elseif action == "ClaimAll" then
+			local n = 0
+			for t = 1, Config.Season.Tiers do
+				if SeasonService.Claim(player, t, false).ok then
+					n += 1
+				end
+				if DataService.HasGamepass(player, "SeasonPass") and SeasonService.Claim(player, t, true).ok then
+					n += 1
+				end
+			end
+			return { ok = true, count = n }
+		end
+		return { ok = false, error = "إجراء غير معروف" }
+	end
+	table.insert(DataService.Extenders, function(_, payload)
+		local tier, into, needed = SeasonService.Tier(payload.Season and payload.Season.XP or 0)
+		payload.SeasonTier = tier
+		payload.SeasonInto = into
+		payload.SeasonNeeded = needed
+	end)
+end
+
+return SeasonService
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000040"><Properties><string name="Name">ShopService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- الجيم باس، المنتجات (الألماس/الجرعات)، الترقيات
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -6283,7 +7476,7 @@ function ShopService.Init()
 end
 
 return ShopService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000035"><Properties><string name="Name">SpinService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000041"><Properties><string name="Name">SpinService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- عجلة الحظ: لفة مجانية يومياً + لفات إضافية
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -6360,7 +7553,141 @@ function SpinService.Init()
 end
 
 return SpinService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000036"><Properties><string name="Name">TradeService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000042"><Properties><string name="Name">TitleService</string><ProtectedString name="Source"><![CDATA[--!strict
+-- الألقاب ولوحة الاسم فوق الرأس (لقب + رتبة الريبيرث + VIP)
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Remotes = require(Shared.Remotes)
+local DataService = require(script.Parent.DataService)
+
+local TitleService = {}
+
+function TitleService.Available(p: DataService.Profile): { string }
+	local out = {}
+	for _, t in ipairs(Config.Titles) do
+		local ok = true
+		if t.Achievement then
+			ok = p.Achievements[t.Achievement] == true
+		elseif t.Stat then
+			ok = (p.Stats[t.Stat] or 0) >= (t.Target or 0)
+		end
+		if ok then
+			table.insert(out, t.Id)
+		end
+	end
+	return out
+end
+
+local function rankIcon(rebirths: number): string
+	local icon = ""
+	for _, r in ipairs(Config.RebirthRanks) do
+		if rebirths >= r[1] then
+			icon = r[2]
+		end
+	end
+	return icon
+end
+
+function TitleService.Refresh(player: Player)
+	local p = DataService.Get(player)
+	local char = player.Character
+	local head = char and char:FindFirstChild("Head")
+	if not p or not head then
+		return
+	end
+	local titleName = ""
+	for _, t in ipairs(Config.Titles) do
+		if t.Id == p.Title and t.Id ~= "" then
+			titleName = t.Name
+		end
+	end
+	local rank = rankIcon(p.Rebirths)
+	local vip = DataService.HasGamepass(player, "VIP")
+	local lines = {}
+	if vip then
+		table.insert(lines, "👑 VIP")
+	end
+	if titleName ~= "" then
+		table.insert(lines, titleName)
+	end
+	if rank ~= "" then
+		table.insert(lines, rank .. " ريبيرث " .. p.Rebirths)
+	end
+	local existing = head:FindFirstChild("VIPTag") or head:FindFirstChild("NameTag")
+	if existing then
+		existing:Destroy()
+	end
+	if #lines == 0 then
+		return
+	end
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "NameTag"
+	bb.Size = UDim2.fromScale(7, #lines * 0.7)
+	bb.StudsOffset = Vector3.new(0, 2.4 + #lines * 0.35, 0)
+	bb.AlwaysOnTop = true
+	bb.MaxDistance = 120
+	local l = Instance.new("TextLabel")
+	l.Size = UDim2.fromScale(1, 1)
+	l.BackgroundTransparency = 1
+	l.Text = table.concat(lines, "\n")
+	l.TextColor3 = vip and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(255, 255, 255)
+	l.TextStrokeTransparency = 0.2
+	l.Font = Enum.Font.FredokaOne
+	l.TextScaled = true
+	l.Parent = bb
+	bb.Parent = head
+end
+
+function TitleService.Set(player: Player, id: string): { ok: boolean, error: string? }
+	local p = DataService.Get(player)
+	if not p then
+		return { ok = false, error = "لم يتم تحميل البيانات" }
+	end
+	if not table.find(TitleService.Available(p), id) then
+		return { ok = false, error = "لم تفتح هذا اللقب بعد" }
+	end
+	p.Title = id
+	DataService.MarkDirty(player)
+	TitleService.Refresh(player)
+	return { ok = true }
+end
+
+function TitleService.Init()
+	Remotes.Function("Title").OnServerInvoke = function(player, id)
+		return TitleService.Set(player, tostring(id))
+	end
+	table.insert(DataService.Extenders, function(player, payload)
+		local p = DataService.Get(player)
+		payload.TitlesAvailable = p and TitleService.Available(p) or {}
+	end)
+	local function hook(player: Player)
+		player.CharacterAdded:Connect(function()
+			task.wait(0.5)
+			TitleService.Refresh(player)
+		end)
+	end
+	Players.PlayerAdded:Connect(hook)
+	for _, pl in ipairs(Players:GetPlayers()) do
+		hook(pl)
+	end
+	DataService.Loaded:Connect(function(player)
+		task.delay(1, TitleService.Refresh, player)
+	end)
+	-- تحديث دوري (الريبيرث/الإنجازات قد تتغير)
+	task.spawn(function()
+		while true do
+			task.wait(30)
+			for _, pl in ipairs(Players:GetPlayers()) do
+				TitleService.Refresh(pl)
+			end
+		end
+	end)
+end
+
+return TitleService
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000043"><Properties><string name="Name">TradeService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- نظام التبادل بين اللاعبين مع تأكيد مزدوج وعدّ تنازلي
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6371,6 +7698,7 @@ local Remotes = require(Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local PetService = require(script.Parent.PetService)
 local RateLimit = require(script.Parent.RateLimit)
+local Hooks = require(script.Parent.Hooks)
 
 local TradeService = {}
 
@@ -6481,6 +7809,8 @@ local function execute(t: Trade)
 	end
 	pa.Stats.Trades += 1
 	pb.Stats.Trades += 1
+	Hooks.Fire(t.A, "Trade", 1)
+	Hooks.Fire(t.B, "Trade", 1)
 	DataService.MarkDirty(t.A)
 	DataService.MarkDirty(t.B)
 	PetService.UpdateEquippedAttribute(t.A)
@@ -6603,7 +7933,86 @@ function TradeService.Init()
 end
 
 return TradeService
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000037"><Properties><string name="Name">ZoneService</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000044"><Properties><string name="Name">TreasureService</string><ProtectedString name="Source"><![CDATA[--!strict
+-- كنز عشوائي يظهر في منطقة عشوائية كل فترة
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Zones = require(Shared.Data.Zones)
+local Remotes = require(Shared.Remotes)
+local DataService = require(script.Parent.DataService)
+local PetService = require(script.Parent.PetService)
+local BreakableService = require(script.Parent.BreakableService)
+local MapBuilder = require(script.Parent.MapBuilder)
+local Rewards = require(script.Parent.Rewards)
+
+local TreasureService = {}
+local rng = Random.new()
+
+local function spawnTreasure()
+	-- منطقة يستطيع أحد اللاعبين الوصول لها
+	local candidates = {}
+	for _, pl in ipairs(Players:GetPlayers()) do
+		local p = DataService.Get(pl)
+		if p then
+			for k in pairs(p.UnlockedZones) do
+				local idx = tonumber(k)
+				if idx and idx <= 10 and not table.find(candidates, idx) then
+					table.insert(candidates, idx)
+				end
+			end
+		end
+	end
+	if #candidates == 0 then
+		return
+	end
+	local zoneIdx = candidates[rng:NextInteger(1, #candidates)]
+	local layout = MapBuilder.Zones[zoneIdx]
+	local zone = Zones.Get(zoneIdx)
+	if not layout or not zone then
+		return
+	end
+	local spot = layout.Spots[rng:NextInteger(1, #layout.Spots)] + Vector3.new(0, 0, 6)
+	local id = BreakableService.SpawnDynamic("Treasure", zoneIdx, spot, {
+		Health = math.floor(3000 * zone.Multiplier),
+		Lifetime = Config.Treasure.Lifetime,
+		Name = "💰 كنز!",
+		OnBroken = function(contributors)
+			for pl in pairs(contributors) do
+				local p = DataService.Get(pl)
+				if pl.Parent == Players and p then
+					Rewards.Grant(pl, { Diamonds = Config.Treasure.Diamonds, Gems = Config.Treasure.Gems })
+					p.Stats.Treasures += 1
+					if rng:NextNumber() < Config.Treasure.PetChance then
+						PetService.Add(pl, Config.Treasure.Pet, "Normal", true)
+						DataService.Notify(pl, "🐢 حصلت على Treasure Turtle!", Color3.fromRGB(255, 215, 0))
+					end
+					DataService.MarkDirty(pl)
+				end
+			end
+			DataService.NotifyAll("💰 تم فتح الكنز في " .. zone.Name .. "!", Color3.fromRGB(255, 215, 0))
+		end,
+	})
+	if id then
+		DataService.NotifyAll("🗺️ ظهر صندوق كنز في " .. zone.Name .. " (" .. zone.Arabic .. ")! لديك " .. Config.Treasure.Lifetime .. " ثانية", Color3.fromRGB(255, 215, 0))
+		Remotes.Event("EventEffect"):FireAllClients({ Type = "Treasure", Zone = zoneIdx })
+	end
+end
+
+function TreasureService.Init()
+	task.spawn(function()
+		while true do
+			task.wait(Config.Treasure.Interval)
+			if #Players:GetPlayers() > 0 then
+				spawnTreasure()
+			end
+		end
+	end)
+end
+
+return TreasureService
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000045"><Properties><string name="Name">ZoneService</string><ProtectedString name="Source"><![CDATA[--!strict
 -- فتح المناطق، البوابات، التنقل، بوابة VIP، سرعة المشي
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -6659,8 +8068,8 @@ function ZoneService.Teleport(player: Player, index: number): boolean
 		if not DataService.HasGamepass(player, "VIP") then
 			return false
 		end
-	elseif index == -1 then
-		-- السوق متاح للجميع
+	elseif index == -1 or index == -2 then
+		-- السوق والزنزانة متاحان للجميع
 	elseif not p.UnlockedZones[tostring(index)] then
 		return false
 	elseif p.Rebirths < Zones.RebirthRequired(index) then
@@ -6740,7 +8149,9 @@ local function onPortalTouched(kind: string, hit: BasePart)
 		ZoneService.Teleport(player, Zones.WorldStart[3] - 1)
 	elseif kind == "Market" then
 		ZoneService.Teleport(player, -1)
-	elseif kind == "MarketReturn" then
+	elseif kind == "Dungeon" then
+		ZoneService.Teleport(player, -2)
+	elseif kind == "MarketReturn" or kind == "DungeonReturn" then
 		ZoneService.Teleport(player, 1)
 	else
 		ZoneService.Teleport(player, 1)
@@ -6868,7 +8279,7 @@ end
 
 return ZoneService
 ]]></ProtectedString></Properties></Item></Item></Item>
-<Item class="Folder" referent="RBX000062"><Properties><string name="Name">Client</string></Properties><Item class="LocalScript" referent="RBX000040"><Properties><string name="Name">ClientMain</string><ProtectedString name="Source"><![CDATA[--!strict
+<Item class="Folder" referent="RBX000074"><Properties><string name="Name">Client</string></Properties><Item class="LocalScript" referent="RBX000048"><Properties><string name="Name">ClientMain</string><ProtectedString name="Source"><![CDATA[--!strict
 -- نقطة تشغيل العميل
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -6892,6 +8303,10 @@ local SpinUI = require(Controllers.SpinUI)
 local MerchantUI = require(Controllers.MerchantUI)
 local AdminUI = require(Controllers.AdminUI)
 local MarketUI = require(Controllers.MarketUI)
+local SeasonUI = require(Controllers.SeasonUI)
+local CraftUI = require(Controllers.CraftUI)
+local CosmeticUI = require(Controllers.CosmeticUI)
+local LeaderboardUI = require(Controllers.LeaderboardUI)
 local EggController = require(Controllers.EggController)
 local PetController = require(Controllers.PetController)
 local BreakableController = require(Controllers.BreakableController)
@@ -6913,6 +8328,10 @@ SpinUI.Init()
 MerchantUI.Init()
 AdminUI.Init()
 MarketUI.Init()
+SeasonUI.Init()
+CraftUI.Init()
+CosmeticUI.Init()
+LeaderboardUI.Init()
 EggController.Init()
 PetController.Init()
 BreakableController.Init()
@@ -6938,7 +8357,7 @@ if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
 end
 
 print("[PetKingdom] Client ready")
-]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX000061"><Properties><string name="Name">Controllers</string></Properties><Item class="ModuleScript" referent="RBX000041"><Properties><string name="Name">AdminUI</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX000073"><Properties><string name="Name">Controllers</string></Properties><Item class="ModuleScript" referent="RBX000049"><Properties><string name="Name">AdminUI</string><ProtectedString name="Source"><![CDATA[--!strict
 -- لوحة الأدمن
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -7003,7 +8422,7 @@ function AdminUI.Init()
 end
 
 return AdminUI
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000042"><Properties><string name="Name">BreakableController</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000050"><Properties><string name="Name">BreakableController</string><ProtectedString name="Source"><![CDATA[--!strict
 -- أشرطة الصحة فوق الصناديق، تأثير الضرب، ونوافذ المكافأة
 local Workspace = game:GetService("Workspace")
 local Debris = game:GetService("Debris")
@@ -7146,7 +8565,161 @@ function BreakableController.Init()
 end
 
 return BreakableController
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000043"><Properties><string name="Name">DataController</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000051"><Properties><string name="Name">CosmeticUI</string><ProtectedString name="Source"><![CDATA[--!strict
+-- البيضة التجميلية: الإكسسوارات
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Remotes = require(Shared.Remotes)
+local UIKit = require(script.Parent.UIKit)
+local DataController = require(script.Parent.DataController)
+local UIController = require(script.Parent.UIController)
+local EffectsController = require(script.Parent.EffectsController)
+
+local CosmeticUI = {}
+
+function CosmeticUI.Init()
+	local gui = UIController.Gui :: ScreenGui
+	local w = UIKit.Window(gui, "Cosmetic", "🎩 البيضة التجميلية", UDim2.fromOffset(700, 520), UIKit.Colors.Pink)
+	UIKit.Label({ Text = "افتح البيضة التجميلية لتحصل على إكسسوار عشوائي، ثم جهّزه على أي حيوان من نافذة الحيوانات.", Size = UDim2.new(1, 0, 0, 40), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 16, Parent = w.Content })
+	local grid = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 300), Position = UDim2.fromOffset(0, 44), BackgroundTransparency = 1, Parent = w.Content })
+	UIKit.Grid(grid, UDim2.fromOffset(150, 130), 8)
+	local counts: { [string]: TextLabel } = {}
+	local total = 0
+	for _, a in ipairs(Config.Accessories) do
+		total += a.Chance
+	end
+	for i, a in ipairs(Config.Accessories) do
+		local card = UIKit.Frame({ LayoutOrder = i, BackgroundColor3 = UIKit.Colors.Panel2, Parent = grid })
+		UIKit.Corner(card, 12)
+		UIKit.Stroke(card, a.Color, 2)
+		UIKit.Label({ Text = a.Icon, Size = UDim2.new(1, 0, 0, 56), MaxTextSize = 44, Parent = card })
+		UIKit.Label({ Text = a.Name, Size = UDim2.new(1, -6, 0, 24), Position = UDim2.fromOffset(3, 58), MaxTextSize = 15, Parent = card })
+		UIKit.Label({ Text = string.format("%.1f%%", a.Chance / total * 100), Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 82), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 13, Parent = card })
+		counts[a.Id] = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 104), TextColor3 = UIKit.Colors.Green, MaxTextSize = 13, Parent = card })
+	end
+	local result = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 34), Position = UDim2.new(0, 0, 1, -90), TextColor3 = UIKit.Colors.Gold, MaxTextSize = 22, Parent = w.Content })
+	local hatching = false
+	UIKit.Button({ Text = "🥚 فتح (💎 " .. Config.CosmeticEggCost .. ")", Color = UIKit.Colors.Pink, Size = UDim2.fromOffset(300, 48), Position = UDim2.new(0.5, -150, 1, -52), MaxTextSize = 20, Parent = w.Content }, function()
+		if hatching then
+			return
+		end
+		hatching = true
+		local res = Remotes.Function("Cosmetic"):InvokeServer("Hatch")
+		if res.ok then
+			for _, a in ipairs(Config.Accessories) do
+				if a.Id == res.result then
+					result.Text = "🎉 " .. a.Icon .. " " .. a.Name .. "!"
+					UIKit.Pop(result)
+				end
+			end
+			EffectsController.Play("Hatch")
+		elseif res.error then
+			UIController.Notify(res.error, UIKit.Colors.Red)
+		end
+		hatching = false
+	end)
+	local function refresh()
+		local p = DataController.Profile
+		if not p then
+			return
+		end
+		for id, label in pairs(counts) do
+			local n = p.Accessories[id] or 0
+			label.Text = n > 0 and ("تملك: " .. n) or ""
+		end
+	end
+	UIController.Register("Cosmetic", w, refresh)
+end
+
+return CosmeticUI
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000052"><Properties><string name="Name">CraftUI</string><ProtectedString name="Source"><![CDATA[--!strict
+-- محطة التصنيع
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Pets = require(Shared.Data.Pets)
+local Format = require(Shared.Modules.Format)
+local Remotes = require(Shared.Remotes)
+local UIKit = require(script.Parent.UIKit)
+local DataController = require(script.Parent.DataController)
+local UIController = require(script.Parent.UIController)
+local PetViewport = require(script.Parent.PetViewport)
+
+local CraftUI = {}
+
+local function have(p: any, input: any): number
+	local n = 0
+	for _, pet in ipairs(p.Pets) do
+		if not pet.Locked then
+			local def = Pets.Get(pet.Id)
+			if (input.Pet == nil or pet.Id == input.Pet) and (input.Rarity == nil or (def and def.Rarity == input.Rarity)) and (input.Variant or "Normal") == pet.Variant then
+				n += 1
+			end
+		end
+	end
+	return n
+end
+
+function CraftUI.Init()
+	local gui = UIController.Gui :: ScreenGui
+	local w = UIKit.Window(gui, "Craft", "🔨 محطة التصنيع", UDim2.fromOffset(820, 600), Color3.fromRGB(255, 160, 60))
+	local scroll = UIKit.Scroll(w.Content)
+	UIKit.List(scroll, 10)
+	local rows = {}
+	for i, r in ipairs(Config.Recipes) do
+		local row = UIKit.Frame({ LayoutOrder = i, Size = UDim2.new(1, -8, 0, 130), BackgroundColor3 = UIKit.Colors.Panel2, Parent = scroll })
+		UIKit.Corner(row, 12)
+		local vp = UIKit.Frame({ Size = UDim2.fromOffset(110, 110), Position = UDim2.fromOffset(8, 10), BackgroundTransparency = 1, Parent = row })
+		if r.Output.Pet then
+			PetViewport.Create(vp, r.Output.Pet, r.Output.Variant or "Normal", true)
+		else
+			UIKit.Label({ Text = r.Output.Potion and "🧪" or "🔁", MaxTextSize = 60, Parent = vp })
+		end
+		UIKit.Label({ Text = r.Name, Size = UDim2.new(1, -330, 0, 28), Position = UDim2.fromOffset(126, 8), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 20, Parent = row })
+		local req = UIKit.Label({ Text = "", Size = UDim2.new(1, -330, 0, 70), Position = UDim2.fromOffset(126, 36), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextColor3 = UIKit.Colors.Muted, MaxTextSize = 14, Parent = row })
+		local cost = UIKit.Label({ Text = "", Size = UDim2.fromOffset(190, 30), Position = UDim2.new(1, -200, 0, 10), TextColor3 = UIKit.Colors.Gold, MaxTextSize = 16, Parent = row })
+		local btn = UIKit.Button({ Text = "🔨 تصنيع", Color = Color3.fromRGB(255, 160, 60), Size = UDim2.fromOffset(190, 44), Position = UDim2.new(1, -200, 0, 70), MaxTextSize = 18, Parent = row }, function()
+			local res = Remotes.Function("Craft"):InvokeServer(r.Id)
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
+		end)
+		rows[r.Id] = { Req = req, Cost = cost, Btn = btn }
+	end
+	local function refresh()
+		local p = DataController.Profile
+		if not p then
+			return
+		end
+		for _, r in ipairs(Config.Recipes) do
+			local row = rows[r.Id]
+			local lines = {}
+			local okAll = true
+			for _, input in ipairs(r.Inputs) do
+				local n = have(p, input)
+				local ok = n >= input.Count
+				okAll = okAll and ok
+				table.insert(lines, (ok and "✅ " or "❌ ") .. input.Count .. " × " .. (input.Pet and (Pets.Get(input.Pet) or { Name = input.Pet }).Name or input.Rarity) .. " (" .. (input.Variant or "Normal") .. ")  [" .. n .. "]")
+			end
+			row.Req.Text = table.concat(lines, "\n")
+			local parts = {}
+			if (r.Diamonds or 0) > 0 then
+				table.insert(parts, "💎 " .. Format.Number(r.Diamonds))
+			end
+			if (r.Gems or 0) > 0 then
+				table.insert(parts, "💠 " .. Format.Number(r.Gems))
+			end
+			row.Cost.Text = table.concat(parts, "  ")
+			local canPay = p.Diamonds >= (r.Diamonds or 0) and p.Gems >= (r.Gems or 0)
+			row.Btn.BackgroundColor3 = (okAll and canPay) and Color3.fromRGB(255, 160, 60) or UIKit.Colors.Panel3
+		end
+	end
+	UIController.Register("Craft", w, refresh)
+end
+
+return CraftUI
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000053"><Properties><string name="Name">DataController</string><ProtectedString name="Source"><![CDATA[--!strict
 -- نسخة العميل من بيانات اللاعب
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -7204,7 +8777,7 @@ function DataController.FindPet(uid: string): any
 end
 
 return DataController
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000044"><Properties><string name="Name">EffectsController</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000054"><Properties><string name="Name">EffectsController</string><ProtectedString name="Source"><![CDATA[--!strict
 -- تأثيرات: ألوان قوس قزح للحيوانات، الموسيقى، الأصوات
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
@@ -7347,6 +8920,29 @@ function EffectsController.Fireworks(origin: Vector3, count: number?)
 	end)
 end
 
+-- وضع الرسومات المنخفضة: إيقاف الجزيئات الجوية والآثار
+local lowApplied = false
+function EffectsController.ApplyLowGraphics(on: boolean)
+	if on == lowApplied then
+		return
+	end
+	lowApplied = on
+	local map = Workspace:FindFirstChild("Map")
+	if map then
+		for _, d in ipairs(map:GetDescendants()) do
+			if d:IsA("ParticleEmitter") then
+				d.Enabled = not on
+			end
+		end
+	end
+	local Lighting = game:GetService("Lighting")
+	for _, e in ipairs(Lighting:GetChildren()) do
+		if e:IsA("BloomEffect") or e:IsA("SunRaysEffect") then
+			e.Enabled = not on
+		end
+	end
+end
+
 function EffectsController.Init()
 	local ReplicatedStorage2 = game:GetService("ReplicatedStorage")
 	local Remotes = require(ReplicatedStorage2:WaitForChild("Shared").Remotes)
@@ -7375,6 +8971,16 @@ function EffectsController.Init()
 				EffectsController.Burst(hrp.Position + Vector3.new(0, 3, 0), rank >= 4 and Color3.fromRGB(255, 0, 80) or Color3.fromRGB(255, 200, 40), 40 * rank, 0.7)
 				EffectsController.Shockwave(hrp.Position, rank >= 4 and Color3.fromRGB(255, 0, 80) or Color3.fromRGB(255, 200, 40))
 			end
+		elseif data.Type == "DungeonWave" then
+			EffectsController.Play("Wave")
+			screenFlash(Color3.fromRGB(80, 0, 140), "🌀 الموجة " .. tostring(data.Wave))
+		elseif data.Type == "DungeonBoss" then
+			EffectsController.Play("Boss")
+			screenFlash(Color3.fromRGB(120, 0, 60), "👹 حارس الشق!")
+		elseif data.Type == "DungeonClear" and hrp then
+			EffectsController.Fireworks(hrp.Position, 8)
+		elseif data.Type == "Treasure" then
+			screenFlash(Color3.fromRGB(120, 100, 0), "🗺️ ظهر كنز! اذهب قبل اختفائه")
 		elseif data.Type == "Purchase" and hrp then
 			EffectsController.Burst(hrp.Position + Vector3.new(0, 3, 0), Color3.fromRGB(200, 140, 255), 40, 0.6)
 			EffectsController.Play("Sell")
@@ -7393,6 +8999,15 @@ function EffectsController.Init()
 			end
 		end
 	end
+	DataController.Changed:Connect(function(p)
+		EffectsController.ApplyLowGraphics(p.Settings and p.Settings.LowGraphics == true)
+	end)
+	task.delay(3, function()
+		local p = DataController.Profile
+		if p then
+			EffectsController.ApplyLowGraphics(p.Settings and p.Settings.LowGraphics == true)
+		end
+	end)
 	if music then
 		music:Play()
 		DataController.Changed:Connect(function(p)
@@ -7425,7 +9040,7 @@ function EffectsController.Init()
 end
 
 return EffectsController
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000045"><Properties><string name="Name">EggController</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000055"><Properties><string name="Name">EggController</string><ProtectedString name="Source"><![CDATA[--!strict
 -- لوحة البيضة عند الاقتراب + شاشة الفتح (أنيميشن) + الفتح التلقائي
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7804,11 +9419,12 @@ function EggController.Init()
 end
 
 return EggController
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000046"><Properties><string name="Name">InventoryUI</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000056"><Properties><string name="Name">InventoryUI</string><ProtectedString name="Source"><![CDATA[--!strict
 -- نافذة الحيوانات: الشبكة، الفرز، البحث، التفاصيل (مستوى، خبرة، إنشانتات)، التجهيز، القفل، الحذف
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
 local Pets = require(Shared.Data.Pets)
 local Rarities = require(Shared.Data.Rarities)
 local PetUtil = require(Shared.Modules.PetUtil)
@@ -7834,7 +9450,7 @@ function InventoryUI.PetCard(parent: Instance, pet: any, onClick: (() -> ())?): 
 	UIKit.Corner(card, 12)
 	UIKit.Stroke(card, color, 2.5)
 	local vpHolder = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 80), BackgroundTransparency = 1, Parent = card })
-	PetViewport.Create(vpHolder, pet.Id, pet.Variant)
+	PetViewport.Create(vpHolder, pet.Id, pet.Variant, false, { Shiny = pet.Shiny == true, Accessory = pet.Accessory })
 	UIKit.Label({ Text = PetUtil.DisplayName(pet), Size = UDim2.new(1, -6, 0, 20), Position = UDim2.fromOffset(3, 80), MaxTextSize = 13, Parent = card })
 	UIKit.Label({ Text = "⚔️ " .. Format.Number(PetUtil.BasePower(pet)), Size = UDim2.new(1, 0, 0, 18), Position = UDim2.fromOffset(0, 100), TextColor3 = UIKit.Colors.Pink, MaxTextSize = 13, Parent = card })
 	UIKit.Label({ Name = "Badge", Text = pet.Equipped and "✅" or "", Size = UDim2.fromOffset(26, 22), Position = UDim2.fromOffset(4, 4), MaxTextSize = 18, Parent = card })
@@ -7842,6 +9458,9 @@ function InventoryUI.PetCard(parent: Instance, pet: any, onClick: (() -> ())?): 
 	UIKit.Label({ Name = "Level", Text = "Lv." .. (pet.Level or 1), Size = UDim2.fromOffset(44, 18), Position = UDim2.new(1, -46, 0, 60), TextColor3 = UIKit.Colors.Cyan, MaxTextSize = 12, Parent = card })
 	if pet.Enchants and #pet.Enchants > 0 then
 		UIKit.Label({ Name = "Ench", Text = "🔧" .. #pet.Enchants, Size = UDim2.fromOffset(34, 18), Position = UDim2.fromOffset(4, 60), TextColor3 = UIKit.Colors.Green, MaxTextSize = 12, Parent = card })
+	end
+	if pet.Shiny then
+		UIKit.Label({ Name = "Shiny", Text = "✨", Size = UDim2.fromOffset(22, 22), Position = UDim2.fromOffset(4, 28), MaxTextSize = 16, Parent = card })
 	end
 	if pet.Variant == "Golden" then
 		UIKit.Gradient(card, Color3.fromRGB(80, 70, 30), UIKit.Colors.Panel)
@@ -7936,6 +9555,15 @@ function InventoryUI.Init()
 	local dLevel = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 18), TextColor3 = UIKit.Colors.Cyan, MaxTextSize = 15, Parent = details })
 	local _, xpFill, xpLabel = UIKit.ProgressBar(details, UIKit.Colors.Cyan, UDim2.new(1, 0, 0, 14))
 	local dEnch = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 60), TextColor3 = UIKit.Colors.Green, TextYAlignment = Enum.TextYAlignment.Top, MaxTextSize = 14, Parent = details })
+	local nickBox = UIKit.New("TextBox", { Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = Color3.fromRGB(15, 16, 28), PlaceholderText = "✏️ اسم مستعار (Enter)", Text = "", Font = UIKit.Font, TextColor3 = UIKit.Colors.Text, TextSize = 15, ClearTextOnFocus = false, Parent = details }) :: TextBox
+	UIKit.Corner(nickBox, 8)
+	nickBox.FocusLost:Connect(function(enter)
+		if enter and selectedUid then
+			Remotes.Function("PetAction"):InvokeServer("Nick", { Uid = selectedUid, Nick = nickBox.Text })
+		end
+	end)
+	local accRow = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, Visible = false, Parent = details })
+	UIKit.List(accRow, 4, true)
 	local equipBtn = UIKit.Button({ Text = "تجهيز", Color = UIKit.Colors.Green, Size = UDim2.new(1, 0, 0, 38), MaxTextSize = 18, Parent = details })
 	local enchantBtn = UIKit.Button({ Text = "🔧 إنشانت", Color = UIKit.Colors.Purple, Size = UDim2.new(1, 0, 0, 38), MaxTextSize = 18, Parent = details })
 	local lockBtn = UIKit.Button({ Text = "🔒 قفل", Color = UIKit.Colors.Blue, Size = UDim2.new(1, 0, 0, 38), MaxTextSize = 18, Parent = details })
@@ -7953,8 +9581,30 @@ function InventoryUI.Init()
 		for _, c in ipairs(dVp:GetChildren()) do
 			c:Destroy()
 		end
-		PetViewport.Create(dVp, pet.Id, pet.Variant, true)
+		PetViewport.Create(dVp, pet.Id, pet.Variant, true, { Shiny = pet.Shiny == true, Accessory = pet.Accessory })
 		dName.Text = PetUtil.DisplayName(pet)
+		nickBox.Text = pet.Nick or ""
+		-- الإكسسوارات المملوكة
+		for _, c in ipairs(accRow:GetChildren()) do
+			if c:IsA("TextButton") then
+				c:Destroy()
+			end
+		end
+		local p = DataController.Profile
+		local ownedAny = false
+		if p then
+			for _, a in ipairs(Config.Accessories) do
+				local n = p.Accessories[a.Id] or 0
+				if n > 0 or pet.Accessory == a.Id then
+					ownedAny = true
+					local isOn = pet.Accessory == a.Id
+					UIKit.Button({ Text = a.Icon .. (isOn and "✓" or (" " .. n)), Color = isOn and UIKit.Colors.Green or UIKit.Colors.Panel3, Size = UDim2.fromOffset(52, 32), MaxTextSize = 14, Parent = accRow }, function()
+						Remotes.Function("PetAction"):InvokeServer("Accessory", { Uid = pet.Uid, Id = isOn and "" or a.Id })
+					end)
+				end
+			end
+		end
+		accRow.Visible = ownedAny
 		dRarity.Text = def.Rarity .. " • " .. (Rarities.Info[def.Rarity] and Rarities.Info[def.Rarity].Arabic or "")
 		dRarity.TextColor3 = Rarities.Color(def.Rarity)
 		dPower.Text = "⚔️ القوة: " .. Format.Number(PetUtil.BasePower(pet))
@@ -8025,7 +9675,7 @@ function InventoryUI.Init()
 			local visible = q == "" or name:find(q, 1, true) ~= nil
 			seen[pet.Uid] = true
 			local card = cards[pet.Uid]
-			local sig = pet.Variant .. "|" .. (pet.Level or 1) .. "|" .. (pet.Enchants and #pet.Enchants or 0)
+			local sig = pet.Variant .. "|" .. (pet.Level or 1) .. "|" .. (pet.Enchants and #pet.Enchants or 0) .. "|" .. tostring(pet.Accessory or "") .. "|" .. tostring(pet.Nick or "")
 			if card and card:GetAttribute("Sig") ~= sig then
 				card:Destroy()
 				card = nil
@@ -8081,7 +9731,50 @@ function InventoryUI.Init()
 end
 
 return InventoryUI
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000047"><Properties><string name="Name">LoadingScreen</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000057"><Properties><string name="Name">LeaderboardUI</string><ProtectedString name="Source"><![CDATA[--!strict
+-- نافذة المتصدرين
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Format = require(Shared.Modules.Format)
+local Remotes = require(Shared.Remotes)
+local UIKit = require(script.Parent.UIKit)
+local UIController = require(script.Parent.UIController)
+
+local LeaderboardUI = {}
+
+function LeaderboardUI.Init()
+	local gui = UIController.Gui :: ScreenGui
+	local w = UIKit.Window(gui, "Leaderboards", "🏆 المتصدرون", UDim2.fromOffset(860, 560), UIKit.Colors.Gold)
+	local grid = UIKit.Frame({ Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Parent = w.Content })
+	UIKit.Grid(grid, UDim2.new(0.5, -6, 0.5, -6), 8)
+	local boards = {}
+	for i, info in ipairs({ { "Coins", "💰 أغنى اللاعبين", UIKit.Colors.Gold }, { "Hatches", "🥚 أكثر فتحاً", UIKit.Colors.Cyan }, { "Rebirths", "🔁 أكثر ريبيرث", Color3.fromRGB(255, 140, 60) }, { "Damage", "⚔️ أعلى ضرر", UIKit.Colors.Pink } }) do
+		local card = UIKit.Frame({ LayoutOrder = i, BackgroundColor3 = UIKit.Colors.Panel2, Parent = grid })
+		UIKit.Corner(card, 12)
+		UIKit.Stroke(card, info[3], 2)
+		UIKit.Label({ Text = info[2], Size = UDim2.new(1, 0, 0, 30), TextColor3 = info[3], MaxTextSize = 20, Parent = card })
+		boards[info[1]] = UIKit.Label({ Text = "...", Size = UDim2.new(1, -16, 1, -36), Position = UDim2.fromOffset(8, 32), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, MaxTextSize = 16, Parent = card })
+	end
+	local function refresh()
+		local data = Remotes.Function("GetLeaderboards"):InvokeServer()
+		for key, label in pairs(boards) do
+			local rows = type(data) == "table" and data[key] or nil
+			if rows and #rows > 0 then
+				local lines = {}
+				for _, r in ipairs(rows) do
+					table.insert(lines, string.format("%d. %s  —  %s", r.Rank, r.Name, Format.Number(r.Value)))
+				end
+				label.Text = table.concat(lines, "\n")
+			else
+				label.Text = "لا توجد بيانات بعد"
+			end
+		end
+	end
+	UIController.Register("Leaderboards", w, refresh)
+end
+
+return LeaderboardUI
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000058"><Properties><string name="Name">LoadingScreen</string><ProtectedString name="Source"><![CDATA[--!strict
 -- شاشة تحميل مع نصائح
 local Players = game:GetService("Players")
 local UIKit = require(script.Parent.UIKit)
@@ -8148,7 +9841,7 @@ function LoadingScreen.Hide()
 end
 
 return LoadingScreen
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000048"><Properties><string name="Name">MachineUI</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000059"><Properties><string name="Name">MachineUI</string><ProtectedString name="Source"><![CDATA[--!strict
 -- نوافذ الآلات: الذهب، قوس قزح، المادة المظلمة، الدمج، الإنشانت + توجيه الـ Prompts للنوافذ الأخرى
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -8452,12 +10145,23 @@ function MachineUI.Init()
 			if MachineUI.OnPetShop then
 				MachineUI.OnPetShop()
 			end
+		elseif kind == "Craft" then
+			UIController.Open("Craft")
+		elseif kind == "Cosmetic" then
+			UIController.Open("Cosmetic")
+		elseif kind == "Zones" then
+			UIController.Open("Zones")
+		elseif kind == "Dungeon" then
+			local res = Remotes.Function("Dungeon"):InvokeServer("Start")
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
 		end
 	end)
 end
 
 return MachineUI
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000049"><Properties><string name="Name">MarketUI</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000060"><Properties><string name="Name">MarketUI</string><ProtectedString name="Source"><![CDATA[--!strict
 -- السوق العالمي: تصفح، عروضي، بيع، متجر الحيوانات (بيع للتاجر) + الأكشاك
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8887,7 +10591,7 @@ function MarketUI.Init()
 end
 
 return MarketUI
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000050"><Properties><string name="Name">MerchantUI</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000061"><Properties><string name="Name">MerchantUI</string><ProtectedString name="Source"><![CDATA[--!strict
 -- التاجر المتجول
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -8970,7 +10674,7 @@ function MerchantUI.Init()
 end
 
 return MerchantUI
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000051"><Properties><string name="Name">MissionsUI</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000062"><Properties><string name="Name">MissionsUI</string><ProtectedString name="Source"><![CDATA[--!strict
 -- المهام اليومية + الإنجازات
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -9089,7 +10793,7 @@ function MissionsUI.Init()
 end
 
 return MissionsUI
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000052"><Properties><string name="Name">PetController</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000063"><Properties><string name="Name">PetController</string><ProtectedString name="Source"><![CDATA[--!strict
 -- يعرض حيوانات كل اللاعبين ويحركها خلفهم، وتهاجم الهدف عند الضرب
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9142,7 +10846,7 @@ local function rebuild(player: Player)
 			end
 		end
 		if not exists then
-			local model = PetModelBuilder.Build(w.Id, w.Variant)
+			local model = PetModelBuilder.Build(w.Id, w.Variant, { Shiny = w.Shiny == true, Accessory = w.Accessory })
 			if model then
 				model.Name = player.Name .. "_" .. w.Uid
 				local char = player.Character
@@ -9249,7 +10953,7 @@ function PetController.Init()
 end
 
 return PetController
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000053"><Properties><string name="Name">PetViewport</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000064"><Properties><string name="Name">PetViewport</string><ProtectedString name="Source"><![CDATA[--!strict
 -- عرض حيوان داخل ViewportFrame (للمخزن، البيض، الفتح)
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9258,14 +10962,14 @@ local PetModelBuilder = require(Shared.Modules.PetModelBuilder)
 
 local PetViewport = {}
 
-function PetViewport.Create(parent: Instance, petId: string, variant: string?, spin: boolean?): ViewportFrame
+function PetViewport.Create(parent: Instance, petId: string, variant: string?, spin: boolean?, opts: any?): ViewportFrame
 	local vp = Instance.new("ViewportFrame")
 	vp.Size = UDim2.fromScale(1, 1)
 	vp.BackgroundTransparency = 1
 	vp.Ambient = Color3.fromRGB(200, 200, 200)
 	vp.LightColor = Color3.fromRGB(255, 255, 255)
 	vp.LightDirection = Vector3.new(-1, -1, -1)
-	local model = PetModelBuilder.Build(petId, variant)
+	local model = PetModelBuilder.Build(petId, variant, opts)
 	if model then
 		model:PivotTo(CFrame.new())
 		model.Parent = vp
@@ -9292,7 +10996,108 @@ function PetViewport.Create(parent: Instance, petId: string, variant: string?, s
 end
 
 return PetViewport
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000054"><Properties><string name="Name">ShopUI</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000065"><Properties><string name="Name">SeasonUI</string><ProtectedString name="Source"><![CDATA[--!strict
+-- باس الموسم
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Format = require(Shared.Modules.Format)
+local Remotes = require(Shared.Remotes)
+local UIKit = require(script.Parent.UIKit)
+local DataController = require(script.Parent.DataController)
+local UIController = require(script.Parent.UIController)
+
+local SeasonUI = {}
+
+local function describe(r: any): string
+	local parts = {}
+	if r.Diamonds then table.insert(parts, "💎" .. Format.Number(r.Diamonds)) end
+	if r.Gems then table.insert(parts, "💠" .. r.Gems) end
+	if r.Potion then table.insert(parts, "🧪" .. (r.Count or 1)) end
+	if r.Spins then table.insert(parts, "🎡" .. r.Spins) end
+	if r.Pet then table.insert(parts, "🐾" .. (r.Variant and (r.Variant .. " ") or "") .. r.Pet) end
+	return table.concat(parts, " ")
+end
+
+function SeasonUI.Init()
+	local gui = UIController.Gui :: ScreenGui
+	local w = UIKit.Window(gui, "Season", "🎫 " .. Config.Season.Name, UDim2.fromOffset(900, 600), UIKit.Colors.Gold)
+	local header = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 70), BackgroundColor3 = UIKit.Colors.Panel2, Parent = w.Content })
+	UIKit.Corner(header, 12)
+	local tierLabel = UIKit.Label({ Text = "", Size = UDim2.new(0.5, 0, 0, 30), Position = UDim2.fromOffset(12, 4), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 22, Parent = header })
+	local _, fill, xpLabel = UIKit.ProgressBar(header, UIKit.Colors.Gold, UDim2.new(0.5, -24, 0, 20), UDim2.fromOffset(12, 40))
+	local passBtn = UIKit.Button({ Text = "🎫 شراء Season Pass", Color = UIKit.Colors.Purple, Size = UDim2.fromOffset(220, 40), Position = UDim2.new(1, -460, 0, 15), MaxTextSize = 17, Parent = header }, function()
+		Remotes.Event("PromptPurchase"):FireServer("Gamepass", "SeasonPass")
+	end)
+	UIKit.Button({ Text = "استلام الكل", Color = UIKit.Colors.Green, Size = UDim2.fromOffset(220, 40), Position = UDim2.new(1, -232, 0, 15), MaxTextSize = 17, Parent = header }, function()
+		local res = Remotes.Function("Season"):InvokeServer("ClaimAll", {})
+		if res.ok then
+			UIController.Notify("🎫 استلمت " .. (res.count or 0) .. " مكافأة", UIKit.Colors.Green)
+		end
+	end)
+	local scroll = UIKit.Scroll(w.Content, { Size = UDim2.new(1, 0, 1, -80), Position = UDim2.fromOffset(0, 80), ScrollingDirection = Enum.ScrollingDirection.X, AutomaticCanvasSize = Enum.AutomaticSize.X })
+	UIKit.List(scroll, 6, true)
+	local columns = {}
+	for t = 1, Config.Season.Tiers do
+		local col = UIKit.Frame({ LayoutOrder = t, Size = UDim2.new(0, 120, 1, -10), BackgroundColor3 = UIKit.Colors.Panel2, Parent = scroll })
+		UIKit.Corner(col, 12)
+		local title = UIKit.Label({ Text = "المستوى " .. t, Size = UDim2.new(1, 0, 0, 26), MaxTextSize = 16, Parent = col })
+		local freeCard = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 150), Position = UDim2.fromOffset(4, 30), BackgroundColor3 = UIKit.Colors.Panel3, Parent = col })
+		UIKit.Corner(freeCard, 10)
+		UIKit.Label({ Text = "مجاني", Size = UDim2.new(1, 0, 0, 20), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 13, Parent = freeCard })
+		UIKit.Label({ Text = describe(Config.SeasonReward(t, false)), Size = UDim2.new(1, -6, 0, 80), Position = UDim2.fromOffset(3, 20), MaxTextSize = 14, Parent = freeCard })
+		local freeBtn = UIKit.Button({ Text = "", Size = UDim2.new(1, -10, 0, 30), Position = UDim2.new(0, 5, 1, -36), MaxTextSize = 14, Parent = freeCard }, function()
+			local res = Remotes.Function("Season"):InvokeServer("Claim", { Tier = t, Premium = false })
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
+		end)
+		local premCard = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 150), Position = UDim2.fromOffset(4, 186), BackgroundColor3 = Color3.fromRGB(70, 50, 30), Parent = col })
+		UIKit.Corner(premCard, 10)
+		UIKit.Stroke(premCard, UIKit.Colors.Gold, 1.5)
+		UIKit.Label({ Text = "🎫 مميز", Size = UDim2.new(1, 0, 0, 20), TextColor3 = UIKit.Colors.Gold, MaxTextSize = 13, Parent = premCard })
+		UIKit.Label({ Text = describe(Config.SeasonReward(t, true)), Size = UDim2.new(1, -6, 0, 80), Position = UDim2.fromOffset(3, 20), MaxTextSize = 14, Parent = premCard })
+		local premBtn = UIKit.Button({ Text = "", Size = UDim2.new(1, -10, 0, 30), Position = UDim2.new(0, 5, 1, -36), MaxTextSize = 14, Parent = premCard }, function()
+			local res = Remotes.Function("Season"):InvokeServer("Claim", { Tier = t, Premium = true })
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
+		end)
+		columns[t] = { Title = title, Free = freeBtn, Prem = premBtn, Col = col }
+	end
+	local function refresh()
+		local p = DataController.Profile
+		if not p then
+			return
+		end
+		local tier = p.SeasonTier or 0
+		tierLabel.Text = "المستوى " .. tier .. " / " .. Config.Season.Tiers .. "   •   XP: " .. Format.Number(p.Season.XP or 0)
+		if (p.SeasonNeeded or 0) > 0 then
+			fill.Size = UDim2.fromScale(math.clamp((p.SeasonInto or 0) / p.SeasonNeeded, 0, 1), 1)
+			xpLabel.Text = Format.Number(p.SeasonInto or 0) .. " / " .. Format.Number(p.SeasonNeeded)
+		else
+			fill.Size = UDim2.fromScale(1, 1)
+			xpLabel.Text = "MAX"
+		end
+		local hasPass = DataController.Owns("SeasonPass")
+		passBtn.Text = hasPass and "✅ Season Pass مفعل" or "🎫 شراء Season Pass"
+		passBtn.BackgroundColor3 = hasPass and UIKit.Colors.Panel3 or UIKit.Colors.Purple
+		for t, c in pairs(columns) do
+			local reached = t <= tier
+			c.Col.BackgroundColor3 = reached and UIKit.Colors.Panel2 or Color3.fromRGB(25, 27, 45)
+			local fc = p.Season.Claimed[tostring(t)]
+			c.Free.Text = fc and "✅" or (reached and "استلام" or "🔒")
+			c.Free.BackgroundColor3 = fc and UIKit.Colors.Panel3 or (reached and UIKit.Colors.Green or UIKit.Colors.Panel3)
+			local pc = p.Season.PremiumClaimed[tostring(t)]
+			c.Prem.Text = pc and "✅" or (reached and (hasPass and "استلام" or "🎫") or "🔒")
+			c.Prem.BackgroundColor3 = pc and UIKit.Colors.Panel3 or ((reached and hasPass) and UIKit.Colors.Gold or UIKit.Colors.Panel3)
+		end
+	end
+	UIController.Register("Season", w, refresh)
+end
+
+return SeasonUI
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000066"><Properties><string name="Name">ShopUI</string><ProtectedString name="Source"><![CDATA[--!strict
 -- المتجر: الجيم باس، الألماس والجرعات، الترقيات، الهوفربورد
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -9465,7 +11270,7 @@ function ShopUI.Init()
 end
 
 return ShopUI
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000055"><Properties><string name="Name">SpinUI</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000067"><Properties><string name="Name">SpinUI</string><ProtectedString name="Source"><![CDATA[--!strict
 -- عجلة الحظ مع أنيميشن الدوران
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -9546,7 +11351,7 @@ function SpinUI.Init()
 end
 
 return SpinUI
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000056"><Properties><string name="Name">StatsUI</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000068"><Properties><string name="Name">StatsUI</string><ProtectedString name="Source"><![CDATA[--!strict
 -- الإحصائيات + الإتقان + الريبيرث + تفاصيل المضاعفات
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -9580,6 +11385,41 @@ function StatsUI.Init()
 			UIController.Close()
 		end
 	end)
+
+	-- متجر الريبيرث
+	UIKit.Label({ Text = "🔁 متجر الريبيرث (بالتوكنات)", Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 22, Parent = scroll })
+	local shopGrid = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 250), BackgroundTransparency = 1, Parent = scroll })
+	UIKit.Grid(shopGrid, UDim2.fromOffset(250, 118), 8)
+	local shopRows = {}
+	for i, u in ipairs(Config.RebirthShop) do
+		local card = UIKit.Frame({ LayoutOrder = i, BackgroundColor3 = UIKit.Colors.Panel2, Parent = shopGrid })
+		UIKit.Corner(card, 12)
+		UIKit.Stroke(card, Color3.fromRGB(255, 140, 60), 2)
+		UIKit.Label({ Text = u.Icon .. " " .. u.Name, Size = UDim2.new(1, -12, 0, 26), Position = UDim2.fromOffset(6, 4), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 17, Parent = card })
+		UIKit.Label({ Text = u.Desc, Size = UDim2.new(1, -12, 0, 20), Position = UDim2.fromOffset(6, 30), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = UIKit.Colors.Muted, MaxTextSize = 13, Parent = card })
+		local lvl = UIKit.Label({ Text = "", Size = UDim2.new(1, -12, 0, 20), Position = UDim2.fromOffset(6, 50), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 13, Parent = card })
+		local btn = UIKit.Button({ Text = "", Color = Color3.fromRGB(255, 140, 60), Size = UDim2.new(1, -12, 0, 34), Position = UDim2.new(0, 6, 1, -40), MaxTextSize = 15, Parent = card }, function()
+			local res = Remotes.Function("RebirthShop"):InvokeServer(u.Key)
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
+		end)
+		shopRows[u.Key] = { Level = lvl, Btn = btn }
+	end
+
+	-- الألقاب
+	UIKit.Label({ Text = "🏷️ الألقاب (تظهر فوق رأسك)", Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 22, Parent = scroll })
+	local titleRow = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 130), BackgroundTransparency = 1, Parent = scroll })
+	UIKit.Grid(titleRow, UDim2.fromOffset(190, 38), 6)
+	local titleBtns = {}
+	for i, t in ipairs(Config.Titles) do
+		titleBtns[t.Id] = UIKit.Button({ LayoutOrder = i, Text = t.Name, Color = UIKit.Colors.Panel3, MaxTextSize = 14, Parent = titleRow }, function()
+			local res = Remotes.Function("Title"):InvokeServer(t.Id)
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
+		end)
+	end
 
 	-- المضاعفات
 	local mult = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 96), BackgroundColor3 = UIKit.Colors.Panel2, Parent = scroll })
@@ -9632,6 +11472,26 @@ function StatsUI.Init()
 		multLabel.Text = string.format("💰 عملات x%.2f    🍀 حظ x%.2f    ⚔️ قوة x%.2f    💎 ألماس x%.2f\n🔁 ريبيرث: %d    🔧 إنشانت: عملات +%d%% / قوة +%d%% / حظ +%d%% / قاضية %d%%",
 			p.CoinMult or 1, p.Luck or 1, p.DamageMult or 1, p.DiamondMult or 1, p.Rebirths or 0,
 			math.floor(((p.Enchants and p.Enchants.Coins) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Damage) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Luck) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Crit) or 0) * 100))
+		for _, u in ipairs(Config.RebirthShop) do
+			local row = shopRows[u.Key]
+			local level = (p.RebirthUpgrades and p.RebirthUpgrades[u.Key]) or 0
+			row.Level.Text = "المستوى " .. level .. " / " .. u.MaxLevel
+			if level >= u.MaxLevel then
+				row.Btn.Text = "الحد الأقصى"
+				row.Btn.BackgroundColor3 = UIKit.Colors.Panel3
+			else
+				local c = u.Cost + u.CostStep * level
+				row.Btn.Text = "🔁 " .. c .. " توكن"
+				row.Btn.BackgroundColor3 = (p.Tokens or 0) >= c and Color3.fromRGB(255, 140, 60) or UIKit.Colors.Panel3
+			end
+		end
+		local avail = p.TitlesAvailable or {}
+		for id, btn in pairs(titleBtns) do
+			local unlocked = table.find(avail, id) ~= nil
+			local current = (p.Title or "") == id
+			btn.BackgroundColor3 = current and UIKit.Colors.Green or (unlocked and UIKit.Colors.Blue or UIKit.Colors.Panel3)
+			btn.TextTransparency = unlocked and 0 or 0.5
+		end
 		for _, cfg in ipairs(Config.Mastery) do
 			local row = masteryRows[cfg.Key]
 			local level, value, needed = Mastery.Progress(cfg, p.Stats[cfg.Stat] or 0)
@@ -9663,7 +11523,7 @@ function StatsUI.Init()
 end
 
 return StatsUI
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000057"><Properties><string name="Name">TradeUI</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000069"><Properties><string name="Name">TradeUI</string><ProtectedString name="Source"><![CDATA[--!strict
 -- قائمة اللاعبين + نافذة التبادل + طلب وارد
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9839,7 +11699,7 @@ function TradeUI.Init()
 end
 
 return TradeUI
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000058"><Properties><string name="Name">UIController</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000070"><Properties><string name="Name">UIController</string><ProtectedString name="Source"><![CDATA[--!strict
 -- HUD + إدارة النوافذ + الإشعارات + النوافذ البسيطة (المناطق، المكافآت، الأكواد، الفهرس، الإعدادات)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9849,6 +11709,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Zones = require(Shared.Data.Zones)
 local Pets = require(Shared.Data.Pets)
+local Eggs = require(Shared.Data.Eggs)
 local Rarities = require(Shared.Data.Rarities)
 local Format = require(Shared.Modules.Format)
 local Remotes = require(Shared.Remotes)
@@ -9944,6 +11805,9 @@ local adminButton: TextButton
 local eventBanner: Frame
 local eventLabel: TextLabel
 local eventTimer: TextLabel
+local dungeonBanner: Frame
+local dungeonLabel: TextLabel
+local dungeonTimer: TextLabel
 local bossBar: Frame
 local bossFill: Frame
 local bossText: TextLabel
@@ -9991,6 +11855,13 @@ local function buildHUD()
 	UIKit.Gradient(eventBanner, Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 150, 150))
 	eventLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, -90, 1, 0), Position = UDim2.fromOffset(8, 0), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 20, Parent = eventBanner })
 	eventTimer = UIKit.Label({ Text = "", Size = UDim2.fromOffset(80, 40), Position = UDim2.new(1, -86, 0, 0), TextColor3 = UIKit.Colors.Gold, MaxTextSize = 20, Parent = eventBanner })
+
+	-- شريط الزنزانة
+	dungeonBanner = UIKit.Frame({ Size = UDim2.fromOffset(440, 40), Position = UDim2.new(0.5, -220, 0, 170), BackgroundColor3 = Color3.fromRGB(60, 0, 110), Visible = false, Parent = hud })
+	UIKit.Corner(dungeonBanner, 12)
+	UIKit.Stroke(dungeonBanner, Color3.fromRGB(157, 0, 255), 2.5)
+	dungeonLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, -90, 1, 0), Position = UDim2.fromOffset(8, 0), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 20, Parent = dungeonBanner })
+	dungeonTimer = UIKit.Label({ Text = "", Size = UDim2.fromOffset(80, 40), Position = UDim2.new(1, -86, 0, 0), TextColor3 = Color3.fromRGB(200, 140, 255), MaxTextSize = 20, Parent = dungeonBanner })
 
 	-- شريط الزعيم
 	bossBar = UIKit.Frame({ Size = UDim2.fromOffset(520, 34), Position = UDim2.new(0.5, -260, 0, 128), BackgroundColor3 = Color3.fromRGB(15, 15, 25), Visible = false, Parent = hud })
@@ -10044,6 +11915,7 @@ local function buildHUD()
 	menuBtn("📊", "Stats", Color3.fromRGB(255, 140, 60), "Stats")
 	menuBtn("🤝", "Trade", Color3.fromRGB(60, 120, 220), "Trade")
 	menuBtn("🏪", "Market", Color3.fromRGB(255, 140, 60), "Market")
+	menuBtn("🎫", "Season", UIKit.Colors.Gold, "Season")
 	menuBtn("📖", "Index", UIKit.Colors.Purple, "Index")
 
 	-- أزرار يمين
@@ -10057,6 +11929,9 @@ local function buildHUD()
 	end)
 	UIKit.IconButton(right, "🔑", "Codes", UIKit.Colors.Cyan, function()
 		UIController.Open("Codes")
+	end)
+	UIKit.IconButton(right, "🏆", "Top", UIKit.Colors.Gold, function()
+		UIController.Open("Leaderboards")
 	end)
 	UIKit.IconButton(right, "👑", "VIP", UIKit.Colors.Gold, function()
 		if DataController.Owns("VIP") then
@@ -10157,6 +12032,14 @@ local function updateTimers()
 			eventLabel.Text = "⏳ حدث قادم بعد"
 			eventTimer.Text = Format.Time(nextAt - now)
 		end
+	end
+	-- الزنزانة
+	local dEnds = tonumber(state:GetAttribute("DungeonEnds")) or 0
+	if dEnds > now then
+		dungeonBanner.Visible = true
+		dungeonTimer.Text = Format.Time(dEnds - now)
+	else
+		dungeonBanner.Visible = false
 	end
 	-- زر الهدية
 	local elapsed = now - (p.SessionStart or now)
@@ -10448,7 +12331,19 @@ end
 local function buildIndexWindow()
 	local w = UIKit.Window(gui, "Index", "📖 فهرس الحيوانات", UDim2.fromOffset(820, 600), UIKit.Colors.Purple)
 	local counter = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 26), MaxTextSize = 20, TextColor3 = UIKit.Colors.Muted, Parent = w.Content })
-	local scroll = UIKit.Scroll(w.Content, { Size = UDim2.new(1, 0, 1, -30), Position = UDim2.fromOffset(0, 30) })
+	-- مكافآت إكمال فهرس كل بيضة
+	local eggRow = UIKit.Scroll(w.Content, { Size = UDim2.new(1, 0, 0, 62), Position = UDim2.fromOffset(0, 28), ScrollingDirection = Enum.ScrollingDirection.X, AutomaticCanvasSize = Enum.AutomaticSize.X })
+	UIKit.List(eggRow, 6, true)
+	local eggChips: { [string]: TextButton } = {}
+	for i, egg in ipairs(Eggs.List) do
+		eggChips[egg.Id] = UIKit.Button({ LayoutOrder = i, Text = egg.Name, Color = UIKit.Colors.Panel3, Size = UDim2.fromOffset(150, 50), MaxTextSize = 13, Parent = eggRow }, function()
+			local res = Remotes.Function("PetAction"):InvokeServer("ClaimIndex", { EggId = egg.Id })
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
+		end)
+	end
+	local scroll = UIKit.Scroll(w.Content, { Size = UDim2.new(1, 0, 1, -96), Position = UDim2.fromOffset(0, 96) })
 	UIKit.Grid(scroll, UDim2.fromOffset(110, 140), 8)
 	local cards: { [string]: { Card: Frame, Vp: ViewportFrame?, Name: TextLabel } } = {}
 	local built = false
@@ -10494,6 +12389,19 @@ local function buildIndexWindow()
 			end
 		end
 		counter.Text = "اكتشفت " .. found .. " / " .. #Pets.List
+		for _, egg in ipairs(Eggs.List) do
+			local chip = eggChips[egg.Id]
+			local have, total = 0, #egg.Pets
+			for _, entry in ipairs(egg.Pets) do
+				if p.Index[entry.Pet] then
+					have += 1
+				end
+			end
+			local claimed = p.IndexClaimed and p.IndexClaimed[egg.Id]
+			local reward = Config.IndexReward(math.max(1, egg.Zone))
+			chip.Text = egg.Name .. "  " .. have .. "/" .. total .. (claimed and "  ✅" or ("\n💎" .. Format.Number(reward.Diamonds) .. " 💠" .. reward.Gems))
+			chip.BackgroundColor3 = claimed and UIKit.Colors.Panel3 or (have >= total and UIKit.Colors.Green or UIKit.Colors.Panel3)
+		end
 	end
 	UIController.Register("Index", w, refresh)
 end
@@ -10607,9 +12515,29 @@ function UIController.Init()
 			bossBar.Visible = true
 			local ratio = math.clamp((data.Health or 0) / math.max(1, data.MaxHealth or 1), 0, 1)
 			bossFill.Size = UDim2.fromScale(ratio, 1)
-			bossText.Text = "👹 " .. Config.Events.Boss.Name .. "  " .. Format.Number(data.Health or 0) .. " / " .. Format.Number(data.MaxHealth or 0)
+			bossText.Text = "👹 " .. (data.Name or Config.Events.Boss.Name) .. "  " .. Format.Number(data.Health or 0) .. " / " .. Format.Number(data.MaxHealth or 0)
 		else
 			bossBar.Visible = false
+		end
+	end)
+
+	Remotes.Event("DungeonUpdate").OnClientEvent:Connect(function(data)
+		dungeonLabel.Text = data.Text or ""
+		if data.Active then
+			dungeonBanner.Visible = true
+		end
+	end)
+	Remotes.Event("EventEffect").OnClientEvent:Connect(function(data)
+		if data.Type == "WelcomeBack" then
+			local popup = UIKit.Frame({ Size = UDim2.fromOffset(420, 150), Position = UDim2.new(0.5, -210, 0, 220), BackgroundColor3 = UIKit.Colors.Panel, ZIndex = 20, Parent = gui })
+			UIKit.Corner(popup, 16)
+			UIKit.Stroke(popup, UIKit.Colors.Gold, 3)
+			UIKit.Label({ Text = "👋 أهلاً بعودتك!", Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 8), MaxTextSize = 26, ZIndex = 21, Parent = popup })
+			UIKit.Label({ Text = "حيواناتك جمعت أثناء غيابك (" .. Format.Time(data.Seconds or 0) .. "):\n💰 " .. Format.Number(data.Coins or 0), Size = UDim2.new(1, -16, 0, 60), Position = UDim2.fromOffset(8, 48), TextColor3 = UIKit.Colors.Gold, MaxTextSize = 20, ZIndex = 21, Parent = popup })
+			UIKit.Button({ Text = "رائع!", Color = UIKit.Colors.Green, Size = UDim2.fromOffset(160, 36), Position = UDim2.new(0.5, -80, 1, -44), MaxTextSize = 18, ZIndex = 21, Parent = popup }, function()
+				popup:Destroy()
+			end)
+			UIKit.Pop(popup)
 		end
 	end)
 
@@ -10629,7 +12557,7 @@ function UIController.Init()
 end
 
 return UIController
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000059"><Properties><string name="Name">UIKit</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000071"><Properties><string name="Name">UIKit</string><ProtectedString name="Source"><![CDATA[--!strict
 -- أدوات بناء الواجهة بالكود (بدون أي أصول خارجية)
 local TweenService = game:GetService("TweenService")
 
@@ -10906,7 +12834,7 @@ function UIKit.Pop(inst: GuiObject)
 end
 
 return UIKit
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000060"><Properties><string name="Name">ZoneController</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX000072"><Properties><string name="Name">ZoneController</string><ProtectedString name="Source"><![CDATA[--!strict
 -- البوابات: تسمح بالمرور محلياً للمناطق المفتوحة، وتحديث لافتاتها
 local Workspace = game:GetService("Workspace")
 local DataController = require(script.Parent.DataController)

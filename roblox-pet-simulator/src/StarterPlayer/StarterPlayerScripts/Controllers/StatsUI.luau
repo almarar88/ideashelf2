@@ -33,6 +33,41 @@ function StatsUI.Init()
 		end
 	end)
 
+	-- متجر الريبيرث
+	UIKit.Label({ Text = "🔁 متجر الريبيرث (بالتوكنات)", Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 22, Parent = scroll })
+	local shopGrid = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 250), BackgroundTransparency = 1, Parent = scroll })
+	UIKit.Grid(shopGrid, UDim2.fromOffset(250, 118), 8)
+	local shopRows = {}
+	for i, u in ipairs(Config.RebirthShop) do
+		local card = UIKit.Frame({ LayoutOrder = i, BackgroundColor3 = UIKit.Colors.Panel2, Parent = shopGrid })
+		UIKit.Corner(card, 12)
+		UIKit.Stroke(card, Color3.fromRGB(255, 140, 60), 2)
+		UIKit.Label({ Text = u.Icon .. " " .. u.Name, Size = UDim2.new(1, -12, 0, 26), Position = UDim2.fromOffset(6, 4), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 17, Parent = card })
+		UIKit.Label({ Text = u.Desc, Size = UDim2.new(1, -12, 0, 20), Position = UDim2.fromOffset(6, 30), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = UIKit.Colors.Muted, MaxTextSize = 13, Parent = card })
+		local lvl = UIKit.Label({ Text = "", Size = UDim2.new(1, -12, 0, 20), Position = UDim2.fromOffset(6, 50), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 13, Parent = card })
+		local btn = UIKit.Button({ Text = "", Color = Color3.fromRGB(255, 140, 60), Size = UDim2.new(1, -12, 0, 34), Position = UDim2.new(0, 6, 1, -40), MaxTextSize = 15, Parent = card }, function()
+			local res = Remotes.Function("RebirthShop"):InvokeServer(u.Key)
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
+		end)
+		shopRows[u.Key] = { Level = lvl, Btn = btn }
+	end
+
+	-- الألقاب
+	UIKit.Label({ Text = "🏷️ الألقاب (تظهر فوق رأسك)", Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 22, Parent = scroll })
+	local titleRow = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 130), BackgroundTransparency = 1, Parent = scroll })
+	UIKit.Grid(titleRow, UDim2.fromOffset(190, 38), 6)
+	local titleBtns = {}
+	for i, t in ipairs(Config.Titles) do
+		titleBtns[t.Id] = UIKit.Button({ LayoutOrder = i, Text = t.Name, Color = UIKit.Colors.Panel3, MaxTextSize = 14, Parent = titleRow }, function()
+			local res = Remotes.Function("Title"):InvokeServer(t.Id)
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
+		end)
+	end
+
 	-- المضاعفات
 	local mult = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 96), BackgroundColor3 = UIKit.Colors.Panel2, Parent = scroll })
 	UIKit.Corner(mult, 14)
@@ -84,6 +119,26 @@ function StatsUI.Init()
 		multLabel.Text = string.format("💰 عملات x%.2f    🍀 حظ x%.2f    ⚔️ قوة x%.2f    💎 ألماس x%.2f\n🔁 ريبيرث: %d    🔧 إنشانت: عملات +%d%% / قوة +%d%% / حظ +%d%% / قاضية %d%%",
 			p.CoinMult or 1, p.Luck or 1, p.DamageMult or 1, p.DiamondMult or 1, p.Rebirths or 0,
 			math.floor(((p.Enchants and p.Enchants.Coins) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Damage) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Luck) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Crit) or 0) * 100))
+		for _, u in ipairs(Config.RebirthShop) do
+			local row = shopRows[u.Key]
+			local level = (p.RebirthUpgrades and p.RebirthUpgrades[u.Key]) or 0
+			row.Level.Text = "المستوى " .. level .. " / " .. u.MaxLevel
+			if level >= u.MaxLevel then
+				row.Btn.Text = "الحد الأقصى"
+				row.Btn.BackgroundColor3 = UIKit.Colors.Panel3
+			else
+				local c = u.Cost + u.CostStep * level
+				row.Btn.Text = "🔁 " .. c .. " توكن"
+				row.Btn.BackgroundColor3 = (p.Tokens or 0) >= c and Color3.fromRGB(255, 140, 60) or UIKit.Colors.Panel3
+			end
+		end
+		local avail = p.TitlesAvailable or {}
+		for id, btn in pairs(titleBtns) do
+			local unlocked = table.find(avail, id) ~= nil
+			local current = (p.Title or "") == id
+			btn.BackgroundColor3 = current and UIKit.Colors.Green or (unlocked and UIKit.Colors.Blue or UIKit.Colors.Panel3)
+			btn.TextTransparency = unlocked and 0 or 0.5
+		end
 		for _, cfg in ipairs(Config.Mastery) do
 			local row = masteryRows[cfg.Key]
 			local level, value, needed = Mastery.Progress(cfg, p.Stats[cfg.Stat] or 0)

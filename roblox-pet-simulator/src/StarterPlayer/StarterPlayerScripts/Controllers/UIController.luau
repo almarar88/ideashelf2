@@ -8,6 +8,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Zones = require(Shared.Data.Zones)
 local Pets = require(Shared.Data.Pets)
+local Eggs = require(Shared.Data.Eggs)
 local Rarities = require(Shared.Data.Rarities)
 local Format = require(Shared.Modules.Format)
 local Remotes = require(Shared.Remotes)
@@ -103,6 +104,9 @@ local adminButton: TextButton
 local eventBanner: Frame
 local eventLabel: TextLabel
 local eventTimer: TextLabel
+local dungeonBanner: Frame
+local dungeonLabel: TextLabel
+local dungeonTimer: TextLabel
 local bossBar: Frame
 local bossFill: Frame
 local bossText: TextLabel
@@ -150,6 +154,13 @@ local function buildHUD()
 	UIKit.Gradient(eventBanner, Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 150, 150))
 	eventLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, -90, 1, 0), Position = UDim2.fromOffset(8, 0), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 20, Parent = eventBanner })
 	eventTimer = UIKit.Label({ Text = "", Size = UDim2.fromOffset(80, 40), Position = UDim2.new(1, -86, 0, 0), TextColor3 = UIKit.Colors.Gold, MaxTextSize = 20, Parent = eventBanner })
+
+	-- شريط الزنزانة
+	dungeonBanner = UIKit.Frame({ Size = UDim2.fromOffset(440, 40), Position = UDim2.new(0.5, -220, 0, 170), BackgroundColor3 = Color3.fromRGB(60, 0, 110), Visible = false, Parent = hud })
+	UIKit.Corner(dungeonBanner, 12)
+	UIKit.Stroke(dungeonBanner, Color3.fromRGB(157, 0, 255), 2.5)
+	dungeonLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, -90, 1, 0), Position = UDim2.fromOffset(8, 0), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 20, Parent = dungeonBanner })
+	dungeonTimer = UIKit.Label({ Text = "", Size = UDim2.fromOffset(80, 40), Position = UDim2.new(1, -86, 0, 0), TextColor3 = Color3.fromRGB(200, 140, 255), MaxTextSize = 20, Parent = dungeonBanner })
 
 	-- شريط الزعيم
 	bossBar = UIKit.Frame({ Size = UDim2.fromOffset(520, 34), Position = UDim2.new(0.5, -260, 0, 128), BackgroundColor3 = Color3.fromRGB(15, 15, 25), Visible = false, Parent = hud })
@@ -203,6 +214,7 @@ local function buildHUD()
 	menuBtn("📊", "Stats", Color3.fromRGB(255, 140, 60), "Stats")
 	menuBtn("🤝", "Trade", Color3.fromRGB(60, 120, 220), "Trade")
 	menuBtn("🏪", "Market", Color3.fromRGB(255, 140, 60), "Market")
+	menuBtn("🎫", "Season", UIKit.Colors.Gold, "Season")
 	menuBtn("📖", "Index", UIKit.Colors.Purple, "Index")
 
 	-- أزرار يمين
@@ -216,6 +228,9 @@ local function buildHUD()
 	end)
 	UIKit.IconButton(right, "🔑", "Codes", UIKit.Colors.Cyan, function()
 		UIController.Open("Codes")
+	end)
+	UIKit.IconButton(right, "🏆", "Top", UIKit.Colors.Gold, function()
+		UIController.Open("Leaderboards")
 	end)
 	UIKit.IconButton(right, "👑", "VIP", UIKit.Colors.Gold, function()
 		if DataController.Owns("VIP") then
@@ -316,6 +331,14 @@ local function updateTimers()
 			eventLabel.Text = "⏳ حدث قادم بعد"
 			eventTimer.Text = Format.Time(nextAt - now)
 		end
+	end
+	-- الزنزانة
+	local dEnds = tonumber(state:GetAttribute("DungeonEnds")) or 0
+	if dEnds > now then
+		dungeonBanner.Visible = true
+		dungeonTimer.Text = Format.Time(dEnds - now)
+	else
+		dungeonBanner.Visible = false
 	end
 	-- زر الهدية
 	local elapsed = now - (p.SessionStart or now)
@@ -607,7 +630,19 @@ end
 local function buildIndexWindow()
 	local w = UIKit.Window(gui, "Index", "📖 فهرس الحيوانات", UDim2.fromOffset(820, 600), UIKit.Colors.Purple)
 	local counter = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 26), MaxTextSize = 20, TextColor3 = UIKit.Colors.Muted, Parent = w.Content })
-	local scroll = UIKit.Scroll(w.Content, { Size = UDim2.new(1, 0, 1, -30), Position = UDim2.fromOffset(0, 30) })
+	-- مكافآت إكمال فهرس كل بيضة
+	local eggRow = UIKit.Scroll(w.Content, { Size = UDim2.new(1, 0, 0, 62), Position = UDim2.fromOffset(0, 28), ScrollingDirection = Enum.ScrollingDirection.X, AutomaticCanvasSize = Enum.AutomaticSize.X })
+	UIKit.List(eggRow, 6, true)
+	local eggChips: { [string]: TextButton } = {}
+	for i, egg in ipairs(Eggs.List) do
+		eggChips[egg.Id] = UIKit.Button({ LayoutOrder = i, Text = egg.Name, Color = UIKit.Colors.Panel3, Size = UDim2.fromOffset(150, 50), MaxTextSize = 13, Parent = eggRow }, function()
+			local res = Remotes.Function("PetAction"):InvokeServer("ClaimIndex", { EggId = egg.Id })
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
+		end)
+	end
+	local scroll = UIKit.Scroll(w.Content, { Size = UDim2.new(1, 0, 1, -96), Position = UDim2.fromOffset(0, 96) })
 	UIKit.Grid(scroll, UDim2.fromOffset(110, 140), 8)
 	local cards: { [string]: { Card: Frame, Vp: ViewportFrame?, Name: TextLabel } } = {}
 	local built = false
@@ -653,6 +688,19 @@ local function buildIndexWindow()
 			end
 		end
 		counter.Text = "اكتشفت " .. found .. " / " .. #Pets.List
+		for _, egg in ipairs(Eggs.List) do
+			local chip = eggChips[egg.Id]
+			local have, total = 0, #egg.Pets
+			for _, entry in ipairs(egg.Pets) do
+				if p.Index[entry.Pet] then
+					have += 1
+				end
+			end
+			local claimed = p.IndexClaimed and p.IndexClaimed[egg.Id]
+			local reward = Config.IndexReward(math.max(1, egg.Zone))
+			chip.Text = egg.Name .. "  " .. have .. "/" .. total .. (claimed and "  ✅" or ("\n💎" .. Format.Number(reward.Diamonds) .. " 💠" .. reward.Gems))
+			chip.BackgroundColor3 = claimed and UIKit.Colors.Panel3 or (have >= total and UIKit.Colors.Green or UIKit.Colors.Panel3)
+		end
 	end
 	UIController.Register("Index", w, refresh)
 end
@@ -766,9 +814,29 @@ function UIController.Init()
 			bossBar.Visible = true
 			local ratio = math.clamp((data.Health or 0) / math.max(1, data.MaxHealth or 1), 0, 1)
 			bossFill.Size = UDim2.fromScale(ratio, 1)
-			bossText.Text = "👹 " .. Config.Events.Boss.Name .. "  " .. Format.Number(data.Health or 0) .. " / " .. Format.Number(data.MaxHealth or 0)
+			bossText.Text = "👹 " .. (data.Name or Config.Events.Boss.Name) .. "  " .. Format.Number(data.Health or 0) .. " / " .. Format.Number(data.MaxHealth or 0)
 		else
 			bossBar.Visible = false
+		end
+	end)
+
+	Remotes.Event("DungeonUpdate").OnClientEvent:Connect(function(data)
+		dungeonLabel.Text = data.Text or ""
+		if data.Active then
+			dungeonBanner.Visible = true
+		end
+	end)
+	Remotes.Event("EventEffect").OnClientEvent:Connect(function(data)
+		if data.Type == "WelcomeBack" then
+			local popup = UIKit.Frame({ Size = UDim2.fromOffset(420, 150), Position = UDim2.new(0.5, -210, 0, 220), BackgroundColor3 = UIKit.Colors.Panel, ZIndex = 20, Parent = gui })
+			UIKit.Corner(popup, 16)
+			UIKit.Stroke(popup, UIKit.Colors.Gold, 3)
+			UIKit.Label({ Text = "👋 أهلاً بعودتك!", Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 8), MaxTextSize = 26, ZIndex = 21, Parent = popup })
+			UIKit.Label({ Text = "حيواناتك جمعت أثناء غيابك (" .. Format.Time(data.Seconds or 0) .. "):\n💰 " .. Format.Number(data.Coins or 0), Size = UDim2.new(1, -16, 0, 60), Position = UDim2.fromOffset(8, 48), TextColor3 = UIKit.Colors.Gold, MaxTextSize = 20, ZIndex = 21, Parent = popup })
+			UIKit.Button({ Text = "رائع!", Color = UIKit.Colors.Green, Size = UDim2.fromOffset(160, 36), Position = UDim2.new(0.5, -80, 1, -44), MaxTextSize = 18, ZIndex = 21, Parent = popup }, function()
+				popup:Destroy()
+			end)
+			UIKit.Pop(popup)
 		end
 	end)
 

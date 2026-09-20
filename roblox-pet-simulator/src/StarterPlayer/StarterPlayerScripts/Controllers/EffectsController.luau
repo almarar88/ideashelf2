@@ -141,6 +141,29 @@ function EffectsController.Fireworks(origin: Vector3, count: number?)
 	end)
 end
 
+-- وضع الرسومات المنخفضة: إيقاف الجزيئات الجوية والآثار
+local lowApplied = false
+function EffectsController.ApplyLowGraphics(on: boolean)
+	if on == lowApplied then
+		return
+	end
+	lowApplied = on
+	local map = Workspace:FindFirstChild("Map")
+	if map then
+		for _, d in ipairs(map:GetDescendants()) do
+			if d:IsA("ParticleEmitter") then
+				d.Enabled = not on
+			end
+		end
+	end
+	local Lighting = game:GetService("Lighting")
+	for _, e in ipairs(Lighting:GetChildren()) do
+		if e:IsA("BloomEffect") or e:IsA("SunRaysEffect") then
+			e.Enabled = not on
+		end
+	end
+end
+
 function EffectsController.Init()
 	local ReplicatedStorage2 = game:GetService("ReplicatedStorage")
 	local Remotes = require(ReplicatedStorage2:WaitForChild("Shared").Remotes)
@@ -169,6 +192,16 @@ function EffectsController.Init()
 				EffectsController.Burst(hrp.Position + Vector3.new(0, 3, 0), rank >= 4 and Color3.fromRGB(255, 0, 80) or Color3.fromRGB(255, 200, 40), 40 * rank, 0.7)
 				EffectsController.Shockwave(hrp.Position, rank >= 4 and Color3.fromRGB(255, 0, 80) or Color3.fromRGB(255, 200, 40))
 			end
+		elseif data.Type == "DungeonWave" then
+			EffectsController.Play("Wave")
+			screenFlash(Color3.fromRGB(80, 0, 140), "🌀 الموجة " .. tostring(data.Wave))
+		elseif data.Type == "DungeonBoss" then
+			EffectsController.Play("Boss")
+			screenFlash(Color3.fromRGB(120, 0, 60), "👹 حارس الشق!")
+		elseif data.Type == "DungeonClear" and hrp then
+			EffectsController.Fireworks(hrp.Position, 8)
+		elseif data.Type == "Treasure" then
+			screenFlash(Color3.fromRGB(120, 100, 0), "🗺️ ظهر كنز! اذهب قبل اختفائه")
 		elseif data.Type == "Purchase" and hrp then
 			EffectsController.Burst(hrp.Position + Vector3.new(0, 3, 0), Color3.fromRGB(200, 140, 255), 40, 0.6)
 			EffectsController.Play("Sell")
@@ -187,6 +220,15 @@ function EffectsController.Init()
 			end
 		end
 	end
+	DataController.Changed:Connect(function(p)
+		EffectsController.ApplyLowGraphics(p.Settings and p.Settings.LowGraphics == true)
+	end)
+	task.delay(3, function()
+		local p = DataController.Profile
+		if p then
+			EffectsController.ApplyLowGraphics(p.Settings and p.Settings.LowGraphics == true)
+		end
+	end)
 	if music then
 		music:Play()
 		DataController.Changed:Connect(function(p)

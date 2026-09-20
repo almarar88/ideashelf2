@@ -14,6 +14,7 @@ local Hooks = require(script.Parent.Hooks)
 local EventService = {}
 
 local active: any = nil
+local activeBoss: any = nil
 local activeEnds = 0
 local lastId = ""
 local rng = Random.new()
@@ -66,12 +67,25 @@ function EventService.Start(id: string): boolean
 	DataService.NotifyAll("🎉 حدث: " .. e.Name .. " — " .. e.Arabic, Color3.fromRGB(255, 220, 90))
 	Remotes.Event("EventEffect"):FireAllClients({ Type = "EventStart", Id = id })
 	if e.Boss then
+		-- اختيار زعيم يمكن لأحد اللاعبين الوصول لمنطقته
+		local candidates = {}
+		for _, bd in ipairs(Config.Bosses) do
+			for _, pl in ipairs(Players:GetPlayers()) do
+				local p = DataService.Get(pl)
+				if p and (bd.Zone == 1 or p.UnlockedZones[tostring(bd.Zone)]) then
+					table.insert(candidates, bd)
+					break
+				end
+			end
+		end
+		activeBoss = candidates[rng:NextInteger(1, math.max(1, #candidates))] or Config.Bosses[1]
 		local totalPower = 0
 		for _, pl in ipairs(Players:GetPlayers()) do
 			totalPower += PetService.GetPower(pl)
 		end
-		local health = math.max(5000, math.floor(totalPower * Config.Events.Boss.HealthPerPower))
-		BreakableService.SpawnBoss(health)
+		local health = math.max(5000, math.floor(totalPower * (activeBoss.HealthPerPower or 45)))
+		BreakableService.SpawnBoss(health, activeBoss)
+		DataService.NotifyAll("👹 " .. activeBoss.Name .. " (" .. activeBoss.Arabic .. ") ظهر في " .. (require(Shared.Data.Zones).Get(activeBoss.Zone) or { Name = "?" }).Name .. "!", Color3.fromRGB(255, 90, 90))
 	end
 	task.delay(activeEnds - os.time(), function()
 		if active == e and os.time() >= activeEnds then
@@ -82,7 +96,11 @@ function EventService.Start(id: string): boolean
 end
 
 local function onBossKilled(contributors: { [Player]: number })
-	local bossCfg = Config.Events.Boss
+	local bossCfg = table.clone(Config.Events.Boss)
+	if activeBoss then
+		bossCfg.Name = activeBoss.Name
+		bossCfg.Pet = activeBoss.Pet
+	end
 	DataService.NotifyAll("🏆 تم هزيمة " .. bossCfg.Name .. "! المكافآت وُزعت على المشاركين", Color3.fromRGB(120, 255, 140))
 	for player in pairs(contributors) do
 		local p = DataService.Get(player)

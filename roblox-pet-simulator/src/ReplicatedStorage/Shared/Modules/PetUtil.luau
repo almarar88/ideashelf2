@@ -18,6 +18,9 @@ export type PetInstance = {
 	Level: number,
 	XP: number,
 	Enchants: { Enchant },
+	Shiny: boolean?,
+	Accessory: string?,
+	Nick: string?,
 }
 
 function PetUtil.Level(inst: PetInstance): number
@@ -31,13 +34,17 @@ function PetUtil.BasePower(inst: PetInstance): number
 	end
 	local mult = Config.VariantMultipliers[inst.Variant] or 1
 	local levelMult = 1 + (PetUtil.Level(inst) - 1) * Config.PetLevelPowerPerLevel
-	return math.floor(def.Power * mult * levelMult + 0.5)
+	local shiny = inst.Shiny and Config.Shiny.Mult or 1
+	return math.floor(def.Power * mult * levelMult * shiny + 0.5)
 end
 
 function PetUtil.DisplayName(inst: PetInstance): string
 	local def = Pets.Get(inst.Id)
+	if inst.Nick and inst.Nick ~= "" then
+		return inst.Nick
+	end
 	local prefix = Config.VariantNames[inst.Variant] or ""
-	return prefix .. (def and def.Name or inst.Id)
+	return (inst.Shiny and "✨ " or "") .. prefix .. (def and def.Name or inst.Id)
 end
 
 function PetUtil.RarityColor(inst: PetInstance): Color3

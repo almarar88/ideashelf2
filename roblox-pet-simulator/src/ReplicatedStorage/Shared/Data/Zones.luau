@@ -109,6 +109,10 @@ Zones.Market = { Index = -1, Id = "Market", Name = "Grand Bazaar", Arabic = "ا�
 	Material = Enum.Material.Cobblestone, Decor = "market",
 	Breakables = { { Type = "GemOre", Count = 10 }, { Type = "CoinPile", Count = 6 } } }
 
+Zones.Dungeon = { Index = -2, Id = "Dungeon", Name = "Rift Dungeon", Arabic = "زنزانة الشق", Cost = 0, Multiplier = 1, World = 1,
+	Ground = Color3.fromRGB(25, 10, 40), Accent = Color3.fromRGB(157, 0, 255), Sky = Color3.fromRGB(0, 0, 0),
+	Material = Enum.Material.Basalt, Decor = "voidorbs", Breakables = {} }
+
 Zones.WorldStart = { [1] = 1, [2] = 11, [3] = 16 }
 
 function Zones.IsWorldStart(index: number): boolean
@@ -149,6 +153,8 @@ function Zones.Get(index: number): ZoneDef?
 		return Zones.VIP
 	elseif index == -1 then
 		return Zones.Market
+	elseif index == -2 then
+		return Zones.Dungeon
 	end
 	return Zones.List[index]
 end

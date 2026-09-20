@@ -302,6 +302,17 @@ function MachineUI.Init()
 			if MachineUI.OnPetShop then
 				MachineUI.OnPetShop()
 			end
+		elseif kind == "Craft" then
+			UIController.Open("Craft")
+		elseif kind == "Cosmetic" then
+			UIController.Open("Cosmetic")
+		elseif kind == "Zones" then
+			UIController.Open("Zones")
+		elseif kind == "Dungeon" then
+			local res = Remotes.Function("Dungeon"):InvokeServer("Start")
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
 		end
 	end)
 end

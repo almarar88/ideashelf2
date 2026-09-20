@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
 local Pets = require(Shared.Data.Pets)
 local Rarities = require(Shared.Data.Rarities)
 local PetUtil = require(Shared.Modules.PetUtil)
@@ -28,7 +29,7 @@ function InventoryUI.PetCard(parent: Instance, pet: any, onClick: (() -> ())?): 
 	UIKit.Corner(card, 12)
 	UIKit.Stroke(card, color, 2.5)
 	local vpHolder = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 80), BackgroundTransparency = 1, Parent = card })
-	PetViewport.Create(vpHolder, pet.Id, pet.Variant)
+	PetViewport.Create(vpHolder, pet.Id, pet.Variant, false, { Shiny = pet.Shiny == true, Accessory = pet.Accessory })
 	UIKit.Label({ Text = PetUtil.DisplayName(pet), Size = UDim2.new(1, -6, 0, 20), Position = UDim2.fromOffset(3, 80), MaxTextSize = 13, Parent = card })
 	UIKit.Label({ Text = "⚔️ " .. Format.Number(PetUtil.BasePower(pet)), Size = UDim2.new(1, 0, 0, 18), Position = UDim2.fromOffset(0, 100), TextColor3 = UIKit.Colors.Pink, MaxTextSize = 13, Parent = card })
 	UIKit.Label({ Name = "Badge", Text = pet.Equipped and "✅" or "", Size = UDim2.fromOffset(26, 22), Position = UDim2.fromOffset(4, 4), MaxTextSize = 18, Parent = card })
@@ -36,6 +37,9 @@ function InventoryUI.PetCard(parent: Instance, pet: any, onClick: (() -> ())?): 
 	UIKit.Label({ Name = "Level", Text = "Lv." .. (pet.Level or 1), Size = UDim2.fromOffset(44, 18), Position = UDim2.new(1, -46, 0, 60), TextColor3 = UIKit.Colors.Cyan, MaxTextSize = 12, Parent = card })
 	if pet.Enchants and #pet.Enchants > 0 then
 		UIKit.Label({ Name = "Ench", Text = "🔧" .. #pet.Enchants, Size = UDim2.fromOffset(34, 18), Position = UDim2.fromOffset(4, 60), TextColor3 = UIKit.Colors.Green, MaxTextSize = 12, Parent = card })
+	end
+	if pet.Shiny then
+		UIKit.Label({ Name = "Shiny", Text = "✨", Size = UDim2.fromOffset(22, 22), Position = UDim2.fromOffset(4, 28), MaxTextSize = 16, Parent = card })
 	end
 	if pet.Variant == "Golden" then
 		UIKit.Gradient(card, Color3.fromRGB(80, 70, 30), UIKit.Colors.Panel)
@@ -130,6 +134,15 @@ function InventoryUI.Init()
 	local dLevel = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 18), TextColor3 = UIKit.Colors.Cyan, MaxTextSize = 15, Parent = details })
 	local _, xpFill, xpLabel = UIKit.ProgressBar(details, UIKit.Colors.Cyan, UDim2.new(1, 0, 0, 14))
 	local dEnch = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 60), TextColor3 = UIKit.Colors.Green, TextYAlignment = Enum.TextYAlignment.Top, MaxTextSize = 14, Parent = details })
+	local nickBox = UIKit.New("TextBox", { Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = Color3.fromRGB(15, 16, 28), PlaceholderText = "✏️ اسم مستعار (Enter)", Text = "", Font = UIKit.Font, TextColor3 = UIKit.Colors.Text, TextSize = 15, ClearTextOnFocus = false, Parent = details }) :: TextBox
+	UIKit.Corner(nickBox, 8)
+	nickBox.FocusLost:Connect(function(enter)
+		if enter and selectedUid then
+			Remotes.Function("PetAction"):InvokeServer("Nick", { Uid = selectedUid, Nick = nickBox.Text })
+		end
+	end)
+	local accRow = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, Visible = false, Parent = details })
+	UIKit.List(accRow, 4, true)
 	local equipBtn = UIKit.Button({ Text = "تجهيز", Color = UIKit.Colors.Green, Size = UDim2.new(1, 0, 0, 38), MaxTextSize = 18, Parent = details })
 	local enchantBtn = UIKit.Button({ Text = "🔧 إنشانت", Color = UIKit.Colors.Purple, Size = UDim2.new(1, 0, 0, 38), MaxTextSize = 18, Parent = details })
 	local lockBtn = UIKit.Button({ Text = "🔒 قفل", Color = UIKit.Colors.Blue, Size = UDim2.new(1, 0, 0, 38), MaxTextSize = 18, Parent = details })
@@ -147,8 +160,30 @@ function InventoryUI.Init()
 		for _, c in ipairs(dVp:GetChildren()) do
 			c:Destroy()
 		end
-		PetViewport.Create(dVp, pet.Id, pet.Variant, true)
+		PetViewport.Create(dVp, pet.Id, pet.Variant, true, { Shiny = pet.Shiny == true, Accessory = pet.Accessory })
 		dName.Text = PetUtil.DisplayName(pet)
+		nickBox.Text = pet.Nick or ""
+		-- الإكسسوارات المملوكة
+		for _, c in ipairs(accRow:GetChildren()) do
+			if c:IsA("TextButton") then
+				c:Destroy()
+			end
+		end
+		local p = DataController.Profile
+		local ownedAny = false
+		if p then
+			for _, a in ipairs(Config.Accessories) do
+				local n = p.Accessories[a.Id] or 0
+				if n > 0 or pet.Accessory == a.Id then
+					ownedAny = true
+					local isOn = pet.Accessory == a.Id
+					UIKit.Button({ Text = a.Icon .. (isOn and "✓" or (" " .. n)), Color = isOn and UIKit.Colors.Green or UIKit.Colors.Panel3, Size = UDim2.fromOffset(52, 32), MaxTextSize = 14, Parent = accRow }, function()
+						Remotes.Function("PetAction"):InvokeServer("Accessory", { Uid = pet.Uid, Id = isOn and "" or a.Id })
+					end)
+				end
+			end
+		end
+		accRow.Visible = ownedAny
 		dRarity.Text = def.Rarity .. " • " .. (Rarities.Info[def.Rarity] and Rarities.Info[def.Rarity].Arabic or "")
 		dRarity.TextColor3 = Rarities.Color(def.Rarity)
 		dPower.Text = "⚔️ القوة: " .. Format.Number(PetUtil.BasePower(pet))
@@ -219,7 +254,7 @@ function InventoryUI.Init()
 			local visible = q == "" or name:find(q, 1, true) ~= nil
 			seen[pet.Uid] = true
 			local card = cards[pet.Uid]
-			local sig = pet.Variant .. "|" .. (pet.Level or 1) .. "|" .. (pet.Enchants and #pet.Enchants or 0)
+			local sig = pet.Variant .. "|" .. (pet.Level or 1) .. "|" .. (pet.Enchants and #pet.Enchants or 0) .. "|" .. tostring(pet.Accessory or "") .. "|" .. tostring(pet.Nick or "")
 			if card and card:GetAttribute("Sig") ~= sig then
 				card:Destroy()
 				card = nil

@@ -468,6 +468,20 @@ function MapBuilder.BuildBreakable(typeName: string, pos: Vector3, scale: number
 		light.Color = def.Color
 		light.Range = 12
 		light.Parent = base
+	elseif def.Shape == "golem" then
+		base = part(model, "Base", Vector3.new(size.X, size.Y * 0.7, size.Z * 0.8), CFrame.new(pos + Vector3.new(0, size.Y * 0.55, 0)), def.Color, def.Material)
+		part(model, "Head", Vector3.new(size.X * 0.5, size.Y * 0.35, size.Z * 0.5), CFrame.new(pos + Vector3.new(0, size.Y * 1.05, 0)), def.Color, def.Material).CanCollide = false
+		for _, sx in ipairs({ -1, 1 }) do
+			part(model, "Arm", Vector3.new(size.X * 0.3, size.Y * 0.7, size.Z * 0.3), CFrame.new(pos + Vector3.new(sx * size.X * 0.68, size.Y * 0.5, 0)), def.Color, def.Material).CanCollide = false
+			part(model, "Eye", Vector3.new(size.X * 0.12, size.X * 0.12, size.X * 0.12), CFrame.new(pos + Vector3.new(sx * size.X * 0.12, size.Y * 1.1, -size.Z * 0.26)), Color3.fromRGB(255, 60, 60), Enum.Material.Neon, "ball").CanCollide = false
+		end
+		local core = part(model, "Core", Vector3.new(size.X * 0.3, size.X * 0.3, size.X * 0.3), CFrame.new(pos + Vector3.new(0, size.Y * 0.6, -size.Z * 0.42)), Color3.fromRGB(255, 200, 40), Enum.Material.Neon, "ball")
+		core.CanCollide = false
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 200, 40)
+		light.Range = 20
+		light.Parent = core
+		billboard(base, "🛡️ " .. def.Name, UDim2.fromScale(16, 4), Color3.fromRGB(255, 200, 40), size.Y * 0.9)
 	elseif def.Shape == "orb" then
 		base = part(model, "Base", size, CFrame.new(pos + Vector3.new(0, size.Y * 0.7, 0)), def.Color, def.Material, "ball")
 		base.Transparency = 0.15
@@ -986,6 +1000,35 @@ local function buildAuctionHouse(parent: Instance, pos: Vector3): Model
 	return model
 end
 
+local function buildPad(parent: Instance, pos: Vector3, kind: string, text: string, color: Color3): Model
+	local model = Instance.new("Model")
+	model.Name = kind .. "Pad"
+	model:SetAttribute("Machine", kind)
+	local base = part(model, "Base", Vector3.new(1, 8, 8), CFrame.new(pos + Vector3.new(0, 0.3, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(40, 40, 60), Enum.Material.Metal, "cyl")
+	local ring = part(model, "Ring", Vector3.new(0.4, 7, 7), CFrame.new(pos + Vector3.new(0, 0.7, 0)) * CFrame.Angles(0, 0, math.pi / 2), color, Enum.Material.Neon, "cyl")
+	ring.CanCollide = false
+	local beam = part(model, "Beam", Vector3.new(1.2, 10, 1.2), CFrame.new(pos + Vector3.new(0, 5.5, 0)), color, Enum.Material.Neon)
+	beam.Transparency = 0.6
+	beam.CanCollide = false
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "فتح"
+	prompt.ObjectText = text
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = base
+	billboard(beam, text, UDim2.fromScale(12, 3), color, 6)
+	model.PrimaryPart = base
+	model.Parent = parent
+	return model
+end
+
+function MapBuilder.BossPosition(zoneIndex: number): Vector3
+	local layout = MapBuilder.Zones[zoneIndex] or MapBuilder.Zones[1]
+	local half = ISLAND / 2
+	return layout.Center + Vector3.new(-half * 0.66, 0, half * 0.64)
+end
+
 function MapBuilder.Build()
 	setupLighting()
 	local existing = Workspace:FindFirstChild("Map")
@@ -1006,6 +1049,7 @@ function MapBuilder.Build()
 		local layout = buildIsland(zone, center, ISLAND, map, rng)
 		ambient(layout.Folder, center, ISLAND, zone.Decor)
 		MapBuilder.Zones[i] = layout
+		buildPad(layout.Folder, center + Vector3.new(-40, 0, -ISLAND / 2 * 0.78), "Zones", "🗺️ منصة التنقل", Color3.fromRGB(80, 200, 255))
 		local prevZone = Zones.List[i - 1]
 		if prevZone and prevZone.World == zone.World then
 			local prev = MapBuilder.Zones[i - 1]
@@ -1072,6 +1116,31 @@ function MapBuilder.Build()
 	portalParticles(MapBuilder.VIPReturnPortal, Color3.fromRGB(120, 200, 255))
 	ambient(vipLayout.Folder, vipCenter, 200, "gold")
 
+	-- زنزانة الشق
+	local dCenter = Config.Map.DungeonOffset
+	local dLayout = buildIsland(Zones.Dungeon, dCenter, 220, map, rng)
+	ambient(dLayout.Folder, dCenter, 220, "voidorbs")
+	MapBuilder.Zones[-2] = dLayout
+	dLayout.Spots = {}
+	local df = dLayout.Folder
+	for i = 1, 8 do
+		local ang = (i / 8) * math.pi * 2
+		part(df, "RiftPillar", Vector3.new(4, 26, 4), CFrame.new(dCenter + Vector3.new(math.cos(ang) * 55, 13, math.sin(ang) * 55)), Color3.fromRGB(30, 10, 50), Enum.Material.Basalt)
+		local top = part(df, "RiftTop", Vector3.new(3, 3, 3), CFrame.new(dCenter + Vector3.new(math.cos(ang) * 55, 28, math.sin(ang) * 55)), Color3.fromRGB(157, 0, 255), Enum.Material.Neon, "ball")
+		top.CanCollide = false
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(157, 0, 255)
+		light.Range = 30
+		light.Parent = top
+	end
+	local rift = part(df, "Rift", Vector3.new(0.5, 40, 40), CFrame.new(dCenter + Vector3.new(0, 35, 60)) * CFrame.Angles(0, math.pi / 2, 0), Color3.fromRGB(157, 0, 255), Enum.Material.Neon, "cyl")
+	rift.Transparency = 0.5
+	rift.CanCollide = false
+	local dStart = buildPad(df, dCenter + Vector3.new(0, 0, -30), "Dungeon", "🌀 ابدأ الزنزانة", Color3.fromRGB(157, 0, 255))
+	dStart.Name = "DungeonStart"
+	MapBuilder.Portals.DungeonReturn = buildPortal(df, dCenter + Vector3.new(0, 0, -85), Color3.fromRGB(120, 200, 255), "🏠 العودة للبلدة")
+	portalParticles(MapBuilder.Portals.DungeonReturn, Color3.fromRGB(120, 200, 255))
+
 	-- البلدة
 	local town = MapBuilder.Zones[1]
 	local tf = town.Folder
@@ -1100,6 +1169,10 @@ function MapBuilder.Build()
 	portalParticles(MapBuilder.VIPPortal, Color3.fromRGB(255, 215, 0))
 	MapBuilder.Portals.Market = buildPortal(tf, town.Center + Vector3.new(-118, 0, -80), Color3.fromRGB(255, 140, 60), "🏪 السوق الكبير\nبيع واشترِ الحيوانات")
 	portalParticles(MapBuilder.Portals.Market, Color3.fromRGB(255, 140, 60))
+	MapBuilder.Portals.Dungeon = buildPortal(tf, town.Center + Vector3.new(-118, 0, -48), Color3.fromRGB(157, 0, 255), "🌀 زنزانة الشق\nموجات + زعيم")
+	portalParticles(MapBuilder.Portals.Dungeon, Color3.fromRGB(157, 0, 255))
+	MapBuilder.Machines.Craft = buildStall(tf, town.Center + Vector3.new(118, 0, 92), "Craft", "🔨 محطة التصنيع", Color3.fromRGB(255, 160, 60))
+	MapBuilder.Machines.Cosmetic = buildStall(tf, town.Center + Vector3.new(118, 0, 124), "Cosmetic", "🎩 البيضة التجميلية", Color3.fromRGB(255, 120, 200))
 
 	-- الأكشاك والعجلة والمذبح والنافورة
 	MapBuilder.Machines.Merchant = buildStall(tf, town.Center + Vector3.new(-62, 0, -116), "Merchant", "🧳 التاجر المتجول", Color3.fromRGB(200, 60, 60))
