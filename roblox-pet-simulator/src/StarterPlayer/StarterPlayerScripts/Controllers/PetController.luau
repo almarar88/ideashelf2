@@ -127,9 +127,10 @@ local function step(dt: number)
 			else
 				local row = (i - 1) // 3
 				local col = (i - 1) % 3
-				local offset = Vector3.new((col - 1) * 3.4, 0, 3.5 + row * 3.4)
+				local scale = tonumber(r.Model:GetAttribute("Scale")) or 1
+				local offset = Vector3.new((col - 1) * 3.4 * math.max(1, scale * 0.8), 0, 3.5 + row * 3.4 * math.max(1, scale * 0.8))
 				goal = (hrp.CFrame * CFrame.new(offset)).Position
-				goal = Vector3.new(goal.X, hrp.Position.Y - 1.6, goal.Z)
+				goal = Vector3.new(goal.X, hrp.Position.Y - 1.6 + (scale - 1) * 1.2, goal.Z)
 				look = goal + hrp.CFrame.LookVector
 			end
 			local bob = math.sin(now * 4 + r.Seed) * 0.35

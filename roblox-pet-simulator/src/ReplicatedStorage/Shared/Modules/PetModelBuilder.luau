@@ -329,6 +329,10 @@ function Builder.Build(petId: string, variant: string?): Model?
 	model.PrimaryPart = body
 	model:SetAttribute("PetId", petId)
 	model:SetAttribute("Variant", variant)
+	model:SetAttribute("Scale", def.Scale or 1)
+	if (def.Scale or 1) ~= 1 then
+		model:ScaleTo(def.Scale)
+	end
 
 	for _, p in ipairs(model:GetDescendants()) do
 		if p:IsA("BasePart") then

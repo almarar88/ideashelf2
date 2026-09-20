@@ -1,5 +1,5 @@
 --!strict
--- تحميل وحفظ بيانات اللاعبين + العملات + إرسال الملف للعميل
+-- تحميل وحفظ بيانات اللاعبين + العملات + المضاعفات + إرسال الملف للعميل
 local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
 local RunService = game:GetService("RunService")
@@ -8,48 +8,71 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
+local Mastery = require(Shared.Modules.Mastery)
 
 local DataService = {}
 
 export type Profile = {
 	Coins: number,
 	Diamonds: number,
+	Tokens: number,
+	Spins: number,
+	Rebirths: number,
 	Pets: { any },
 	UnlockedZones: { [string]: boolean },
 	Upgrades: { [string]: number },
 	Stats: { [string]: number },
 	Daily: { LastClaim: number, Streak: number },
+	VIPDaily: number,
 	Codes: { [string]: boolean },
 	Potions: { [string]: number },
+	PotionBag: { [string]: number },
 	DarkMatter: { any },
-	Settings: { [string]: boolean },
+	Settings: { [string]: any },
 	Index: { [string]: boolean },
 	Gamepasses: { [string]: boolean },
 	LastZone: number,
 	InGroup: boolean,
 	SessionStart: number,
 	PlaytimeClaimed: { [string]: boolean },
+	Missions: { Day: number, List: { any } },
+	Achievements: { [string]: boolean },
+	Tutorial: { Step: number, Progress: number },
+	Hoverboards: { Owned: { [string]: boolean }, Equipped: string },
+	Merchant: { Rotation: number, Bought: { [string]: number } },
+	SpinDay: number,
 }
 
 local function template(): Profile
 	return {
 		Coins = 0,
 		Diamonds = 0,
+		Tokens = 0,
+		Spins = 0,
+		Rebirths = 0,
 		Pets = {},
 		UnlockedZones = { ["1"] = true },
-		Upgrades = { Storage = 0, Equip = 0, Coins = 0, Luck = 0, Damage = 0, Speed = 0 },
-		Stats = { Hatches = 0, Breaks = 0, CoinsEarned = 0, Playtime = 0, BestPet = 0 },
+		Upgrades = { Storage = 0, Equip = 0, Coins = 0, Luck = 0, Damage = 0, Speed = 0, Diamonds = 0, XP = 0 },
+		Stats = { Hatches = 0, Breaks = 0, CoinsEarned = 0, DiamondsEarned = 0, Damage = 0, Playtime = 0, BestPet = 0, Fusions = 0, Goldens = 0, Rainbows = 0, DarkMatters = 0, Rebirths = 0, BossKills = 0, Trades = 0, Enchants = 0, Spins = 0 },
 		Daily = { LastClaim = 0, Streak = 0 },
+		VIPDaily = 0,
 		Codes = {},
-		Potions = { Lucky = 0, Coins = 0 },
+		Potions = { Lucky = 0, Coins = 0, Damage = 0, Diamonds = 0 },
+		PotionBag = { Lucky = 0, Coins = 0, Damage = 0, Diamonds = 0 },
 		DarkMatter = {},
-		Settings = { Music = true, HideOthersPets = false, LowGraphics = false },
+		Settings = { Music = true, HideOthersPets = false, LowGraphics = false, AutoDeleteRank = 0, DamageNumbers = true },
 		Index = {},
 		Gamepasses = {},
 		LastZone = 1,
 		InGroup = false,
 		SessionStart = 0,
 		PlaytimeClaimed = {},
+		Missions = { Day = 0, List = {} },
+		Achievements = {},
+		Tutorial = { Step = 1, Progress = 0 },
+		Hoverboards = { Owned = {}, Equipped = "" },
+		Merchant = { Rotation = 0, Bought = {} },
+		SpinDay = 0,
 	}
 end
 
@@ -59,6 +82,10 @@ local dirty: { [Player]: boolean } = {}
 local loadedEvent = Instance.new("BindableEvent")
 
 DataService.Loaded = loadedEvent.Event
+-- دوال إضافية تضيف حقولاً محسوبة للملف المرسل للعميل
+DataService.Extenders = {} :: { (Player, any) -> () }
+-- مزودو المكافآت: كل دالة ترجع { Coins=, Luck=, Damage=, Diamonds=, XP=, Crit=, Agility= } (إضافات أو مضاعفات)
+DataService.BonusProviders = {} :: { (Player) -> { [string]: number }? }
 
 local function key(player: Player): string
 	return "p_" .. player.UserId
@@ -79,6 +106,12 @@ local function reconcile(data: any): Profile
 				end
 			end
 		end
+	end
+	-- ترقية الحيوانات القديمة
+	for _, pet in ipairs(data.Pets) do
+		pet.Level = pet.Level or 1
+		pet.XP = pet.XP or 0
+		pet.Enchants = pet.Enchants or {}
 	end
 	return data :: Profile
 end
@@ -105,7 +138,7 @@ local function load(player: Player)
 		return
 	end
 	if player.Parent ~= Players then
-		return -- غادر أثناء التحميل
+		return
 	end
 	local profile = reconcile(data)
 	profile.SessionStart = os.time()
@@ -114,17 +147,14 @@ local function load(player: Player)
 	profile.InGroup = false
 	profiles[player] = profile
 
-	-- leaderstats
 	local ls = Instance.new("Folder")
 	ls.Name = "leaderstats"
-	local coins = Instance.new("NumberValue")
-	coins.Name = "Coins"
-	coins.Value = profile.Coins
-	coins.Parent = ls
-	local diamonds = Instance.new("NumberValue")
-	diamonds.Name = "Diamonds"
-	diamonds.Value = profile.Diamonds
-	diamonds.Parent = ls
+	for _, name in ipairs({ "Coins", "Diamonds", "Rebirths" }) do
+		local v = Instance.new("NumberValue")
+		v.Name = name
+		v.Value = (profile :: any)[name]
+		v.Parent = ls
+	end
 	ls.Parent = player
 
 	dirty[player] = true
@@ -164,8 +194,12 @@ function DataService.MarkDirty(player: Player)
 	dirty[player] = true
 end
 
--- دوال إضافية تضيف حقولاً محسوبة للملف المرسل للعميل (تسجلها الخدمات الأخرى)
-DataService.Extenders = {} :: { (Player, any) -> () }
+function DataService.IsAdmin(player: Player): boolean
+	if Config.StudioEveryoneAdmin and RunService:IsStudio() then
+		return true
+	end
+	return table.find(Config.Admins, player.UserId) ~= nil
+end
 
 function DataService.Replicate(player: Player)
 	local profile = profiles[player]
@@ -175,24 +209,26 @@ function DataService.Replicate(player: Player)
 	local payload = table.clone(profile) :: any
 	payload.ServerTime = os.time()
 	payload.OwnedPasses = {}
-	for key in pairs(Config.Gamepasses) do
-		payload.OwnedPasses[key] = DataService.HasGamepass(player, key)
+	for k in pairs(Config.Gamepasses) do
+		payload.OwnedPasses[k] = DataService.HasGamepass(player, k)
 	end
 	payload.Luck = DataService.LuckMultiplier(player)
 	payload.CoinMult = DataService.CoinMultiplier(player)
+	payload.DamageMult = DataService.DamageMultiplier(player)
+	payload.DiamondMult = DataService.DiamondMultiplier(player)
+	payload.IsAdmin = DataService.IsAdmin(player)
+	payload.Premium = player.MembershipType == Enum.MembershipType.Premium
 	for _, fn in ipairs(DataService.Extenders) do
 		fn(player, payload)
 	end
 	Remotes.Event("ProfileUpdate"):FireClient(player, payload)
 	local ls = player:FindFirstChild("leaderstats")
 	if ls then
-		local coins = ls:FindFirstChild("Coins") :: NumberValue?
-		local diamonds = ls:FindFirstChild("Diamonds") :: NumberValue?
-		if coins then
-			coins.Value = math.floor(profile.Coins)
-		end
-		if diamonds then
-			diamonds.Value = math.floor(profile.Diamonds)
+		for _, name in ipairs({ "Coins", "Diamonds", "Rebirths" }) do
+			local v = ls:FindFirstChild(name) :: NumberValue?
+			if v then
+				v.Value = math.floor((profile :: any)[name])
+			end
 		end
 	end
 end
@@ -205,6 +241,7 @@ function DataService.NotifyAll(text: string, color: Color3?)
 	Remotes.Event("Notify"):FireAllClients({ Text = text, Color = color })
 end
 
+-- ===== العملات =====
 function DataService.AddCoins(player: Player, amount: number)
 	local p = profiles[player]
 	if not p or amount <= 0 then
@@ -215,37 +252,53 @@ function DataService.AddCoins(player: Player, amount: number)
 	dirty[player] = true
 end
 
-function DataService.AddDiamonds(player: Player, amount: number)
+function DataService.AddDiamonds(player: Player, amount: number, fromBreakable: boolean?)
 	local p = profiles[player]
 	if not p or amount <= 0 then
 		return
 	end
 	p.Diamonds += amount
+	if fromBreakable then
+		p.Stats.DiamondsEarned += amount
+	end
 	dirty[player] = true
+end
+
+function DataService.AddTokens(player: Player, amount: number)
+	local p = profiles[player]
+	if p and amount > 0 then
+		p.Tokens += amount
+		dirty[player] = true
+	end
+end
+
+function DataService.AddSpins(player: Player, amount: number)
+	local p = profiles[player]
+	if p and amount > 0 then
+		p.Spins += amount
+		dirty[player] = true
+	end
 end
 
 function DataService.Spend(player: Player, currency: string, amount: number): boolean
 	local p = profiles[player]
-	if not p then
+	if not p or amount < 0 then
 		return false
 	end
-	if currency == "Coins" then
-		if p.Coins < amount then
-			return false
-		end
-		p.Coins -= amount
-	elseif currency == "Diamonds" then
-		if p.Diamonds < amount then
-			return false
-		end
-		p.Diamonds -= amount
-	else
+	local field = if currency == "Coins" then "Coins" elseif currency == "Diamonds" then "Diamonds" elseif currency == "Tokens" then "Tokens" elseif currency == "Spins" then "Spins" else nil
+	if not field then
 		return false
 	end
+	local pp = p :: any
+	if pp[field] < amount then
+		return false
+	end
+	pp[field] -= amount
 	dirty[player] = true
 	return true
 end
 
+-- ===== الجيم باس والجرعات =====
 function DataService.HasGamepass(player: Player, keyName: string): boolean
 	local p = profiles[player]
 	if not p then
@@ -262,16 +315,63 @@ function DataService.PotionActive(player: Player, potion: string): boolean
 	return p ~= nil and (p.Potions[potion] or 0) > os.time()
 end
 
-function DataService.GivePotion(player: Player, potion: string)
+-- يضيف جرعة إلى الحقيبة
+function DataService.GivePotion(player: Player, potion: string, count: number?)
 	local p = profiles[player]
 	local cfg = Config.Potions[potion]
 	if not p or not cfg then
 		return
 	end
+	p.PotionBag[potion] = (p.PotionBag[potion] or 0) + (count or 1)
+	dirty[player] = true
+	DataService.Notify(player, "🧪 حصلت على " .. cfg.Name .. " (في الحقيبة)", Color3.fromRGB(180, 120, 255))
+end
+
+function DataService.UsePotion(player: Player, potion: string): { ok: boolean, error: string? }
+	local p = profiles[player]
+	local cfg = Config.Potions[potion]
+	if not p or not cfg then
+		return { ok = false, error = "جرعة غير معروفة" }
+	end
+	if (p.PotionBag[potion] or 0) <= 0 then
+		return { ok = false, error = "لا تملك هذه الجرعة" }
+	end
+	p.PotionBag[potion] -= 1
 	local base = math.max(os.time(), p.Potions[potion] or 0)
 	p.Potions[potion] = base + cfg.Duration
 	dirty[player] = true
-	DataService.Notify(player, "تم تفعيل " .. cfg.Name .. " ✨", Color3.fromRGB(180, 120, 255))
+	DataService.Notify(player, "✨ تم تفعيل " .. cfg.Name, Color3.fromRGB(180, 120, 255))
+	return { ok = true }
+end
+
+-- ===== المضاعفات =====
+local function bonuses(player: Player): { [string]: number }
+	local p = profiles[player]
+	local out = { Coins = 0, Luck = 0, Damage = 0, Diamonds = 0, XP = 0, Crit = 0, Agility = 0, EventCoins = 1, EventLuck = 1, EventDiamonds = 1, EventXP = 1 }
+	if not p then
+		return out
+	end
+	local m = Mastery.Bonuses(p.Stats)
+	for k, v in pairs(m) do
+		out[k] = (out[k] or 0) + v
+	end
+	for _, fn in ipairs(DataService.BonusProviders) do
+		local b = fn(player)
+		if b then
+			for k, v in pairs(b) do
+				if k:sub(1, 5) == "Event" then
+					out[k] = (out[k] or 1) * v
+				else
+					out[k] = (out[k] or 0) + v
+				end
+			end
+		end
+	end
+	return out
+end
+
+function DataService.Bonuses(player: Player): { [string]: number }
+	return bonuses(player)
 end
 
 function DataService.LuckMultiplier(player: Player): number
@@ -279,9 +379,11 @@ function DataService.LuckMultiplier(player: Player): number
 	if not p then
 		return 1
 	end
-	local upgrade = (p.Upgrades.Luck or 0) * 0.10
-	local group = p.InGroup and Config.GroupBonus.Luck or 0
-	local mult = 1 + upgrade + group
+	local b = bonuses(player)
+	local add = (p.Upgrades.Luck or 0) * 0.10 + (p.InGroup and Config.GroupBonus.Luck or 0)
+		+ (player.MembershipType == Enum.MembershipType.Premium and Config.PremiumBonus.Luck or 0)
+		+ p.Rebirths * Config.Rebirth.LuckPerRebirth + b.Luck
+	local mult = 1 + add
 	if DataService.HasGamepass(player, "Lucky") then
 		mult *= 2
 	end
@@ -291,7 +393,7 @@ function DataService.LuckMultiplier(player: Player): number
 	if DataService.PotionActive(player, "Lucky") then
 		mult *= Config.Potions.Lucky.Mult
 	end
-	return mult
+	return mult * b.EventLuck
 end
 
 function DataService.CoinMultiplier(player: Player): number
@@ -299,9 +401,11 @@ function DataService.CoinMultiplier(player: Player): number
 	if not p then
 		return 1
 	end
-	local upgrade = (p.Upgrades.Coins or 0) * 0.05
-	local group = p.InGroup and Config.GroupBonus.Coins or 0
-	local mult = 1 + upgrade + group
+	local b = bonuses(player)
+	local add = (p.Upgrades.Coins or 0) * 0.05 + (p.InGroup and Config.GroupBonus.Coins or 0)
+		+ (player.MembershipType == Enum.MembershipType.Premium and Config.PremiumBonus.Coins or 0)
+		+ p.Rebirths * Config.Rebirth.CoinsPerRebirth + b.Coins
+	local mult = 1 + add
 	if DataService.HasGamepass(player, "VIP") then
 		mult *= Config.VIPCoinMultiplier
 	end
@@ -311,7 +415,61 @@ function DataService.CoinMultiplier(player: Player): number
 	if DataService.PotionActive(player, "Coins") then
 		mult *= Config.Potions.Coins.Mult
 	end
+	return mult * b.EventCoins
+end
+
+function DataService.DamageMultiplier(player: Player): number
+	local p = profiles[player]
+	if not p then
+		return 1
+	end
+	local b = bonuses(player)
+	local mult = 1 + (p.Upgrades.Damage or 0) * 0.05 + p.Rebirths * Config.Rebirth.DamagePerRebirth + b.Damage
+	if DataService.PotionActive(player, "Damage") then
+		mult *= Config.Potions.Damage.Mult
+	end
 	return mult
+end
+
+function DataService.DiamondMultiplier(player: Player): number
+	local p = profiles[player]
+	if not p then
+		return 1
+	end
+	local b = bonuses(player)
+	local mult = 1 + (p.Upgrades.Diamonds or 0) * 0.10 + p.Rebirths * Config.Rebirth.DiamondsPerRebirth + b.Diamonds
+	if DataService.HasGamepass(player, "DoubleDiamonds") then
+		mult *= 2
+	end
+	if DataService.PotionActive(player, "Diamonds") then
+		mult *= Config.Potions.Diamonds.Mult
+	end
+	return mult * b.EventDiamonds
+end
+
+function DataService.XPMultiplier(player: Player): number
+	local p = profiles[player]
+	if not p then
+		return 1
+	end
+	local b = bonuses(player)
+	return (1 + (p.Upgrades.XP or 0) * 0.10 + b.XP) * b.EventXP
+end
+
+function DataService.CritChance(player: Player): number
+	return bonuses(player).Crit
+end
+
+function DataService.Save(player: Player)
+	save(player)
+end
+
+function DataService.ResetProfile(player: Player)
+	local fresh = template()
+	fresh.SessionStart = os.time()
+	profiles[player] = fresh
+	dirty[player] = true
+	loadedEvent:Fire(player, fresh)
 end
 
 function DataService.Init()
@@ -320,6 +478,21 @@ function DataService.Init()
 			DataService.Replicate(player)
 		end
 	end)
+	Remotes.Function("UsePotion").OnServerInvoke = function(player, potion)
+		return DataService.UsePotion(player, tostring(potion))
+	end
+	Remotes.Function("BuyPotion").OnServerInvoke = function(player, potion)
+		local cfg = Config.Potions[tostring(potion)]
+		if not cfg then
+			return { ok = false, error = "جرعة غير معروفة" }
+		end
+		if not DataService.Spend(player, "Diamonds", cfg.Cost) then
+			return { ok = false, error = "تحتاج 💎 " .. cfg.Cost }
+		end
+		DataService.GivePotion(player, tostring(potion), 1)
+		return { ok = true }
+	end
+
 	Players.PlayerAdded:Connect(load)
 	for _, p in ipairs(Players:GetPlayers()) do
 		task.spawn(load, p)
@@ -328,7 +501,6 @@ function DataService.Init()
 		save(player, true)
 	end)
 
-	-- إرسال التحديثات للعميل (بحد أقصى 10 مرات بالثانية)
 	local acc = 0
 	RunService.Heartbeat:Connect(function(dt)
 		acc += dt

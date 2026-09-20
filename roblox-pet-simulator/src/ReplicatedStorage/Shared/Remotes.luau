@@ -9,15 +9,22 @@ Remotes.Events = {
 	"ProfileUpdate",   -- S->C: الملف الكامل
 	"Notify",          -- S->C: {Text, Color}
 	"RewardPopup",     -- S->C: {Position, Coins, Diamonds}
-	"HatchBroadcast",  -- S->C all: {Player, PetId, Variant}
+	"HatchBroadcast",  -- S->C all: {Player, PetId, Variant, Rarity}
 	"Teleport",        -- C->S: zoneIndex
 	"PromptPurchase",  -- C->S: kind, key
 	"SetTarget",       -- C->S: breakableId?
 	"RequestProfile",  -- C->S: العميل جاهز، أرسل الملف
+	"TradeRequest",    -- C->S: targetUserId
+	"TradeIncoming",   -- S->C: {FromUserId, FromName}
+	"TradeRespond",    -- C->S: fromUserId, accept
+	"TradeAction",     -- C->S: action, payload (Add/Remove/Confirm/Cancel)
+	"TradeUpdate",     -- S->C: state أو nil
+	"EventEffect",     -- S->C all: {Type, ...} تأثيرات بصرية
+	"BossUpdate",      -- S->C all: {Active, Health, MaxHealth, Ends}
 }
 
 Remotes.Functions = {
-	"HatchEgg",       -- (eggId, count) -> {ok, error?, pets?}
+	"HatchEgg",       -- (eggId, count, variant) -> {ok, error?, pets?}
 	"PetAction",      -- (action, payload) -> {ok, error?}
 	"Machine",        -- (kind, payload) -> {ok, error?, result?}
 	"UnlockZone",     -- (index) -> {ok, error?}
@@ -26,6 +33,17 @@ Remotes.Functions = {
 	"ClaimPlaytime",  -- (index) -> {ok, error?}
 	"RedeemCode",     -- (code) -> {ok, error?}
 	"GetServerTime",  -- () -> number
+	"Rebirth",        -- () -> {ok, error?}
+	"Spin",           -- (paid: boolean) -> {ok, error?, index?, reward?}
+	"Merchant",       -- (slotIndex) -> {ok, error?}
+	"Hoverboard",     -- (action, id) -> {ok, error?}
+	"UsePotion",      -- (key) -> {ok, error?}
+	"BuyPotion",      -- (key) -> {ok, error?}
+	"ClaimMission",   -- (index) -> {ok, error?}
+	"ClaimAchievement", -- (id) -> {ok, error?}
+	"ClaimTutorial",  -- () -> {ok, error?}
+	"ClaimVIPDaily",  -- () -> {ok, error?}
+	"Admin",          -- (command, payload) -> {ok, error?}
 }
 
 local folder: Folder
@@ -45,6 +63,12 @@ function Remotes.Init(): Folder
 			fn.Parent = folder
 		end
 		folder.Parent = ReplicatedStorage
+		local state = Instance.new("Folder")
+		state.Name = "GameState"
+		state:SetAttribute("EventId", "")
+		state:SetAttribute("EventEnds", 0)
+		state:SetAttribute("NextEvent", 0)
+		state.Parent = ReplicatedStorage
 	else
 		folder = ReplicatedStorage:WaitForChild("Remotes") :: Folder
 	end
@@ -63,6 +87,10 @@ function Remotes.Function(name: string): RemoteFunction
 		Remotes.Init()
 	end
 	return folder:WaitForChild(name) :: RemoteFunction
+end
+
+function Remotes.State(): Folder
+	return ReplicatedStorage:WaitForChild("GameState") :: Folder
 end
 
 return Remotes

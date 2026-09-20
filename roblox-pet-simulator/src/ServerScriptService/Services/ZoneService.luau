@@ -11,6 +11,8 @@ local Format = require(Shared.Modules.Format)
 local Remotes = require(Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local MapBuilder = require(script.Parent.MapBuilder)
+local Hooks = require(script.Parent.Hooks)
+local PetUtil = require(Shared.Modules.PetUtil)
 
 local ZoneService = {}
 
@@ -25,13 +27,18 @@ function ZoneService.Unlock(player: Player, index: number): { ok: boolean, error
 	if p.UnlockedZones[tostring(index)] then
 		return { ok = true }
 	end
-	if not p.UnlockedZones[tostring(index - 1)] then
+	if index == Zones.World2Start then
+		if p.Rebirths < 1 then
+			return { ok = false, error = "العالم الثاني يتطلب ريبيرث واحد على الأقل" }
+		end
+	elseif not p.UnlockedZones[tostring(index - 1)] then
 		return { ok = false, error = "افتح المنطقة السابقة أولاً" }
 	end
 	if not DataService.Spend(player, "Coins", zone.Cost) then
 		return { ok = false, error = "تحتاج 💰 " .. Format.Number(zone.Cost) .. " لفتح " .. zone.Name }
 	end
 	p.UnlockedZones[tostring(index)] = true
+	Hooks.Fire(player, "Zone", index)
 	DataService.MarkDirty(player)
 	DataService.Notify(player, "🔓 فتحت منطقة " .. zone.Name .. " (" .. zone.Arabic .. ")!", Color3.fromRGB(120, 255, 140))
 	return { ok = true }
@@ -47,6 +54,8 @@ function ZoneService.Teleport(player: Player, index: number): boolean
 			return false
 		end
 	elseif not p.UnlockedZones[tostring(index)] then
+		return false
+	elseif index >= Zones.World2Start and p.Rebirths < 1 then
 		return false
 	end
 	local layout = MapBuilder.Zones[index]
@@ -103,16 +112,41 @@ local function onPortalTouched(kind: string, hit: BasePart)
 				pcall(MarketplaceService.PromptGamePassPurchase, MarketplaceService, player, Config.Gamepasses.VIP)
 			end
 		end
+	elseif kind == "World2" then
+		local p = DataService.Get(player)
+		if not p then
+			return
+		end
+		if not p.UnlockedZones[tostring(Zones.World2Start)] then
+			local res = ZoneService.Unlock(player, Zones.World2Start)
+			if not res.ok then
+				DataService.Notify(player, res.error or "لا يمكن الدخول", Color3.fromRGB(255, 120, 120))
+				return
+			end
+		end
+		ZoneService.Teleport(player, Zones.World2Start)
+	elseif kind == "World1" then
+		ZoneService.Teleport(player, Zones.World2Start - 1)
 	else
 		ZoneService.Teleport(player, 1)
 	end
+end
+
+local function computeSpeed(player: Player): number
+	local p = DataService.Get(player)
+	if not p then
+		return 16
+	end
+	local agility = PetUtil.EnchantBonuses(p.Pets).Agility or 0
+	local board = tonumber(player:GetAttribute("BoardSpeed")) or 0
+	return 16 + (p.Upgrades.Speed or 0) * 2 + agility + board
 end
 
 local function applyCharacter(player: Player, char: Model)
 	local p = DataService.Get(player)
 	local hum = char:WaitForChild("Humanoid", 10) :: Humanoid?
 	if hum and p then
-		hum.WalkSpeed = 16 + (p.Upgrades.Speed or 0) * 2
+		hum.WalkSpeed = computeSpeed(player)
 	end
 	task.wait(0.3)
 	if p and p.LastZone and p.LastZone ~= 1 then
@@ -142,11 +176,10 @@ local function applyCharacter(player: Player, char: Model)
 end
 
 function ZoneService.RefreshSpeed(player: Player)
-	local p = DataService.Get(player)
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
-	if p and hum then
-		hum.WalkSpeed = 16 + (p.Upgrades.Speed or 0) * 2
+	if hum then
+		hum.WalkSpeed = computeSpeed(player)
 	end
 end
 
@@ -169,6 +202,22 @@ function ZoneService.Init()
 			onPortalTouched("Return", hit)
 		end)
 	end
+	if MapBuilder.World2Portal then
+		MapBuilder.World2Portal.Touched:Connect(function(hit)
+			onPortalTouched("World2", hit)
+		end)
+	end
+	if MapBuilder.World1Portal then
+		MapBuilder.World1Portal.Touched:Connect(function(hit)
+			onPortalTouched("World1", hit)
+		end)
+	end
+	-- تحديث السرعة عند تغير الإنشانتات (عبر تغير الحيوانات المجهزة)
+	Players.PlayerAdded:Connect(function(player)
+		player:GetAttributeChangedSignal("EquippedPets"):Connect(function()
+			ZoneService.RefreshSpeed(player)
+		end)
+	end)
 
 	Remotes.Function("UnlockZone").OnServerInvoke = function(player, index)
 		return ZoneService.Unlock(player, tonumber(index) or 0)
@@ -178,6 +227,10 @@ function ZoneService.Init()
 	end)
 
 	local function hook(player: Player)
+		if player:GetAttribute("ZoneHooked") then
+			return
+		end
+		player:SetAttribute("ZoneHooked", true)
 		player.CharacterAdded:Connect(function(char)
 			applyCharacter(player, char)
 		end)

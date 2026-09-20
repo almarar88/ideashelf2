@@ -106,7 +106,10 @@ local function grantProduct(player: Player, key: string): boolean
 		DataService.AddDiamonds(player, info.Diamonds)
 		DataService.Notify(player, "💎 حصلت على " .. info.Diamonds .. " ألماسة!", Color3.fromRGB(120, 220, 255))
 	elseif info.Potion then
-		DataService.GivePotion(player, info.Potion)
+		DataService.GivePotion(player, info.Potion, info.Count or 1)
+	elseif info.Spins then
+		DataService.AddSpins(player, info.Spins)
+		DataService.Notify(player, "🎡 حصلت على " .. info.Spins .. " لفات!", Color3.fromRGB(255, 220, 60))
 	end
 	return true
 end

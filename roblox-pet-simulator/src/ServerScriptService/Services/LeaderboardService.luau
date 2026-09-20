@@ -15,14 +15,18 @@ local LeaderboardService = {}
 local stores = {
 	Coins = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Coins"),
 	Hatches = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Hatches"),
+	Rebirths = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Rebirths"),
+	Damage = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Damage"),
 }
 
 local function refresh()
 	for _, player in ipairs(Players:GetPlayers()) do
 		local p = DataService.Get(player)
 		if p then
-			pcall(stores.Coins.SetAsync, stores.Coins, tostring(player.UserId), math.floor(p.Stats.CoinsEarned))
+			pcall(stores.Coins.SetAsync, stores.Coins, tostring(player.UserId), math.floor(math.min(p.Stats.CoinsEarned, 9e15)))
 			pcall(stores.Hatches.SetAsync, stores.Hatches, tostring(player.UserId), math.floor(p.Stats.Hatches))
+			pcall(stores.Rebirths.SetAsync, stores.Rebirths, tostring(player.UserId), math.floor(p.Rebirths))
+			pcall(stores.Damage.SetAsync, stores.Damage, tostring(player.UserId), math.floor(math.min(p.Stats.Damage, 9e15)))
 		end
 	end
 	for key, store in pairs(stores) do

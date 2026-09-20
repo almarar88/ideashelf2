@@ -7,6 +7,7 @@ local Rarities = require(Shared.Data.Rarities)
 
 local PetUtil = {}
 
+export type Enchant = { Type: string, Tier: number }
 export type PetInstance = {
 	Uid: string,
 	Id: string,
@@ -14,7 +15,14 @@ export type PetInstance = {
 	Locked: boolean,
 	Equipped: boolean,
 	Time: number,
+	Level: number,
+	XP: number,
+	Enchants: { Enchant },
 }
+
+function PetUtil.Level(inst: PetInstance): number
+	return math.clamp(inst.Level or 1, 1, Config.PetMaxLevel)
+end
 
 function PetUtil.BasePower(inst: PetInstance): number
 	local def = Pets.Get(inst.Id)
@@ -22,7 +30,8 @@ function PetUtil.BasePower(inst: PetInstance): number
 		return 0
 	end
 	local mult = Config.VariantMultipliers[inst.Variant] or 1
-	return def.Power * mult
+	local levelMult = 1 + (PetUtil.Level(inst) - 1) * Config.PetLevelPowerPerLevel
+	return math.floor(def.Power * mult * levelMult + 0.5)
 end
 
 function PetUtil.DisplayName(inst: PetInstance): string
@@ -36,7 +45,6 @@ function PetUtil.RarityColor(inst: PetInstance): Color3
 	return def and Rarities.Color(def.Rarity) or Color3.new(1, 1, 1)
 end
 
--- ترتيب حسب القوة ثم الندرة
 function PetUtil.SortByPower(list: { PetInstance })
 	table.sort(list, function(a, b)
 		local pa, pb = PetUtil.BasePower(a), PetUtil.BasePower(b)
@@ -56,6 +64,47 @@ function PetUtil.NextVariant(v: string): string?
 		return "DarkMatter"
 	end
 	return nil
+end
+
+function PetUtil.XPToNext(level: number): number
+	return Config.XPForLevel(level)
+end
+
+function PetUtil.EnchantSlots(inst: PetInstance): number
+	return Config.EnchantSlots[inst.Variant] or 1
+end
+
+function PetUtil.EnchantLabel(e: Enchant): string
+	local cfg = Config.Enchants[e.Type]
+	if not cfg then
+		return e.Type
+	end
+	local value = cfg.PerTier * e.Tier
+	local text
+	if e.Type == "Agility" then
+		text = "+" .. value .. " سرعة"
+	else
+		text = "+" .. math.floor(value * 100 + 0.5) .. "%"
+	end
+	return cfg.Icon .. " " .. cfg.Arabic .. " " .. string.rep("★", e.Tier) .. " " .. text
+end
+
+-- مجموع الإنشانتات للحيوانات المجهزة
+function PetUtil.EnchantBonuses(pets: { PetInstance }): { [string]: number }
+	local out = { Coins = 0, Damage = 0, Luck = 0, Diamonds = 0, Crit = 0, Agility = 0, XP = 0 }
+	for _, pet in ipairs(pets) do
+		if pet.Equipped and pet.Enchants then
+			for _, e in ipairs(pet.Enchants) do
+				local cfg = Config.Enchants[e.Type]
+				if cfg then
+					out[e.Type] = (out[e.Type] or 0) + cfg.PerTier * e.Tier
+				end
+			end
+		end
+	end
+	out.Crit = math.min(out.Crit, 0.75)
+	out.Agility = math.min(out.Agility, 30)
+	return out
 end
 
 return PetUtil

@@ -29,6 +29,8 @@ MapBuilder.Machines = {} :: { [string]: Model }
 MapBuilder.Specials = {} :: { [string]: Vector3 }
 MapBuilder.VIPPortal = nil :: BasePart?
 MapBuilder.VIPReturnPortal = nil :: BasePart?
+MapBuilder.World2Portal = nil :: BasePart?
+MapBuilder.World1Portal = nil :: BasePart?
 
 local SPACING = Config.Map.ZoneSpacing
 local ISLAND = Config.Map.IslandSize
@@ -166,7 +168,74 @@ local function iceSpike(parent: Instance, pos: Vector3, rng: Random)
 	crystalCluster(parent, pos, Color3.fromRGB(200, 240, 255), rng, false)
 end
 
+local function techPillar(parent: Instance, pos: Vector3, rng: Random)
+	local h = rng:NextNumber(8, 16)
+	part(parent, "Pillar", Vector3.new(3, h, 3), CFrame.new(pos + Vector3.new(0, h / 2, 0)), Color3.fromRGB(50, 55, 75), Enum.Material.Metal)
+	for i = 1, 3 do
+		local strip = part(parent, "Strip", Vector3.new(3.2, 0.4, 3.2), CFrame.new(pos + Vector3.new(0, h * i / 4, 0)), Color3.fromRGB(0, 255, 255), Enum.Material.Neon)
+		strip.CanCollide = false
+	end
+	local top = part(parent, "Top", Vector3.new(2, 2, 2), CFrame.new(pos + Vector3.new(0, h + 1, 0)), Color3.fromRGB(0, 255, 255), Enum.Material.Neon, "ball")
+	top.CanCollide = false
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(0, 255, 255)
+	light.Range = 16
+	light.Parent = top
+end
+
+local function cyberTree(parent: Instance, pos: Vector3, rng: Random)
+	local h = rng:NextNumber(6, 10)
+	part(parent, "Trunk", Vector3.new(1.4, h, 1.4), CFrame.new(pos + Vector3.new(0, h / 2, 0)), Color3.fromRGB(20, 30, 25), Enum.Material.Metal)
+	for i = 1, 3 do
+		local s = (5 - i) * 1.6
+		local leaves = part(parent, "Leaves", Vector3.new(s, s * 0.6, s), CFrame.new(pos + Vector3.new(0, h + i * 1.4 - 1, 0)), Color3.fromRGB(57, 255, 20), Enum.Material.Neon)
+		leaves.Transparency = 0.2
+		leaves.CanCollide = false
+	end
+end
+
+local function neonBuilding(parent: Instance, pos: Vector3, rng: Random)
+	local h = rng:NextNumber(14, 30)
+	local w = rng:NextNumber(6, 10)
+	part(parent, "Building", Vector3.new(w, h, w), CFrame.new(pos + Vector3.new(0, h / 2, 0)), Color3.fromRGB(25, 20, 40), Enum.Material.Concrete)
+	local colors = { Color3.fromRGB(255, 45, 149), Color3.fromRGB(0, 240, 255), Color3.fromRGB(255, 230, 0) }
+	for y = 3, h - 2, 3 do
+		for _, side in ipairs({ -1, 1 }) do
+			local win = part(parent, "Window", Vector3.new(w * 0.6, 1.2, 0.3), CFrame.new(pos + Vector3.new(0, y, side * (w / 2 + 0.1))), colors[rng:NextInteger(1, 3)], Enum.Material.Neon)
+			win.CanCollide = false
+		end
+	end
+	local sign = part(parent, "Sign", Vector3.new(w * 0.8, 1.5, 0.4), CFrame.new(pos + Vector3.new(0, h + 1, 0)), colors[rng:NextInteger(1, 3)], Enum.Material.Neon)
+	sign.CanCollide = false
+end
+
+local function serverRack(parent: Instance, pos: Vector3, rng: Random)
+	local h = rng:NextNumber(6, 10)
+	part(parent, "Rack", Vector3.new(4, h, 3), CFrame.new(pos + Vector3.new(0, h / 2, 0)), Color3.fromRGB(30, 30, 45), Enum.Material.Metal)
+	for y = 1, h - 1, 1.2 do
+		local led = part(parent, "LED", Vector3.new(3, 0.3, 0.2), CFrame.new(pos + Vector3.new(0, y, -1.6)), rng:NextNumber() < 0.5 and Color3.fromRGB(0, 206, 209) or Color3.fromRGB(0, 255, 120), Enum.Material.Neon)
+		led.CanCollide = false
+	end
+end
+
+local function quantumOrb(parent: Instance, pos: Vector3, rng: Random)
+	for i = 1, 3 do
+		local s = rng:NextNumber(2, 5)
+		local orb = part(parent, "Orb", Vector3.new(s, s, s), CFrame.new(pos + Vector3.new(rng:NextNumber(-4, 4), rng:NextNumber(4, 14), rng:NextNumber(-4, 4))), Color3.fromHSV(rng:NextNumber(), 0.8, 1), Enum.Material.Neon, "ball")
+		orb.CanCollide = false
+		orb.Transparency = 0.15
+	end
+	local ring = part(parent, "Ring", Vector3.new(0.5, 8, 8), CFrame.new(pos + Vector3.new(0, 6, 0)) * CFrame.Angles(rng:NextNumber(0, 3), rng:NextNumber(0, 3), 0), Color3.fromRGB(255, 0, 255), Enum.Material.Neon, "cyl")
+	ring.CanCollide = false
+	ring.Transparency = 0.4
+end
+
 local DECOR: { [string]: (Instance, Vector3, Random) -> () } = {
+	tech = techPillar,
+	cybertrees = cyberTree,
+	city = neonBuilding,
+	servers = serverRack,
+	quantum = quantumOrb,
 	trees = function(parent, pos, rng)
 		tree(parent, pos, rng:NextNumber(0.9, 1.5), Color3.fromRGB(40 + rng:NextInteger(0, 40), 140 + rng:NextInteger(0, 50), 50), rng)
 	end,
@@ -199,7 +268,7 @@ local function buildEgg(parent: Instance, egg: Eggs.EggDef, pos: Vector3): Model
 		spot.CanCollide = false
 	end
 	model.PrimaryPart = shell
-	local currency = egg.Currency == "Coins" and "💰" or "💎"
+	local currency = egg.Currency == "Coins" and "💰" or (egg.Currency == "Diamonds" and "💎" or "🔁")
 	billboard(shell, egg.Name .. "\n" .. currency .. " " .. Format.Number(egg.Cost), UDim2.fromScale(12, 4), Color3.new(1, 1, 1), 5.5)
 	if egg.VIPOnly then
 		local crown = part(model, "Crown", Vector3.new(2, 2, 2), CFrame.new(pos + Vector3.new(0, 8.6, 0)), Color3.fromRGB(255, 215, 0), Enum.Material.Neon, "cone")
@@ -215,6 +284,7 @@ local MACHINE_INFO = {
 	{ Kind = "Rainbow", Name = "Rainbow Machine", Arabic = "آلة قوس قزح", Color = Color3.fromRGB(255, 100, 200) },
 	{ Kind = "DarkMatter", Name = "Dark Matter Machine", Arabic = "آلة المادة المظلمة", Color = Color3.fromRGB(120, 40, 200) },
 	{ Kind = "Fuse", Name = "Fusion Machine", Arabic = "آلة الدمج", Color = Color3.fromRGB(60, 200, 255) },
+	{ Kind = "Enchant", Name = "Enchant Machine", Arabic = "آلة الإنشانت", Color = Color3.fromRGB(0, 255, 140) },
 }
 
 local function buildMachine(parent: Instance, info: any, pos: Vector3): Model
@@ -290,6 +360,25 @@ function MapBuilder.BuildBreakable(typeName: string, pos: Vector3, scale: number
 		light.Color = def.Color
 		light.Range = 12
 		light.Parent = base
+	elseif def.Shape == "boss" then
+		base = part(model, "Base", Vector3.new(size.X, size.Y * 0.8, size.Z), CFrame.new(pos + Vector3.new(0, size.Y * 0.4, 0)), def.Color, def.Material, "ball")
+		base.Transparency = 0.1
+		for _, side in ipairs({ -1, 1 }) do
+			local eye = part(model, "Eye", Vector3.new(2.6, 2.6, 2.6), CFrame.new(pos + Vector3.new(side * size.X * 0.2, size.Y * 0.5, -size.Z * 0.42)), Color3.new(1, 1, 1), Enum.Material.SmoothPlastic, "ball")
+			eye.CanCollide = false
+			local pupil = part(model, "Pupil", Vector3.new(1.2, 1.2, 1.2), CFrame.new(pos + Vector3.new(side * size.X * 0.2, size.Y * 0.5, -size.Z * 0.52)), Color3.fromRGB(120, 0, 0), Enum.Material.Neon, "ball")
+			pupil.CanCollide = false
+		end
+		local mouthPart = part(model, "Mouth", Vector3.new(size.X * 0.4, 1, 0.6), CFrame.new(pos + Vector3.new(0, size.Y * 0.28, -size.Z * 0.48)), Color3.fromRGB(20, 20, 20), Enum.Material.SmoothPlastic)
+		mouthPart.CanCollide = false
+		local crown = part(model, "Crown", Vector3.new(size.X * 0.45, 3, size.Z * 0.45), CFrame.new(pos + Vector3.new(0, size.Y * 0.85, 0)), Color3.fromRGB(255, 215, 0), Enum.Material.Metal, "cone")
+		crown.CanCollide = false
+		local light = Instance.new("PointLight")
+		light.Color = def.Color
+		light.Range = 40
+		light.Brightness = 2
+		light.Parent = base
+		billboard(base, "👹 " .. def.Name, UDim2.fromScale(20, 5), Color3.fromRGB(255, 80, 80), size.Y * 0.7)
 	else -- gift
 		base = part(model, "Base", size, CFrame.new(pos + Vector3.new(0, size.Y / 2, 0)), def.Color, def.Material)
 		local ribbon = Color3.fromRGB(255, 220, 60)
@@ -498,8 +587,143 @@ function MapBuilder.ZoneOfPosition(pos: Vector3): number
 	if (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(vipCenter.X, 0, vipCenter.Z)).Magnitude < 220 then
 		return 0
 	end
+	local w2 = Config.Map.World2Offset
+	if pos.X > w2.X - 500 then
+		local idx = Zones.World2Start + math.floor((pos.Z - w2.Z) / SPACING + 0.5)
+		return math.clamp(idx, Zones.World2Start, #Zones.List)
+	end
 	local idx = math.floor(pos.Z / SPACING + 0.5) + 1
-	return math.clamp(idx, 1, #Zones.List)
+	return math.clamp(idx, 1, Zones.World2Start - 1)
+end
+
+local function buildStall(parent: Instance, pos: Vector3, kind: string, title: string, color: Color3): Model
+	local model = Instance.new("Model")
+	model.Name = kind .. "Stall"
+	model:SetAttribute("Machine", kind)
+	local base = part(model, "Base", Vector3.new(10, 1, 8), CFrame.new(pos + Vector3.new(0, 0.5, 0)), Color3.fromRGB(120, 80, 50), Enum.Material.WoodPlanks)
+	part(model, "Counter", Vector3.new(8, 3, 2), CFrame.new(pos + Vector3.new(0, 2.5, -2.5)), Color3.fromRGB(150, 100, 60), Enum.Material.Wood)
+	for _, s in ipairs({ -1, 1 }) do
+		part(model, "Pole", Vector3.new(0.6, 9, 0.6), CFrame.new(pos + Vector3.new(s * 4.5, 5, 3)), Color3.fromRGB(90, 60, 40), Enum.Material.Wood)
+	end
+	local roof = part(model, "Roof", Vector3.new(11, 0.6, 9), CFrame.new(pos + Vector3.new(0, 9.5, 0)) * CFrame.Angles(0.12, 0, 0), color, Enum.Material.Fabric)
+	roof.CanCollide = false
+	for i = 0, 4 do
+		local stripe = part(model, "Stripe", Vector3.new(1.4, 0.7, 9.2), CFrame.new(pos + Vector3.new(-4.4 + i * 2.2, 9.55, 0)) * CFrame.Angles(0.12, 0, 0), Color3.new(1, 1, 1), Enum.Material.Fabric)
+		stripe.CanCollide = false
+	end
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "فتح"
+	prompt.ObjectText = title
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 12
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = base
+	billboard(base, title, UDim2.fromScale(14, 4), color, 12)
+	model.PrimaryPart = base
+	model.Parent = parent
+	return model
+end
+
+local function buildWheel(parent: Instance, pos: Vector3): Model
+	local model = Instance.new("Model")
+	model.Name = "SpinWheel"
+	model:SetAttribute("Machine", "Spin")
+	local stand = part(model, "Stand", Vector3.new(2, 8, 2), CFrame.new(pos + Vector3.new(0, 4, 0)), Color3.fromRGB(80, 80, 90), Enum.Material.Metal)
+	local wheel = part(model, "Wheel", Vector3.new(1, 12, 12), CFrame.new(pos + Vector3.new(0, 9, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(255, 255, 255), Enum.Material.SmoothPlastic, "cyl")
+	wheel.CanCollide = false
+	local colors = { Color3.fromRGB(255, 80, 80), Color3.fromRGB(80, 200, 255), Color3.fromRGB(255, 220, 60), Color3.fromRGB(120, 255, 120), Color3.fromRGB(200, 100, 255), Color3.fromRGB(255, 150, 60), Color3.fromRGB(80, 255, 220), Color3.fromRGB(255, 120, 200) }
+	for i = 1, 8 do
+		local ang = (i / 8) * math.pi * 2
+		local seg = part(model, "Segment", Vector3.new(1.2, 3, 3), CFrame.new(pos + Vector3.new(0, 9 + math.sin(ang) * 4, math.cos(ang) * 4)), colors[i], Enum.Material.Neon, "ball")
+		seg.CanCollide = false
+	end
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "لف"
+	prompt.ObjectText = "عجلة الحظ"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 12
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = stand
+	billboard(wheel, "🎡 عجلة الحظ\nلفة مجانية كل يوم", UDim2.fromScale(14, 4), Color3.fromRGB(255, 220, 60), 8)
+	model.PrimaryPart = stand
+	model.Parent = parent
+	return model
+end
+
+local function buildAltar(parent: Instance, pos: Vector3): Model
+	local model = Instance.new("Model")
+	model.Name = "RebirthAltar"
+	model:SetAttribute("Machine", "Rebirth")
+	local base = part(model, "Base", Vector3.new(1.5, 14, 14), CFrame.new(pos + Vector3.new(0, 0.75, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(60, 40, 40), Enum.Material.Marble, "cyl")
+	for i = 1, 6 do
+		local ang = i / 6 * math.pi * 2
+		part(model, "Pillar", Vector3.new(1.5, 9, 1.5), CFrame.new(pos + Vector3.new(math.cos(ang) * 6, 5, math.sin(ang) * 6)), Color3.fromRGB(90, 70, 70), Enum.Material.Marble)
+	end
+	local core = part(model, "Core", Vector3.new(4, 4, 4), CFrame.new(pos + Vector3.new(0, 6, 0)), Color3.fromRGB(255, 120, 40), Enum.Material.Neon, "ball")
+	core.CanCollide = false
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 120, 40)
+	light.Range = 24
+	light.Brightness = 2
+	light.Parent = core
+	local fire = Instance.new("Fire")
+	fire.Size = 8
+	fire.Heat = 12
+	fire.Parent = core
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "فتح"
+	prompt.ObjectText = "مذبح الريبيرث"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 14
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = base
+	billboard(core, "🔁 Rebirth\nمذبح الريبيرث", UDim2.fromScale(14, 4), Color3.fromRGB(255, 140, 60), 6)
+	model.PrimaryPart = base
+	model.Parent = parent
+	return model
+end
+
+local function buildLamp(parent: Instance, pos: Vector3)
+	part(parent, "LampPost", Vector3.new(0.6, 9, 0.6), CFrame.new(pos + Vector3.new(0, 4.5, 0)), Color3.fromRGB(40, 40, 45), Enum.Material.Metal)
+	local bulb = part(parent, "Bulb", Vector3.new(1.6, 1.6, 1.6), CFrame.new(pos + Vector3.new(0, 9.5, 0)), Color3.fromRGB(255, 240, 180), Enum.Material.Neon, "ball")
+	bulb.CanCollide = false
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 240, 180)
+	light.Range = 22
+	light.Brightness = 1.2
+	light.Parent = bulb
+end
+
+local function buildFountain(parent: Instance, pos: Vector3)
+	local basin = part(parent, "Basin", Vector3.new(2, 16, 16), CFrame.new(pos + Vector3.new(0, 1, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(200, 200, 210), Enum.Material.Marble, "cyl")
+	local water = part(parent, "Water", Vector3.new(0.6, 14, 14), CFrame.new(pos + Vector3.new(0, 1.8, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(80, 170, 255), Enum.Material.Glass, "cyl")
+	water.Transparency = 0.4
+	water.CanCollide = false
+	part(parent, "Column", Vector3.new(2, 6, 2), CFrame.new(pos + Vector3.new(0, 4, 0)), Color3.fromRGB(200, 200, 210), Enum.Material.Marble)
+	local top = part(parent, "Top", Vector3.new(0.8, 6, 6), CFrame.new(pos + Vector3.new(0, 7, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(200, 200, 210), Enum.Material.Marble, "cyl")
+	local attach = Instance.new("Attachment")
+	attach.Position = Vector3.new(0, 0.5, 0)
+	attach.Parent = top
+	local pe = Instance.new("ParticleEmitter")
+	pe.Color = ColorSequence.new(Color3.fromRGB(150, 210, 255))
+	pe.Size = NumberSequence.new(0.6, 0.2)
+	pe.Transparency = NumberSequence.new(0.3, 1)
+	pe.Lifetime = NumberRange.new(0.8, 1.4)
+	pe.Rate = 40
+	pe.Speed = NumberRange.new(10, 14)
+	pe.SpreadAngle = Vector2.new(25, 25)
+	pe.Acceleration = Vector3.new(0, -30, 0)
+	pe.Parent = attach
+	basin.CanCollide = true
+end
+
+local function buildBench(parent: Instance, pos: Vector3, rot: number)
+	local cf = CFrame.new(pos) * CFrame.Angles(0, rot, 0)
+	part(parent, "Seat", Vector3.new(6, 0.5, 2), cf * CFrame.new(0, 1.5, 0), Color3.fromRGB(150, 100, 60), Enum.Material.Wood)
+	part(parent, "Back", Vector3.new(6, 2, 0.4), cf * CFrame.new(0, 2.7, 0.9), Color3.fromRGB(150, 100, 60), Enum.Material.Wood)
+	for _, s in ipairs({ -1, 1 }) do
+		part(parent, "Leg", Vector3.new(0.5, 1.4, 1.8), cf * CFrame.new(s * 2.5, 0.7, 0), Color3.fromRGB(60, 60, 65), Enum.Material.Metal)
+	end
 end
 
 function MapBuilder.Build()
@@ -514,16 +738,31 @@ function MapBuilder.Build()
 
 	local rng = Random.new(2024)
 
-	-- المناطق
+	-- المناطق (عالم 1 و 2)
+	local w2 = Config.Map.World2Offset
 	for i, zone in ipairs(Zones.List) do
-		local center = Vector3.new(0, 0, (i - 1) * SPACING)
+		local center
+		if zone.World == 2 then
+			center = w2 + Vector3.new(0, 0, (i - Zones.World2Start) * SPACING)
+		else
+			center = Vector3.new(0, 0, (i - 1) * SPACING)
+		end
 		local layout = buildIsland(zone, center, ISLAND, map, rng)
 		MapBuilder.Zones[i] = layout
-		if i > 1 then
+		local prevZone = Zones.List[i - 1]
+		if prevZone and prevZone.World == zone.World then
 			local prev = MapBuilder.Zones[i - 1]
 			layout.Gate = buildBridgeAndGate(prev, zone, prev.Folder)
 		end
 	end
+
+	-- بوابة العالم الثاني (في الفراغ) وبوابة العودة (في مركز التقنية)
+	local void = MapBuilder.Zones[Zones.World2Start - 1]
+	local hub = MapBuilder.Zones[Zones.World2Start]
+	MapBuilder.World2Portal = buildPortal(void.Folder, void.Center + Vector3.new(0, 0, ISLAND / 2 - 8), Color3.fromRGB(0, 255, 255), "🌐 Tech World\nيتطلب ريبيرث + 💰 " .. Format.Number(Zones.List[Zones.World2Start].Cost))
+	MapBuilder.World2Portal:SetAttribute("Portal", "World2")
+	MapBuilder.World1Portal = buildPortal(hub.Folder, hub.Center + Vector3.new(0, 0, -ISLAND / 2 + 30), Color3.fromRGB(120, 200, 255), "🏠 العودة للعالم الأول")
+	MapBuilder.World1Portal:SetAttribute("Portal", "World1")
 
 	-- منطقة VIP
 	local vipCenter = Config.Map.VIPOffset
@@ -532,7 +771,7 @@ function MapBuilder.Build()
 	MapBuilder.VIPReturnPortal = buildPortal(vipLayout.Folder, vipCenter + Vector3.new(0, 0, -70), Color3.fromRGB(120, 200, 255), "🏠 العودة للبلدة")
 	MapBuilder.VIPReturnPortal:SetAttribute("Portal", "Return")
 
-	-- البلدة: سبون، آلات، صناديق خاصة، بوابة VIP، لوحات
+	-- البلدة
 	local town = MapBuilder.Zones[1]
 	local tf = town.Folder
 	local spawnLoc = Instance.new("SpawnLocation")
@@ -547,18 +786,33 @@ function MapBuilder.Build()
 	spawnLoc.Parent = tf
 
 	for i, info in ipairs(MACHINE_INFO) do
-		local pos = town.Center + Vector3.new(118, 0, -105 + (i - 1) * 34)
+		local pos = town.Center + Vector3.new(118, 0, -118 + (i - 1) * 32)
 		MapBuilder.Machines[info.Kind] = buildMachine(tf, info, pos)
 	end
 
 	MapBuilder.Specials.GiantChest = town.Center + Vector3.new(60, 0, 118)
 	MapBuilder.Specials.MysteryBox = town.Center + Vector3.new(-60, 0, 118)
+	MapBuilder.Specials.BossArena = town.Center + Vector3.new(-100, 0, 96)
 
 	MapBuilder.VIPPortal = buildPortal(tf, town.Center + Vector3.new(-118, 0, -112), Color3.fromRGB(255, 215, 0), "👑 VIP Lounge")
 	MapBuilder.VIPPortal:SetAttribute("Portal", "VIP")
 
-	MapBuilder.Boards.Coins = buildBoard(tf, town.Center + Vector3.new(-72, 0, -140), "💰 أغنى اللاعبين", Color3.fromRGB(255, 200, 40))
-	MapBuilder.Boards.Hatches = buildBoard(tf, town.Center + Vector3.new(-104, 0, -140), "🥚 أكثر فتحاً للبيض", Color3.fromRGB(120, 200, 255))
+	-- الأكشاك والعجلة والمذبح والنافورة
+	MapBuilder.Machines.Merchant = buildStall(tf, town.Center + Vector3.new(-62, 0, -116), "Merchant", "🧳 التاجر المتجول", Color3.fromRGB(200, 60, 60))
+	MapBuilder.Machines.Trade = buildStall(tf, town.Center + Vector3.new(62, 0, -116), "Trade", "🤝 ساحة التبادل", Color3.fromRGB(60, 120, 220))
+	MapBuilder.Machines.Spin = buildWheel(tf, town.Center + Vector3.new(-30, 0, -124))
+	MapBuilder.Machines.Rebirth = buildAltar(tf, town.Center + Vector3.new(118, 0, 60))
+	buildFountain(tf, town.Center + Vector3.new(0, 0, -60))
+	for _, off in ipairs({ Vector3.new(-16, 0, -80), Vector3.new(16, 0, -80), Vector3.new(-16, 0, -40), Vector3.new(16, 0, -40), Vector3.new(-40, 0, -100), Vector3.new(40, 0, -100) }) do
+		buildLamp(tf, town.Center + off)
+	end
+	buildBench(tf, town.Center + Vector3.new(-14, 0, -60), math.pi / 2)
+	buildBench(tf, town.Center + Vector3.new(14, 0, -60), -math.pi / 2)
+
+	MapBuilder.Boards.Coins = buildBoard(tf, town.Center + Vector3.new(-72, 0, -142), "💰 أغنى اللاعبين", Color3.fromRGB(255, 200, 40))
+	MapBuilder.Boards.Hatches = buildBoard(tf, town.Center + Vector3.new(-104, 0, -142), "🥚 أكثر فتحاً للبيض", Color3.fromRGB(120, 200, 255))
+	MapBuilder.Boards.Rebirths = buildBoard(vipLayout.Folder, vipCenter + Vector3.new(-40, 0, -95), "🔁 أكثر ريبيرث", Color3.fromRGB(255, 140, 60))
+	MapBuilder.Boards.Damage = buildBoard(vipLayout.Folder, vipCenter + Vector3.new(40, 0, -95), "⚔️ أعلى ضرر", Color3.fromRGB(255, 90, 120))
 
 	-- أرضية الموت تحت الجزر
 	local kill = part(map, "KillPlane", Vector3.new(4000, 1, 8000), CFrame.new(300, -120, 2000), Color3.fromRGB(20, 20, 30), Enum.Material.SmoothPlastic)

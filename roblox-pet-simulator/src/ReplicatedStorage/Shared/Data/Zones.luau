@@ -15,6 +15,7 @@ export type ZoneDef = {
 	Multiplier: number, -- مضاعف صحة/مكافأة الصناديق
 	Breakables: { { Type: string, Count: number } },
 	Decor: string, -- نوع الزينة
+	World: number,
 }
 
 Zones.List = {
@@ -58,13 +59,42 @@ Zones.List = {
 		Ground = Color3.fromRGB(20, 15, 30), Accent = Color3.fromRGB(150, 0, 255), Sky = Color3.fromRGB(5, 0, 15),
 		Material = Enum.Material.Basalt, Decor = "crystals",
 		Breakables = { { Type = "CoinPile", Count = 12 }, { Type = "CoinChest", Count = 6 }, { Type = "DiamondCrystal", Count = 4 } } },
+	-- ===== العالم الثاني: عالم التقنية (يتطلب ريبيرث واحد على الأقل) =====
+	{ Index = 11, Id = "TechHub", Name = "Tech Hub", Arabic = "مركز التقنية", Cost = 300000000000, Multiplier = 900000000, World = 2,
+		Ground = Color3.fromRGB(40, 44, 60), Accent = Color3.fromRGB(0, 255, 255), Sky = Color3.fromRGB(10, 10, 30),
+		Material = Enum.Material.Metal, Decor = "tech",
+		Breakables = { { Type = "TechCrate", Count = 12 }, { Type = "CoinChest", Count = 5 }, { Type = "DiamondCrystal", Count = 4 } } },
+	{ Index = 12, Id = "CyberForest", Name = "Cyber Forest", Arabic = "الغابة الرقمية", Cost = 2500000000000, Multiplier = 7000000000, World = 2,
+		Ground = Color3.fromRGB(10, 40, 20), Accent = Color3.fromRGB(57, 255, 20), Sky = Color3.fromRGB(0, 20, 10),
+		Material = Enum.Material.Neon, Decor = "cybertrees",
+		Breakables = { { Type = "TechCrate", Count = 12 }, { Type = "CoinChest", Count = 5 }, { Type = "DiamondCrystal", Count = 4 } } },
+	{ Index = 13, Id = "NeonCity", Name = "Neon City", Arabic = "مدينة النيون", Cost = 20000000000000, Multiplier = 55000000000, World = 2,
+		Ground = Color3.fromRGB(25, 15, 40), Accent = Color3.fromRGB(255, 45, 149), Sky = Color3.fromRGB(20, 0, 40),
+		Material = Enum.Material.Concrete, Decor = "city",
+		Breakables = { { Type = "TechCrate", Count = 12 }, { Type = "CoinChest", Count = 6 }, { Type = "DiamondCrystal", Count = 4 } } },
+	{ Index = 14, Id = "DataCore", Name = "Data Core", Arabic = "نواة البيانات", Cost = 150000000000000, Multiplier = 450000000000, World = 2,
+		Ground = Color3.fromRGB(10, 10, 40), Accent = Color3.fromRGB(0, 206, 209), Sky = Color3.fromRGB(0, 0, 20),
+		Material = Enum.Material.Glass, Decor = "servers",
+		Breakables = { { Type = "TechCrate", Count = 12 }, { Type = "CoinChest", Count = 6 }, { Type = "DiamondCrystal", Count = 5 } } },
+	{ Index = 15, Id = "Quantum", Name = "Quantum Realm", Arabic = "العالم الكمي", Cost = 1000000000000000, Multiplier = 3500000000000, World = 2,
+		Ground = Color3.fromRGB(5, 0, 25), Accent = Color3.fromRGB(255, 0, 255), Sky = Color3.fromRGB(0, 0, 0),
+		Material = Enum.Material.Neon, Decor = "quantum",
+		Breakables = { { Type = "TechCrate", Count = 12 }, { Type = "CoinChest", Count = 6 }, { Type = "DiamondCrystal", Count = 5 } } },
 }
+
+for _, z in ipairs(Zones.List) do
+	if z.World == nil then
+		z.World = 1
+	end
+end
 
 -- منطقة VIP (لا تعتمد على الترتيب)
 Zones.VIP = { Index = 0, Id = "VIP", Name = "VIP Lounge", Arabic = "صالة VIP", Cost = 0, Multiplier = 300,
 	Ground = Color3.fromRGB(255, 215, 0), Accent = Color3.fromRGB(255, 255, 255), Sky = Color3.fromRGB(255, 240, 200),
-	Material = Enum.Material.Marble, Decor = "gold",
+	Material = Enum.Material.Marble, Decor = "gold", World = 1,
 	Breakables = { { Type = "CoinPile", Count = 8 }, { Type = "VIPChest", Count = 3 }, { Type = "DiamondCrystal", Count = 3 } } }
+
+Zones.World2Start = 11
 
 function Zones.Get(index: number): ZoneDef?
 	if index == 0 then

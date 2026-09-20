@@ -2,6 +2,7 @@
 -- أشرطة الصحة فوق الصناديق، تأثير الضرب، ونوافذ المكافأة
 local Workspace = game:GetService("Workspace")
 local Debris = game:GetService("Debris")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -9,6 +10,7 @@ local Breakables = require(Shared.Data.Breakables)
 local Format = require(Shared.Modules.Format)
 local Remotes = require(Shared.Remotes)
 local UIKit = require(script.Parent.UIKit)
+local DataController = require(script.Parent.DataController)
 
 local BreakableController = {}
 
@@ -50,6 +52,28 @@ local function attach(model: Model)
 	update()
 	model:GetAttributeChangedSignal("Health"):Connect(update)
 	model:GetAttributeChangedSignal("LastHit"):Connect(function()
+		local by = model:GetAttribute("LastHitBy")
+		local dmg = model:GetAttribute("LastDamage")
+		local p = DataController.Profile
+		if by == Players.LocalPlayer.UserId and type(dmg) == "number" and p and p.Settings.DamageNumbers ~= false then
+			local crit = model:GetAttribute("LastCrit") == true
+			local anchor = Instance.new("Part")
+			anchor.Anchored = true
+			anchor.CanCollide = false
+			anchor.CanQuery = false
+			anchor.Transparency = 1
+			anchor.Size = Vector3.new(1, 1, 1)
+			anchor.Position = root.Position + Vector3.new(math.random(-2, 2), root.Size.Y / 2, math.random(-2, 2))
+			anchor.Parent = Workspace
+			local dbb = Instance.new("BillboardGui")
+			dbb.Size = UDim2.fromOffset(160, 40)
+			dbb.AlwaysOnTop = true
+			local dl = UIKit.Label({ Text = (crit and "💥 " or "-") .. Format.Number(dmg), TextColor3 = crit and UIKit.Colors.Gold or Color3.fromRGB(255, 90, 90), TextStrokeTransparency = 0, MaxTextSize = crit and 30 or 22, Parent = dbb })
+			dbb.Parent = anchor
+			UIKit.Tween(dbb, { StudsOffset = Vector3.new(0, 4, 0) }, 0.8)
+			UIKit.Tween(dl, { TextTransparency = 1, TextStrokeTransparency = 1 }, 0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			Debris:AddItem(anchor, 0.9)
+		end
 		local hl = Instance.new("Highlight")
 		hl.FillColor = Color3.new(1, 1, 1)
 		hl.FillTransparency = 0.3

@@ -26,6 +26,10 @@ Breakables.Types = {
 		Size = Vector3.new(6, 5, 5), Color = Color3.fromRGB(255, 215, 0), Shape = "chest", Material = Enum.Material.Metal },
 	GiantChest = { Name = "Giant Chest", Arabic = "الصندوق العملاق", Health = 250000, Coins = 25000, Diamonds = 150, Respawn = 600,
 		Size = Vector3.new(14, 11, 11), Color = Color3.fromRGB(200, 60, 200), Shape = "giant", Material = Enum.Material.Metal },
+	TechCrate = { Name = "Tech Crate", Arabic = "صندوق تقني", Health = 30, Coins = 14, Diamonds = 0, Respawn = 4,
+		Size = Vector3.new(4, 4, 4), Color = Color3.fromRGB(60, 200, 255), Shape = "gift", Material = Enum.Material.Metal },
+	Boss = { Name = "Slime King", Arabic = "ملك السلايم", Health = 1000, Coins = 1500, Diamonds = 40, Respawn = 999999,
+		Size = Vector3.new(16, 14, 16), Color = Color3.fromRGB(50, 205, 50), Shape = "boss", Material = Enum.Material.SmoothPlastic },
 	MysteryBox = { Name = "Mystery Box", Arabic = "صندوق الغموض", Health = 5000, Coins = 2000, Diamonds = 25, Respawn = 240,
 		Size = Vector3.new(6, 6, 6), Color = Color3.fromRGB(80, 60, 200), Shape = "gift", Material = Enum.Material.Neon },
 }

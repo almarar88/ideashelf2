@@ -17,6 +17,14 @@ local ZoneService = require(Services.ZoneService)
 local ShopService = require(Services.ShopService)
 local RewardService = require(Services.RewardService)
 local LeaderboardService = require(Services.LeaderboardService)
+local EventService = require(Services.EventService)
+local MissionService = require(Services.MissionService)
+local RebirthService = require(Services.RebirthService)
+local TradeService = require(Services.TradeService)
+local SpinService = require(Services.SpinService)
+local MerchantService = require(Services.MerchantService)
+local HoverboardService = require(Services.HoverboardService)
+local AdminService = require(Services.AdminService)
 
 MapBuilder.Build()
 
@@ -26,13 +34,22 @@ for _, layout in pairs(MapBuilder.Zones) do
 	end
 end
 
-DataService.Init()
+-- الترتيب مهم: الخدمات التي تسجل مزودي المكافآت قبل تحميل اللاعبين
 PetService.Init()
+EventService.Init()
+MissionService.Init()
+RebirthService.Init()
+SpinService.Init()
 EggService.Init()
 BreakableService.Init()
 ZoneService.Init()
 ShopService.Init()
 RewardService.Init()
+TradeService.Init()
+MerchantService.Init()
+HoverboardService.Init()
+AdminService.Init()
 LeaderboardService.Init()
+DataService.Init()
 
 print("[PetKingdom] Server ready")

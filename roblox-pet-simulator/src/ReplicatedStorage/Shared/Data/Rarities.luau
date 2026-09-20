@@ -1,7 +1,7 @@
 --!strict
 local Rarities = {}
 
-Rarities.Order = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythical", "Exclusive" }
+Rarities.Order = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythical", "Exclusive", "Huge" }
 
 Rarities.Info = {
 	Common = { Rank = 1, Color = Color3.fromRGB(190, 190, 190), LuckAffected = false, Arabic = "عادي" },
@@ -11,6 +11,7 @@ Rarities.Info = {
 	Legendary = { Rank = 5, Color = Color3.fromRGB(255, 170, 30), LuckAffected = true, Arabic = "أسطوري" },
 	Mythical = { Rank = 6, Color = Color3.fromRGB(255, 60, 120), LuckAffected = true, Arabic = "خرافي" },
 	Exclusive = { Rank = 7, Color = Color3.fromRGB(0, 255, 230), LuckAffected = true, Arabic = "حصري" },
+	Huge = { Rank = 8, Color = Color3.fromRGB(255, 0, 80), LuckAffected = true, Arabic = "عملاق" },
 }
 
 function Rarities.Rank(name: string): number

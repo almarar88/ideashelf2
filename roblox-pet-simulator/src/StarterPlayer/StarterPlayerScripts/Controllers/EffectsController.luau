@@ -21,7 +21,68 @@ function EffectsController.Play(name: string)
 	end
 end
 
+local function screenFlash(color: Color3, text: string)
+	local Players = game:GetService("Players")
+	local gui = Instance.new("ScreenGui")
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = 50
+	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	local flash = Instance.new("Frame")
+	flash.Size = UDim2.fromScale(1, 1)
+	flash.BackgroundColor3 = color
+	flash.BackgroundTransparency = 0.4
+	flash.BorderSizePixel = 0
+	flash.Parent = gui
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 0, 80)
+	label.Position = UDim2.new(0, 0, 0.2, 0)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.Font = Enum.Font.FredokaOne
+	label.TextScaled = true
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextStrokeTransparency = 0
+	label.Parent = gui
+	local tw = game:GetService("TweenService"):Create(flash, TweenInfo.new(1.5), { BackgroundTransparency = 1 })
+	tw:Play()
+	game:GetService("TweenService"):Create(label, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+	task.delay(1.6, function()
+		gui:Destroy()
+	end)
+	-- كونفيتي
+	local cam = Workspace.CurrentCamera
+	if cam then
+		local attach = Instance.new("Attachment")
+		attach.Parent = Workspace.Terrain
+		attach.WorldPosition = cam.CFrame.Position + cam.CFrame.LookVector * 10 + Vector3.new(0, 6, 0)
+		local pe = Instance.new("ParticleEmitter")
+		pe.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 80)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 220, 0)), ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255)) })
+		pe.Size = NumberSequence.new(0.5)
+		pe.Lifetime = NumberRange.new(1.5, 2.5)
+		pe.Rate = 0
+		pe.Speed = NumberRange.new(20, 35)
+		pe.SpreadAngle = Vector2.new(180, 180)
+		pe.Acceleration = Vector3.new(0, -25, 0)
+		pe.LightEmission = 1
+		pe.Parent = attach
+		pe:Emit(200)
+		task.delay(3, function()
+			attach:Destroy()
+		end)
+	end
+end
+
 function EffectsController.Init()
+	local ReplicatedStorage2 = game:GetService("ReplicatedStorage")
+	local Remotes = require(ReplicatedStorage2:WaitForChild("Shared").Remotes)
+	Remotes.Event("EventEffect").OnClientEvent:Connect(function(data)
+		if data.Type == "Huge" then
+			screenFlash(Color3.fromRGB(255, 0, 80), "🎉 " .. tostring(data.Player) .. " حصل على حيوان عملاق!")
+		elseif data.Type == "EventStart" then
+			EffectsController.Play(data.Id == "BossRaid" and "Boss" or "Unlock")
+			screenFlash(Color3.fromRGB(120, 60, 200), "🎉 بدأ حدث عالمي!")
+		end
+	end)
 	for name, id in pairs(Config.Sounds) do
 		if id and id > 0 then
 			local s = Instance.new("Sound")

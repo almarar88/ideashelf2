@@ -20,9 +20,10 @@ export type PetDef = {
 	Secondary: Color3,
 	Egg: string,
 	Tier: number,
+	Scale: number,
 }
 
-local RARITY_MULT = { Common = 1, Uncommon = 1.6, Rare = 2.6, Epic = 4.2, Legendary = 7, Mythical = 12, Exclusive = 20 }
+local RARITY_MULT = { Common = 1, Uncommon = 1.6, Rare = 2.6, Epic = 4.2, Legendary = 7, Mythical = 12, Exclusive = 20, Huge = 60 }
 
 local list: { PetDef } = {}
 local byId: { [string]: PetDef } = {}
@@ -41,6 +42,7 @@ local function egg(eggId: string, tier: number, base: number, pets: { { string }
 			Secondary = hex(c2),
 			Egg = eggId,
 			Tier = tier,
+			Scale = rarity == "Huge" and 3.2 or 1,
 		}
 		table.insert(list, def)
 		byId[id] = def
@@ -170,10 +172,83 @@ egg("VIPEgg", 3, 400, {
 	{ "emperor_unicorn", "Emperor Unicorn", "Mythical", "unicorn", "FFFFFF", "FFD700" },
 })
 
--- حيوانات المكافآت (لا تخرج من البيض)
+-- ===== العالم الثاني: عالم التقنية =====
+egg("TechEgg", 11, 29296875, {
+	{ "cyber_cat", "Cyber Cat", "Common", "cat", "1E1E2E", "00FFFF" },
+	{ "drone_bee", "Drone Bee", "Common", "bird", "FFD700", "1E1E2E" },
+	{ "mech_dog", "Mech Dog", "Uncommon", "dog", "8A8A9A", "FF3C3C" },
+	{ "circuit_fox", "Circuit Fox", "Rare", "fox", "00D1FF", "0A0A2A" },
+	{ "laser_golem", "Laser Golem", "Epic", "golem", "2A2A3A", "FF00AA" },
+	{ "mecha_dragon", "Mecha Dragon", "Legendary", "dragon", "C0C0C0", "00FFFF" },
+})
+
+egg("CyberForestEgg", 12, 146484375, {
+	{ "pixel_bunny", "Pixel Bunny", "Common", "bunny", "7CFC00", "FFFFFF" },
+	{ "glitch_slime", "Glitch Slime", "Common", "blob", "FF00FF", "00FF00" },
+	{ "neon_owl", "Neon Owl", "Uncommon", "bird", "00FF7F", "FF1493" },
+	{ "data_deer", "Data Deer", "Rare", "unicorn", "20B2AA", "E0FFFF" },
+	{ "virus_demon", "Virus Demon", "Epic", "demon", "0F0F0F", "39FF14" },
+	{ "matrix_ent", "Matrix Ent", "Legendary", "golem", "003300", "39FF14" },
+})
+
+egg("NeonCityEgg", 13, 732421875, {
+	{ "neon_cat", "Neon Cat", "Common", "cat", "FF6EC7", "00F0FF" },
+	{ "taxi_dog", "Taxi Dog", "Common", "dog", "FFD300", "111111" },
+	{ "hologram_ghost", "Hologram Ghost", "Uncommon", "ghost", "66CCFF", "FFFFFF" },
+	{ "synth_fox", "Synth Fox", "Rare", "fox", "9D00FF", "FF00C8" },
+	{ "skyline_robot", "Skyline Robot", "Epic", "robot", "222233", "FF2D95" },
+	{ "vapor_dragon", "Vapor Dragon", "Legendary", "dragon", "FF77FF", "77FFFF" },
+})
+
+egg("DataCoreEgg", 14, 3662109375, {
+	{ "byte_blob", "Byte Blob", "Common", "blob", "3366FF", "FFFFFF" },
+	{ "cache_cat", "Cache Cat", "Common", "cat", "6A5ACD", "E6E6FA" },
+	{ "server_golem", "Server Golem", "Uncommon", "golem", "2F4F4F", "00CED1" },
+	{ "firewall_demon", "Firewall Demon", "Rare", "demon", "8B0000", "FF8C00" },
+	{ "quantum_owl", "Quantum Owl", "Epic", "bird", "4B0082", "00FFFF" },
+	{ "core_guardian", "Core Guardian", "Legendary", "robot", "0B0B3B", "FFD700" },
+})
+
+egg("QuantumEgg", 15, 18310546875, {
+	{ "quark_slime", "Quark Slime", "Common", "blob", "FF4500", "1E90FF" },
+	{ "photon_bunny", "Photon Bunny", "Common", "bunny", "FFFACD", "FFD700" },
+	{ "entangled_cat", "Entangled Cat", "Uncommon", "cat", "9370DB", "00FA9A" },
+	{ "singularity_ghost", "Singularity Ghost", "Rare", "ghost", "000000", "FFFFFF" },
+	{ "nova_unicorn", "Nova Unicorn", "Epic", "unicorn", "FF69B4", "FFFF00" },
+	{ "quantum_dragon", "Quantum Dragon", "Legendary", "dragon", "00008B", "00FFFF" },
+	{ "omniverse_overlord", "Omniverse Overlord", "Mythical", "demon", "120024", "FF00FF" },
+})
+
+-- بيضة الريبيرث (تشترى بتوكنات الريبيرث)
+egg("RebirthEgg", 8, 500000, {
+	{ "reborn_cat", "Reborn Cat", "Epic", "cat", "FFFFFF", "FF4500" },
+	{ "phoenix_bunny", "Phoenix Bunny", "Epic", "bunny", "FF8C00", "FFD700" },
+	{ "eternal_golem", "Eternal Golem", "Legendary", "golem", "708090", "FF4500" },
+	{ "ascended_dragon", "Ascended Dragon", "Mythical", "dragon", "FFD700", "FFFFFF" },
+	{ "immortal_overlord", "Immortal Overlord", "Exclusive", "demon", "FFFFFF", "FF0000" },
+})
+
+-- الحيوانات العملاقة (Huge): فرصة نادرة جداً في بيض معينة
+egg("Huge", 5, 2000, {
+	{ "huge_cat", "HUGE Cat", "Huge", "cat", "F2F2F2", "FFB6C1" },
+	{ "huge_dragon", "HUGE Dragon", "Huge", "dragon", "3CB371", "F5DEB3" },
+	{ "huge_dominus", "HUGE Dominus", "Huge", "cat", "000000", "FFD700" },
+	{ "huge_robot", "HUGE Robot", "Huge", "robot", "C0C0C0", "00FFFF" },
+})
+
+-- حيوانات المكافآت والتاجر والأحداث (لا تخرج من البيض)
 egg("Rewards", 1, 60, {
 	{ "gift_bear", "Gift Bear", "Epic", "bear", "FF0000", "00FF00" },
 	{ "party_dog", "Party Dog", "Legendary", "dog", "FF69B4", "FFFF00" },
+	{ "wheel_wizard", "Wheel Wizard", "Legendary", "ghost", "4B0082", "FFD700" },
+})
+egg("Merchant", 4, 600, {
+	{ "merchant_mole", "Merchant Mole", "Rare", "blob", "8B4513", "FFD700" },
+	{ "traveler_owl", "Traveler Owl", "Epic", "bird", "556B2F", "F5DEB3" },
+	{ "bazaar_dragon", "Bazaar Dragon", "Legendary", "dragon", "B8860B", "FF4500" },
+})
+egg("Boss", 6, 20000, {
+	{ "slime_king", "Slime King", "Mythical", "blob", "32CD32", "FFD700" },
 })
 
 Pets.List = list

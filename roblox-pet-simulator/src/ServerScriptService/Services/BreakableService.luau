@@ -1,5 +1,5 @@
 --!strict
--- الصناديق والعملات: الظهور، الاستهداف، الضرر من الحيوانات، المكافآت، إعادة الظهور
+-- الصناديق والعملات: الظهور، الاستهداف، الضرر، الضربات القاضية، الخبرة، المكافآت، الزعيم
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,6 +14,7 @@ local Remotes = require(Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local PetService = require(script.Parent.PetService)
 local MapBuilder = require(script.Parent.MapBuilder)
+local Hooks = require(script.Parent.Hooks)
 
 local BreakableService = {}
 
@@ -30,6 +31,7 @@ type Breakable = {
 	Position: Vector3,
 	Model: Model,
 	Special: boolean,
+	Boss: boolean,
 }
 
 local breakables: { [string]: Breakable } = {}
@@ -38,6 +40,8 @@ local lastTap: { [Player]: number } = {}
 local folder: Folder
 local counter = 0
 local rng = Random.new()
+local boss: Breakable? = nil
+BreakableService.OnBossKilled = nil :: ((contributors: { [Player]: number }) -> ())?
 
 local function canUseZone(player: Player, zone: number): boolean
 	local p = DataService.Get(player)
@@ -46,6 +50,10 @@ local function canUseZone(player: Player, zone: number): boolean
 	end
 	if zone == 0 then
 		return DataService.HasGamepass(player, "VIP")
+	end
+	local z = Zones.Get(zone)
+	if z and z.World == 2 and p.Rebirths < 1 then
+		return false
 	end
 	return p.UnlockedZones[tostring(zone)] == true
 end
@@ -79,11 +87,29 @@ local function tryTarget(player: Player, b: Breakable, maxDist: number): boolean
 end
 
 local function respawn(b: Breakable)
+	if b.Boss then
+		return
+	end
 	b.Health = b.MaxHealth
 	b.Alive = true
 	b.Damage = {}
 	b.Model:SetAttribute("Health", b.Health)
 	b.Model.Parent = folder
+end
+
+local function highestZoneMult(player: Player): number
+	local p = DataService.Get(player)
+	if not p then
+		return 1
+	end
+	local best = 1
+	for idxStr in pairs(p.UnlockedZones) do
+		local z = Zones.Get(tonumber(idxStr) or 1)
+		if z and z.Multiplier > best then
+			best = z.Multiplier
+		end
+	end
+	return best
 end
 
 local function breakIt(b: Breakable)
@@ -99,26 +125,30 @@ local function breakIt(b: Breakable)
 		total = 1
 	end
 	for player, d in pairs(b.Damage) do
-		if player.Parent == Players and DataService.Get(player) then
+		local p = DataService.Get(player)
+		if player.Parent == Players and p then
 			local share = d / total
-			local coins = 0
-			local diamonds = 0
+			local mult = b.Boss and highestZoneMult(player) or b.Mult
+			local coins, diamonds = 0, 0
 			if b.Def.Coins > 0 then
-				coins = math.max(1, math.floor(b.Def.Coins * b.Mult * share * DataService.CoinMultiplier(player) + 0.5))
+				coins = math.max(1, math.floor(b.Def.Coins * mult * share * DataService.CoinMultiplier(player) + 0.5))
 				DataService.AddCoins(player, coins)
+				Hooks.Fire(player, "Coins", coins)
 			end
 			if b.Def.Diamonds > 0 then
-				local raw = b.Def.Diamonds * share
+				local raw = b.Def.Diamonds * share * DataService.DiamondMultiplier(player)
 				diamonds = math.floor(raw)
 				if rng:NextNumber() < (raw - diamonds) then
 					diamonds += 1
 				end
 				if diamonds > 0 then
-					DataService.AddDiamonds(player, diamonds)
+					DataService.AddDiamonds(player, diamonds, true)
+					Hooks.Fire(player, "Diamonds", diamonds)
 				end
 			end
-			local p = DataService.Get(player) :: DataService.Profile
 			p.Stats.Breaks += 1
+			Hooks.Fire(player, "Break", 1)
+			PetService.GrantXP(player, Config.XPPerBreakBase * (b.Zone == 0 and 3 or b.Zone) * (b.Boss and 25 or 1))
 			Remotes.Event("RewardPopup"):FireClient(player, { Position = b.Position + Vector3.new(0, b.Def.Size.Y, 0), Coins = coins, Diamonds = diamonds })
 		end
 	end
@@ -132,18 +162,38 @@ local function breakIt(b: Breakable)
 	elseif b.Type == "MysteryBox" then
 		DataService.NotifyAll("🎁 انفتح صندوق الغموض!", Color3.fromRGB(120, 120, 255))
 	end
+	local contributors = b.Damage
 	b.Model.Parent = nil
-	task.delay(b.Def.Respawn, respawn, b)
+	if b.Boss then
+		boss = nil
+		breakables[b.Id] = nil
+		if BreakableService.OnBossKilled then
+			BreakableService.OnBossKilled(contributors)
+		end
+	else
+		task.delay(b.Def.Respawn, respawn, b)
+	end
 end
 
-local function applyDamage(b: Breakable, player: Player, amount: number)
+local function applyDamage(b: Breakable, player: Player, amount: number, crit: boolean?)
 	if not b.Alive or amount <= 0 then
 		return
 	end
+	amount = math.min(amount, b.Health)
 	b.Health -= amount
 	b.Damage[player] = (b.Damage[player] or 0) + amount
+	local p = DataService.Get(player)
+	if p then
+		p.Stats.Damage += amount
+	end
 	b.Model:SetAttribute("Health", math.max(0, b.Health))
 	b.Model:SetAttribute("LastHit", os.clock())
+	b.Model:SetAttribute("LastHitBy", player.UserId)
+	b.Model:SetAttribute("LastDamage", amount)
+	b.Model:SetAttribute("LastCrit", crit == true)
+	if b.Boss then
+		Remotes.Event("BossUpdate"):FireAllClients({ Active = true, Health = math.max(0, b.Health), MaxHealth = b.MaxHealth })
+	end
 	if b.Health <= 0 then
 		breakIt(b)
 	end
@@ -155,19 +205,17 @@ local function tap(player: Player, b: Breakable)
 		return
 	end
 	lastTap[player] = now
-	local p = DataService.Get(player)
-	local dmg = Config.TapDamageBase * (1 + ((p and p.Upgrades.Damage or 0) * 0.05))
-	-- الضغط بدون حيوانات يعطي ضرر أقوى في البداية حتى يقدر اللاعب يشتري أول بيضة
+	local dmg = Config.TapDamageBase * DataService.DamageMultiplier(player)
 	if PetService.GetPower(player) <= 0 then
 		dmg *= 5
 	end
 	applyDamage(b, player, dmg)
 end
 
-local function spawnBreakable(typeName: string, zone: number, mult: number, pos: Vector3, special: boolean)
+local function spawnBreakable(typeName: string, zone: number, mult: number, pos: Vector3, special: boolean, isBoss: boolean?, healthOverride: number?): Breakable?
 	local def = Breakables.Get(typeName)
 	if not def then
-		return
+		return nil
 	end
 	counter += 1
 	local id = typeName .. "_" .. counter
@@ -176,11 +224,12 @@ local function spawnBreakable(typeName: string, zone: number, mult: number, pos:
 	model:SetAttribute("Id", id)
 	model:SetAttribute("Type", typeName)
 	model:SetAttribute("Zone", zone)
-	local maxHealth = math.floor(def.Health * mult)
+	local maxHealth = healthOverride or math.floor(def.Health * mult)
 	model:SetAttribute("MaxHealth", maxHealth)
 	model:SetAttribute("Health", maxHealth)
 	model:SetAttribute("Coins", math.floor(def.Coins * mult))
 	model:SetAttribute("Diamonds", def.Diamonds)
+	model:SetAttribute("Boss", isBoss == true)
 	local b: Breakable = {
 		Id = id,
 		Type = typeName,
@@ -194,6 +243,7 @@ local function spawnBreakable(typeName: string, zone: number, mult: number, pos:
 		Position = pos,
 		Model = model,
 		Special = special,
+		Boss = isBoss == true,
 	}
 	breakables[id] = b
 	local cd = model:FindFirstChildOfClass("ClickDetector") :: ClickDetector
@@ -205,6 +255,7 @@ local function spawnBreakable(typeName: string, zone: number, mult: number, pos:
 		end
 	end)
 	model.Parent = folder
+	return b
 end
 
 local function nearestAlive(player: Player, maxDist: number): Breakable?
@@ -233,7 +284,14 @@ local function tick()
 			if not pos or (pos - b.Position).Magnitude > 110 then
 				setTarget(player, nil)
 			else
-				applyDamage(b, player, PetService.GetPower(player))
+				local dmg = PetService.GetPower(player)
+				local crit = false
+				local critChance = DataService.CritChance(player)
+				if critChance > 0 and rng:NextNumber() < critChance then
+					dmg *= Config.CritMultiplier
+					crit = true
+				end
+				applyDamage(b, player, dmg, crit)
 				if DataService.HasGamepass(player, "AutoTap") then
 					lastTap[player] = 0
 					tap(player, b)
@@ -248,6 +306,40 @@ local function tick()
 			setTarget(player, nil)
 		end
 	end
+end
+
+-- ===== الزعيم =====
+function BreakableService.SpawnBoss(health: number): Breakable?
+	if boss then
+		return boss
+	end
+	local pos = MapBuilder.Specials.BossArena
+	local b = spawnBreakable("Boss", 1, 1, pos, true, true, health)
+	boss = b
+	if b then
+		Remotes.Event("BossUpdate"):FireAllClients({ Active = true, Health = b.Health, MaxHealth = b.MaxHealth })
+	end
+	return b
+end
+
+function BreakableService.RemoveBoss()
+	if boss then
+		local b = boss
+		boss = nil
+		b.Alive = false
+		for player, id in pairs(targets) do
+			if id == b.Id then
+				setTarget(player, nil)
+			end
+		end
+		b.Model:Destroy()
+		breakables[b.Id] = nil
+		Remotes.Event("BossUpdate"):FireAllClients({ Active = false })
+	end
+end
+
+function BreakableService.BossAlive(): boolean
+	return boss ~= nil
 end
 
 function BreakableService.Init()

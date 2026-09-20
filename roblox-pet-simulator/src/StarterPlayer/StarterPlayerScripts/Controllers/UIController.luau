@@ -68,6 +68,12 @@ function UIController.IsOpen(name: string): boolean
 	return currentWindow == name
 end
 
+function UIController.Refresh(name: string)
+	if currentWindow == name and refreshers[name] then
+		refreshers[name]()
+	end
+end
+
 -- ===== الإشعارات =====
 function UIController.Notify(text: string, color: Color3?)
 	local frame = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 44), BackgroundColor3 = UIKit.Colors.Panel2, BackgroundTransparency = 0.1, Parent = notifHolder })
@@ -86,16 +92,31 @@ end
 -- ===== HUD =====
 local coinsLabel: TextLabel
 local diamondsLabel: TextLabel
+local tokensLabel: TextLabel
 local powerLabel: TextLabel
 local zoneLabel: TextLabel
+local rebirthLabel: TextLabel
 local potionsLabel: TextLabel
 local giftButton: TextButton
+local adminButton: TextButton
+local eventBanner: Frame
+local eventLabel: TextLabel
+local eventTimer: TextLabel
+local bossBar: Frame
+local bossFill: Frame
+local bossText: TextLabel
+local questFrame: Frame
+local questText: TextLabel
+local questProgress: TextLabel
+local questClaim: TextButton
+local potionBar: Frame
+local potionButtons: { [string]: TextButton } = {}
 
 local function buildHUD()
 	hud = UIKit.Frame({ Name = "HUD", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = gui })
 
 	-- العملات
-	local currency = UIKit.Frame({ Size = UDim2.fromOffset(210, 96), Position = UDim2.fromOffset(16, 16), BackgroundColor3 = UIKit.Colors.Panel, BackgroundTransparency = 0.15, Parent = hud })
+	local currency = UIKit.Frame({ Size = UDim2.fromOffset(220, 138), Position = UDim2.fromOffset(16, 16), BackgroundColor3 = UIKit.Colors.Panel, BackgroundTransparency = 0.15, Parent = hud })
 	UIKit.Corner(currency, 16)
 	UIKit.Stroke(currency, UIKit.Colors.Panel3, 2)
 	UIKit.Padding(currency, 8)
@@ -104,55 +125,95 @@ local function buildHUD()
 		local row = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 36), BackgroundColor3 = Color3.fromRGB(15, 16, 28), Parent = currency })
 		UIKit.Corner(row, 10)
 		UIKit.Label({ Text = icon, Size = UDim2.fromOffset(34, 36), Parent = row })
-		local l = UIKit.Label({ Text = "0", Size = UDim2.new(1, -44, 1, 0), Position = UDim2.fromOffset(40, 0), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = color, MaxTextSize = 26, Parent = row })
-		return l
+		return UIKit.Label({ Text = "0", Size = UDim2.new(1, -44, 1, 0), Position = UDim2.fromOffset(40, 0), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = color, MaxTextSize = 26, Parent = row })
 	end
 	coinsLabel = currencyRow("💰", UIKit.Colors.Gold)
 	diamondsLabel = currencyRow("💎", UIKit.Colors.Cyan)
+	tokensLabel = currencyRow("🔁", Color3.fromRGB(255, 140, 60))
 
-	-- القوة والمنطقة
-	local top = UIKit.Frame({ Size = UDim2.fromOffset(300, 40), Position = UDim2.new(0.5, -150, 0, 12), BackgroundColor3 = UIKit.Colors.Panel, BackgroundTransparency = 0.15, Parent = hud })
+	-- القوة والمنطقة والريبيرث
+	local top = UIKit.Frame({ Size = UDim2.fromOffset(440, 40), Position = UDim2.new(0.5, -220, 0, 12), BackgroundColor3 = UIKit.Colors.Panel, BackgroundTransparency = 0.15, Parent = hud })
 	UIKit.Corner(top, 14)
 	UIKit.Stroke(top, UIKit.Colors.Panel3, 2)
-	zoneLabel = UIKit.Label({ Text = "Town", Size = UDim2.fromScale(0.5, 1), MaxTextSize = 22, Parent = top })
-	powerLabel = UIKit.Label({ Text = "⚔️ 0", Size = UDim2.fromScale(0.5, 1), Position = UDim2.fromScale(0.5, 0), TextColor3 = UIKit.Colors.Pink, MaxTextSize = 22, Parent = top })
+	zoneLabel = UIKit.Label({ Text = "Town", Size = UDim2.fromScale(0.4, 1), MaxTextSize = 22, Parent = top })
+	powerLabel = UIKit.Label({ Text = "⚔️ 0", Size = UDim2.fromScale(0.35, 1), Position = UDim2.fromScale(0.4, 0), TextColor3 = UIKit.Colors.Pink, MaxTextSize = 22, Parent = top })
+	rebirthLabel = UIKit.Label({ Text = "🔁 0", Size = UDim2.fromScale(0.25, 1), Position = UDim2.fromScale(0.75, 0), TextColor3 = Color3.fromRGB(255, 140, 60), MaxTextSize = 22, Parent = top })
 
-	-- الجرعات
-	potionsLabel = UIKit.Label({ Text = "", Size = UDim2.fromOffset(300, 24), Position = UDim2.new(0.5, -150, 0, 56), TextColor3 = UIKit.Colors.Purple, MaxTextSize = 18, Parent = hud })
+	potionsLabel = UIKit.Label({ Text = "", Size = UDim2.fromOffset(440, 22), Position = UDim2.new(0.5, -220, 0, 56), TextColor3 = UIKit.Colors.Purple, MaxTextSize = 17, Parent = hud })
+
+	-- شريط الحدث
+	eventBanner = UIKit.Frame({ Size = UDim2.fromOffset(440, 40), Position = UDim2.new(0.5, -220, 0, 82), BackgroundColor3 = Color3.fromRGB(80, 40, 120), Visible = false, Parent = hud })
+	UIKit.Corner(eventBanner, 12)
+	UIKit.Stroke(eventBanner, UIKit.Colors.Gold, 2.5)
+	UIKit.Gradient(eventBanner, Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 150, 150))
+	eventLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, -90, 1, 0), Position = UDim2.fromOffset(8, 0), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 20, Parent = eventBanner })
+	eventTimer = UIKit.Label({ Text = "", Size = UDim2.fromOffset(80, 40), Position = UDim2.new(1, -86, 0, 0), TextColor3 = UIKit.Colors.Gold, MaxTextSize = 20, Parent = eventBanner })
+
+	-- شريط الزعيم
+	bossBar = UIKit.Frame({ Size = UDim2.fromOffset(520, 34), Position = UDim2.new(0.5, -260, 0, 128), BackgroundColor3 = Color3.fromRGB(15, 15, 25), Visible = false, Parent = hud })
+	UIKit.Corner(bossBar, 10)
+	UIKit.Stroke(bossBar, UIKit.Colors.Red, 3)
+	bossFill = UIKit.Frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(60, 200, 60), Parent = bossBar })
+	UIKit.Corner(bossFill, 10)
+	bossText = UIKit.Label({ Text = "", MaxTextSize = 20, TextStrokeTransparency = 0, Parent = bossBar })
+
+	-- متتبع الدليل التعليمي
+	questFrame = UIKit.Frame({ Size = UDim2.fromOffset(300, 92), Position = UDim2.new(1, -316, 0.5, -46), BackgroundColor3 = UIKit.Colors.Panel, BackgroundTransparency = 0.15, Visible = false, Parent = hud })
+	UIKit.Corner(questFrame, 12)
+	UIKit.Stroke(questFrame, UIKit.Colors.Cyan, 2)
+	UIKit.Label({ Text = "🎓 الدليل", Size = UDim2.new(1, -12, 0, 22), Position = UDim2.fromOffset(6, 2), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = UIKit.Colors.Cyan, MaxTextSize = 16, Parent = questFrame })
+	questText = UIKit.Label({ Text = "", Size = UDim2.new(1, -12, 0, 36), Position = UDim2.fromOffset(6, 22), MaxTextSize = 15, Parent = questFrame })
+	questProgress = UIKit.Label({ Text = "", Size = UDim2.new(0.5, 0, 0, 28), Position = UDim2.new(0, 6, 1, -32), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 16, Parent = questFrame })
+	questClaim = UIKit.Button({ Text = "استلام", Color = UIKit.Colors.Green, Size = UDim2.fromOffset(120, 28), Position = UDim2.new(1, -126, 1, -32), MaxTextSize = 16, Visible = false, Parent = questFrame }, function()
+		local res = Remotes.Function("ClaimTutorial"):InvokeServer()
+		if not res.ok and res.error then
+			UIController.Notify(res.error, UIKit.Colors.Red)
+		end
+	end)
+
+	-- شريط الجرعات السريع
+	potionBar = UIKit.Frame({ Size = UDim2.fromOffset(240, 52), Position = UDim2.new(1, -256, 1, -70), BackgroundTransparency = 1, Parent = hud })
+	UIKit.List(potionBar, 6, true)
+	for _, key in ipairs(Config.PotionOrder) do
+		local cfg = Config.Potions[key]
+		local btn = UIKit.Button({ Text = cfg.Icon .. " 0", Color = UIKit.Colors.Panel3, Size = UDim2.fromOffset(54, 48), MaxTextSize = 16, Parent = potionBar }, function()
+			local res = Remotes.Function("UsePotion"):InvokeServer(key)
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
+		end)
+		potionButtons[key] = btn
+	end
 
 	-- أزرار القائمة اليسرى
-	local menu = UIKit.Frame({ BackgroundTransparency = 1, Size = UDim2.fromOffset(80, 520), Position = UDim2.fromOffset(16, 124), Parent = hud })
-	UIKit.List(menu, 4)
-	UIKit.IconButton(menu, "🐾", "Pets", UIKit.Colors.Green, function()
-		UIController.Open("Inventory")
-	end)
-	UIKit.IconButton(menu, "🛒", "Shop", UIKit.Colors.Blue, function()
-		UIController.Open("Shop")
-	end)
-	UIKit.IconButton(menu, "🗺️", "Zones", UIKit.Colors.Gold, function()
-		UIController.Open("Zones")
-	end)
-	UIKit.IconButton(menu, "🎁", "Rewards", UIKit.Colors.Pink, function()
-		UIController.Open("Rewards")
-	end)
-	UIKit.IconButton(menu, "📖", "Index", UIKit.Colors.Purple, function()
-		UIController.Open("Index")
-	end)
-	UIKit.IconButton(menu, "🔑", "Codes", UIKit.Colors.Cyan, function()
-		UIController.Open("Codes")
-	end)
+	local menu = UIKit.Frame({ BackgroundTransparency = 1, Size = UDim2.fromOffset(80, 720), Position = UDim2.fromOffset(16, 166), Parent = hud })
+	UIKit.List(menu, 2)
+	local function menuBtn(icon: string, text: string, color: Color3, win: string)
+		UIKit.IconButton(menu, icon, text, color, function()
+			UIController.Open(win)
+		end)
+	end
+	menuBtn("🐾", "Pets", UIKit.Colors.Green, "Inventory")
+	menuBtn("🛒", "Shop", UIKit.Colors.Blue, "Shop")
+	menuBtn("🗺️", "Zones", UIKit.Colors.Gold, "Zones")
+	menuBtn("🎁", "Rewards", UIKit.Colors.Pink, "Rewards")
+	menuBtn("📋", "Missions", UIKit.Colors.Cyan, "Missions")
+	menuBtn("📊", "Stats", Color3.fromRGB(255, 140, 60), "Stats")
+	menuBtn("🤝", "Trade", Color3.fromRGB(60, 120, 220), "Trade")
+	menuBtn("📖", "Index", UIKit.Colors.Purple, "Index")
 
 	-- أزرار يمين
-	local right = UIKit.Frame({ BackgroundTransparency = 1, Size = UDim2.fromOffset(80, 200), Position = UDim2.new(1, -96, 0, 16), Parent = hud })
-	UIKit.List(right, 4)
+	local right = UIKit.Frame({ BackgroundTransparency = 1, Size = UDim2.fromOffset(80, 360), Position = UDim2.new(1, -96, 0, 16), Parent = hud })
+	UIKit.List(right, 2)
 	UIKit.IconButton(right, "⚙️", "Settings", UIKit.Colors.Panel3, function()
 		UIController.Open("Settings")
 	end)
 	giftButton = UIKit.IconButton(right, "⏱️", "Gift", UIKit.Colors.Red, function()
 		UIController.Open("Rewards")
 	end)
-
-	-- زر VIP
+	UIKit.IconButton(right, "🔑", "Codes", UIKit.Colors.Cyan, function()
+		UIController.Open("Codes")
+	end)
 	UIKit.IconButton(right, "👑", "VIP", UIKit.Colors.Gold, function()
 		if DataController.Owns("VIP") then
 			Remotes.Event("Teleport"):FireServer(0)
@@ -160,6 +221,10 @@ local function buildHUD()
 			Remotes.Event("PromptPurchase"):FireServer("Gamepass", "VIP")
 		end
 	end)
+	adminButton = UIKit.IconButton(right, "🛠️", "Admin", UIKit.Colors.Red, function()
+		UIController.Open("Admin")
+	end)
+	adminButton.Parent.Visible = false
 end
 
 local function tweenNumber(label: TextLabel, from: number, to: number)
@@ -181,7 +246,33 @@ local function refreshHUD(p: any)
 	tweenNumber(coinsLabel, lastCoins, p.Coins)
 	tweenNumber(diamondsLabel, lastDiamonds, p.Diamonds)
 	lastCoins, lastDiamonds = p.Coins, p.Diamonds
+	tokensLabel.Text = tostring(p.Tokens or 0)
 	powerLabel.Text = "⚔️ " .. Format.Number(p.Power or 0)
+	rebirthLabel.Text = "🔁 " .. (p.Rebirths or 0)
+	adminButton.Parent.Visible = p.IsAdmin == true
+	for key, btn in pairs(potionButtons) do
+		local n = p.PotionBag and p.PotionBag[key] or 0
+		btn.Text = Config.Potions[key].Icon .. " " .. n
+		btn.BackgroundColor3 = n > 0 and UIKit.Colors.Purple or UIKit.Colors.Panel3
+	end
+	-- الدليل
+	local step = Config.Tutorial[p.Tutorial and p.Tutorial.Step or 999]
+	if step then
+		questFrame.Visible = true
+		questText.Text = step.Text
+		local prog = p.Tutorial.Progress
+		local done = false
+		if step.Type == "Zone" then
+			done = p.UnlockedZones[tostring(step.Target)] == true
+			questProgress.Text = done and "✅" or "🔒"
+		else
+			questProgress.Text = prog .. " / " .. step.Target
+			done = prog >= step.Target
+		end
+		questClaim.Visible = done
+	else
+		questFrame.Visible = false
+	end
 end
 
 local function updateTimers()
@@ -191,13 +282,37 @@ local function updateTimers()
 	end
 	local now = DataController.ServerTime()
 	local parts = {}
-	for key, cfg in pairs(Config.Potions) do
+	for _, key in ipairs(Config.PotionOrder) do
+		local cfg = Config.Potions[key]
 		local exp = p.Potions[key] or 0
 		if exp > now then
-			table.insert(parts, "🧪 " .. cfg.Name .. " " .. Format.Time(exp - now))
+			table.insert(parts, cfg.Icon .. " " .. Format.Time(exp - now))
 		end
 	end
 	potionsLabel.Text = table.concat(parts, "   ")
+	-- الحدث
+	local state = Remotes.State()
+	local eventId = state:GetAttribute("EventId")
+	local ends = tonumber(state:GetAttribute("EventEnds")) or 0
+	if type(eventId) == "string" and eventId ~= "" and ends > now then
+		local e
+		for _, ev in ipairs(Config.Events.List) do
+			if ev.Id == eventId then
+				e = ev
+			end
+		end
+		eventBanner.Visible = true
+		eventLabel.Text = e and (e.Name .. " • " .. e.Arabic) or eventId
+		eventTimer.Text = Format.Time(ends - now)
+	else
+		eventBanner.Visible = false
+		local nextAt = tonumber(state:GetAttribute("NextEvent")) or 0
+		if nextAt > now and nextAt - now < 60 then
+			eventBanner.Visible = true
+			eventLabel.Text = "⏳ حدث قادم بعد"
+			eventTimer.Text = Format.Time(nextAt - now)
+		end
+	end
 	-- زر الهدية
 	local elapsed = now - (p.SessionStart or now)
 	local nextReward
@@ -218,12 +333,16 @@ local function updateTimers()
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if hrp then
+		local pos = hrp.Position
 		local vip = Config.Map.VIPOffset
+		local w2 = Config.Map.World2Offset
 		local idx
-		if (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - Vector3.new(vip.X, 0, vip.Z)).Magnitude < 220 then
+		if (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(vip.X, 0, vip.Z)).Magnitude < 220 then
 			idx = 0
+		elseif pos.X > w2.X - 500 then
+			idx = math.clamp(Zones.World2Start + math.floor((pos.Z - w2.Z) / Config.Map.ZoneSpacing + 0.5), Zones.World2Start, #Zones.List)
 		else
-			idx = math.clamp(math.floor(hrp.Position.Z / Config.Map.ZoneSpacing + 0.5) + 1, 1, #Zones.List)
+			idx = math.clamp(math.floor(pos.Z / Config.Map.ZoneSpacing + 0.5) + 1, 1, Zones.World2Start - 1)
 		end
 		local zone = Zones.Get(idx)
 		if zone then
@@ -234,13 +353,16 @@ end
 
 -- ===== نافذة المناطق =====
 local function buildZonesWindow()
-	local w = UIKit.Window(gui, "Zones", "🗺️ المناطق", UDim2.fromOffset(520, 560), UIKit.Colors.Gold)
+	local w = UIKit.Window(gui, "Zones", "🗺️ المناطق", UDim2.fromOffset(560, 600), UIKit.Colors.Gold)
 	local scroll = UIKit.Scroll(w.Content)
 	UIKit.List(scroll, 8)
 	local rows: { [number]: { Frame: Frame, Button: TextButton, Status: TextLabel } } = {}
 	local all = table.clone(Zones.List)
 	table.insert(all, Zones.VIP)
 	for _, zone in ipairs(all) do
+		if zone.Index == Zones.World2Start then
+			UIKit.Label({ Text = "🌐 العالم الثاني — Tech World (يتطلب ريبيرث)", Size = UDim2.new(1, -8, 0, 30), TextColor3 = UIKit.Colors.Cyan, MaxTextSize = 20, Parent = scroll })
+		end
 		local row = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 64), BackgroundColor3 = UIKit.Colors.Panel2, Parent = scroll })
 		UIKit.Corner(row, 12)
 		UIKit.Stroke(row, zone.Accent, 2)
@@ -287,11 +409,15 @@ local function buildZonesWindow()
 				row.Button.Text = owns and "انتقال" or "👑 شراء VIP"
 				row.Button.BackgroundColor3 = owns and UIKit.Colors.Green or UIKit.Colors.Gold
 				row.Status.Text = "منطقة حصرية لأعضاء VIP"
+			elseif zone.World == 2 and (p.Rebirths or 0) < 1 then
+				row.Button.Text = "🔁 ريبيرث"
+				row.Button.BackgroundColor3 = UIKit.Colors.Panel3
+				row.Status.Text = "يتطلب ريبيرث واحد على الأقل"
 			elseif p.UnlockedZones[tostring(idx)] then
 				row.Button.Text = "انتقال"
 				row.Button.BackgroundColor3 = UIKit.Colors.Green
-				row.Status.Text = "✅ مفتوحة"
-			elseif p.UnlockedZones[tostring(idx - 1)] then
+				row.Status.Text = "✅ مفتوحة  •  x" .. Format.Number(zone.Multiplier)
+			elseif idx == Zones.World2Start or p.UnlockedZones[tostring(idx - 1)] then
 				row.Button.Text = "🔓 " .. Format.Number(zone.Cost)
 				row.Button.BackgroundColor3 = p.Coins >= zone.Cost and UIKit.Colors.Gold or UIKit.Colors.Panel3
 				row.Status.Text = "💰 " .. Format.Number(zone.Cost) .. " لفتحها"
@@ -303,16 +429,11 @@ local function buildZonesWindow()
 		end
 	end
 	UIController.Register("Zones", w, refresh)
-	DataController.Changed:Connect(function()
-		if UIController.IsOpen("Zones") then
-			refresh()
-		end
-	end)
 end
 
 -- ===== نافذة المكافآت =====
 local function buildRewardsWindow()
-	local w = UIKit.Window(gui, "Rewards", "🎁 المكافآت", UDim2.fromOffset(640, 560), UIKit.Colors.Pink)
+	local w = UIKit.Window(gui, "Rewards", "🎁 المكافآت", UDim2.fromOffset(760, 600), UIKit.Colors.Pink)
 	local scroll = UIKit.Scroll(w.Content)
 	UIKit.List(scroll, 10)
 
@@ -321,7 +442,7 @@ local function buildRewardsWindow()
 	UIKit.List(dailyRow, 6, true)
 	local dailyTiles = {}
 	for i, r in ipairs(Config.DailyRewards) do
-		local tile = UIKit.Frame({ Size = UDim2.fromOffset(78, 100), BackgroundColor3 = UIKit.Colors.Panel2, Parent = dailyRow })
+		local tile = UIKit.Frame({ Size = UDim2.fromOffset(92, 100), BackgroundColor3 = UIKit.Colors.Panel2, Parent = dailyRow })
 		UIKit.Corner(tile, 10)
 		local stroke = UIKit.Stroke(tile, UIKit.Colors.Panel3, 2)
 		UIKit.Label({ Text = "يوم " .. i, Size = UDim2.new(1, 0, 0, 22), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 16, Parent = tile })
@@ -329,10 +450,16 @@ local function buildRewardsWindow()
 		if r.Potion then
 			text = text .. "\n🧪"
 		end
-		UIKit.Label({ Text = text, Size = UDim2.new(1, 0, 1, -24), Position = UDim2.fromOffset(0, 22), MaxTextSize = 20, Parent = tile })
+		if r.Spins then
+			text = text .. " 🎡" .. r.Spins
+		end
+		UIKit.Label({ Text = text, Size = UDim2.new(1, 0, 1, -24), Position = UDim2.fromOffset(0, 22), MaxTextSize = 18, Parent = tile })
 		dailyTiles[i] = { Tile = tile, Stroke = stroke }
 	end
-	local dailyBtn = UIKit.Button({ Text = "استلام", Color = UIKit.Colors.Green, Size = UDim2.fromOffset(200, 44), MaxTextSize = 22, Parent = scroll })
+	local dailyBtnRow = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, Parent = scroll })
+	UIKit.List(dailyBtnRow, 10, true)
+	local dailyBtn = UIKit.Button({ Text = "استلام", Color = UIKit.Colors.Green, Size = UDim2.fromOffset(200, 44), MaxTextSize = 22, Parent = dailyBtnRow })
+	local vipBtn = UIKit.Button({ Text = "👑 صندوق VIP اليومي", Color = UIKit.Colors.Gold, Size = UDim2.fromOffset(240, 44), MaxTextSize = 20, Parent = dailyBtnRow })
 	local dailyStatus = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 22), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 18, Parent = scroll })
 	dailyBtn.Activated:Connect(function()
 		local res = Remotes.Function("ClaimDaily"):InvokeServer()
@@ -340,16 +467,26 @@ local function buildRewardsWindow()
 			UIController.Notify(res.error, UIKit.Colors.Red)
 		end
 	end)
+	vipBtn.Activated:Connect(function()
+		if not DataController.Owns("VIP") then
+			Remotes.Event("PromptPurchase"):FireServer("Gamepass", "VIP")
+			return
+		end
+		local res = Remotes.Function("ClaimVIPDaily"):InvokeServer()
+		if not res.ok and res.error then
+			UIController.Notify(res.error, UIKit.Colors.Red)
+		end
+	end)
 
 	UIKit.Label({ Text = "⏱️ مكافآت وقت اللعب", Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 24, Parent = scroll })
-	local ptRow = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 120), BackgroundTransparency = 1, Parent = scroll })
-	UIKit.List(ptRow, 6, true)
+	local ptRow = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 250), BackgroundTransparency = 1, Parent = scroll })
+	UIKit.Grid(ptRow, UDim2.fromOffset(92, 116), 6)
 	local ptTiles = {}
 	for i, r in ipairs(Config.PlaytimeRewards) do
-		local tile = UIKit.Frame({ Size = UDim2.fromOffset(92, 116), BackgroundColor3 = UIKit.Colors.Panel2, Parent = ptRow })
+		local tile = UIKit.Frame({ LayoutOrder = i, BackgroundColor3 = UIKit.Colors.Panel2, Parent = ptRow })
 		UIKit.Corner(tile, 10)
 		UIKit.Label({ Text = r.Minutes .. " دقيقة", Size = UDim2.new(1, 0, 0, 22), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 16, Parent = tile })
-		UIKit.Label({ Text = "💎 " .. r.Diamonds .. (r.Potion and "\n🧪" or ""), Size = UDim2.new(1, 0, 0, 46), Position = UDim2.fromOffset(0, 22), MaxTextSize = 20, Parent = tile })
+		UIKit.Label({ Text = "💎 " .. r.Diamonds .. (r.Potion and "\n🧪" or "") .. (r.Spins and " 🎡" or ""), Size = UDim2.new(1, 0, 0, 46), Position = UDim2.fromOffset(0, 22), MaxTextSize = 18, Parent = tile })
 		local btn = UIKit.Button({ Text = "...", Size = UDim2.new(1, -12, 0, 34), Position = UDim2.new(0, 6, 1, -40), MaxTextSize = 16, Parent = tile })
 		btn.Activated:Connect(function()
 			local res = Remotes.Function("ClaimPlaytime"):InvokeServer(i)
@@ -377,6 +514,8 @@ local function buildRewardsWindow()
 		local canClaim = since >= 20 * 3600
 		dailyBtn.BackgroundColor3 = canClaim and UIKit.Colors.Green or UIKit.Colors.Panel3
 		dailyStatus.Text = canClaim and "جاهزة للاستلام! سلسلة: " .. (p.Daily.Streak or 0) or ("التالية بعد " .. Format.Time(20 * 3600 - since))
+		local day = math.floor(now / 86400)
+		vipBtn.BackgroundColor3 = (DataController.Owns("VIP") and p.VIPDaily ~= day) and UIKit.Colors.Gold or UIKit.Colors.Panel3
 		local elapsed = now - (p.SessionStart or now)
 		for i, btn in pairs(ptTiles) do
 			local r = Config.PlaytimeRewards[i]
@@ -391,11 +530,14 @@ local function buildRewardsWindow()
 				btn.BackgroundColor3 = UIKit.Colors.Panel3
 			end
 		end
+		local lines = {}
 		if Config.GroupId > 0 then
-			groupLabel.Text = p.InGroup and "✅ مكافأة المجموعة مفعلة: +25% حظ و +25% عملات" or "انضم لمجموعة اللعبة واحصل على +25% حظ و +25% عملات"
-		else
-			groupLabel.Text = ""
+			table.insert(lines, p.InGroup and "✅ مكافأة المجموعة مفعلة: +25% حظ و +25% عملات" or "انضم لمجموعة اللعبة واحصل على +25% حظ و +25% عملات")
 		end
+		if p.Premium then
+			table.insert(lines, "⭐ Premium: +10% حظ و +10% عملات")
+		end
+		groupLabel.Text = table.concat(lines, "\n")
 	end
 	UIController.Register("Rewards", w, refresh)
 	task.spawn(function()
@@ -404,11 +546,6 @@ local function buildRewardsWindow()
 			if UIController.IsOpen("Rewards") then
 				refresh()
 			end
-		end
-	end)
-	DataController.Changed:Connect(function()
-		if UIController.IsOpen("Rewards") then
-			refresh()
 		end
 	end)
 end
@@ -444,7 +581,7 @@ end
 
 -- ===== نافذة الفهرس =====
 local function buildIndexWindow()
-	local w = UIKit.Window(gui, "Index", "📖 فهرس الحيوانات", UDim2.fromOffset(760, 580), UIKit.Colors.Purple)
+	local w = UIKit.Window(gui, "Index", "📖 فهرس الحيوانات", UDim2.fromOffset(820, 600), UIKit.Colors.Purple)
 	local counter = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 26), MaxTextSize = 20, TextColor3 = UIKit.Colors.Muted, Parent = w.Content })
 	local scroll = UIKit.Scroll(w.Content, { Size = UDim2.new(1, 0, 1, -30), Position = UDim2.fromOffset(0, 30) })
 	UIKit.Grid(scroll, UDim2.fromOffset(110, 140), 8)
@@ -498,26 +635,26 @@ end
 
 -- ===== الإعدادات =====
 local function buildSettingsWindow()
-	local w = UIKit.Window(gui, "Settings", "⚙️ الإعدادات", UDim2.fromOffset(420, 300), UIKit.Colors.Panel3)
+	local w = UIKit.Window(gui, "Settings", "⚙️ الإعدادات", UDim2.fromOffset(460, 400), UIKit.Colors.Panel3)
 	UIKit.List(w.Content, 8)
-	local function toggle(text: string, key: string)
+	local function toggle(text: string, key: string, defaultOn: boolean)
 		local row = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 48), BackgroundColor3 = UIKit.Colors.Panel2, Parent = w.Content })
 		UIKit.Corner(row, 10)
 		UIKit.Label({ Text = text, Size = UDim2.new(1, -120, 1, 0), Position = UDim2.fromOffset(12, 0), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 20, Parent = row })
 		local btn = UIKit.Button({ Text = "ON", Size = UDim2.fromOffset(90, 36), Position = UDim2.new(1, -100, 0, 6), MaxTextSize = 18, Parent = row })
 		local function refresh()
 			local p = DataController.Profile
-			local on = p and p.Settings and p.Settings[key] ~= false
-			if key == "HideOthersPets" or key == "LowGraphics" then
-				on = p and p.Settings and p.Settings[key] == true
-			end
+			local v = p and p.Settings and p.Settings[key]
+			local on = if v == nil then defaultOn else v == true
 			btn.Text = on and "ON" or "OFF"
 			btn.BackgroundColor3 = on and UIKit.Colors.Green or UIKit.Colors.Red
 		end
 		btn.Activated:Connect(function()
 			local p = DataController.Profile
 			if p then
-				p.Settings[key] = not (p.Settings[key] == true)
+				local v = p.Settings[key]
+				local on = if v == nil then defaultOn else v == true
+				p.Settings[key] = not on
 				Remotes.Function("PetAction"):InvokeServer("Setting", { Key = key, Value = p.Settings[key] })
 				refresh()
 			end
@@ -525,9 +662,34 @@ local function buildSettingsWindow()
 		DataController.Changed:Connect(refresh)
 		refresh()
 	end
-	toggle("🎵 الموسيقى", "Music")
-	toggle("🙈 إخفاء حيوانات الآخرين", "HideOthersPets")
-	toggle("⚡ رسومات منخفضة", "LowGraphics")
+	toggle("🎵 الموسيقى", "Music", true)
+	toggle("🙈 إخفاء حيوانات الآخرين", "HideOthersPets", false)
+	toggle("⚡ رسومات منخفضة", "LowGraphics", false)
+	toggle("🔢 أرقام الضرر", "DamageNumbers", true)
+
+	-- الحذف التلقائي
+	local row = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = UIKit.Colors.Panel2, Parent = w.Content })
+	UIKit.Corner(row, 10)
+	UIKit.Label({ Text = "🗑️ حذف تلقائي بعد الفتح (حتى الندرة):", Size = UDim2.new(1, -12, 0, 28), Position = UDim2.fromOffset(12, 4), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 18, Parent = row })
+	local opts = UIKit.Frame({ Size = UDim2.new(1, -12, 0, 36), Position = UDim2.fromOffset(6, 38), BackgroundTransparency = 1, Parent = row })
+	UIKit.List(opts, 6, true)
+	local optButtons = {}
+	for rank = 0, 4 do
+		local label = rank == 0 and "إيقاف" or Rarities.Order[rank]
+		local btn = UIKit.Button({ Text = label, Size = UDim2.fromOffset(80, 34), MaxTextSize = 15, Parent = opts }, function()
+			Remotes.Function("PetAction"):InvokeServer("Setting", { Key = "AutoDeleteRank", Value = rank })
+		end)
+		optButtons[rank] = btn
+	end
+	local function refreshAuto()
+		local p = DataController.Profile
+		local cur = p and p.Settings and p.Settings.AutoDeleteRank or 0
+		for rank, btn in pairs(optButtons) do
+			btn.BackgroundColor3 = rank == cur and UIKit.Colors.Green or UIKit.Colors.Panel3
+		end
+	end
+	DataController.Changed:Connect(refreshAuto)
+	refreshAuto()
 	UIController.Register("Settings", w)
 end
 
@@ -540,7 +702,7 @@ function UIController.Init()
 	gui.Parent = player:WaitForChild("PlayerGui")
 	UIController.Gui = gui
 
-	notifHolder = UIKit.Frame({ Name = "Notifications", BackgroundTransparency = 1, Size = UDim2.fromOffset(380, 300), Position = UDim2.new(0.5, -190, 0, 90), Parent = gui })
+	notifHolder = UIKit.Frame({ Name = "Notifications", BackgroundTransparency = 1, Size = UDim2.fromOffset(380, 300), Position = UDim2.new(0.5, -190, 0, 170), Parent = gui })
 	UIKit.List(notifHolder, 6, false, true)
 
 	buildHUD()
@@ -550,7 +712,12 @@ function UIController.Init()
 	buildIndexWindow()
 	buildSettingsWindow()
 
-	DataController.Changed:Connect(refreshHUD)
+	DataController.Changed:Connect(function(p)
+		refreshHUD(p)
+		if currentWindow and refreshers[currentWindow] then
+			refreshers[currentWindow]()
+		end
+	end)
 	if DataController.Profile then
 		refreshHUD(DataController.Profile)
 	end
@@ -570,6 +737,16 @@ function UIController.Init()
 			UIController.Notify("🌟 " .. data.Player .. " حصل على " .. def.Name .. " (" .. def.Rarity .. ")!", Rarities.Color(def.Rarity))
 		end
 	end)
+	Remotes.Event("BossUpdate").OnClientEvent:Connect(function(data)
+		if data.Active then
+			bossBar.Visible = true
+			local ratio = math.clamp((data.Health or 0) / math.max(1, data.MaxHealth or 1), 0, 1)
+			bossFill.Size = UDim2.fromScale(ratio, 1)
+			bossText.Text = "👹 " .. Config.Events.Boss.Name .. "  " .. Format.Number(data.Health or 0) .. " / " .. Format.Number(data.MaxHealth or 0)
+		else
+			bossBar.Visible = false
+		end
+	end)
 
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then
@@ -577,6 +754,11 @@ function UIController.Init()
 		end
 		if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.X then
 			UIController.Close()
+		elseif input.KeyCode == Enum.KeyCode.Q then
+			local res = Remotes.Function("Hoverboard"):InvokeServer("Toggle", "")
+			if not res.ok and res.error then
+				UIController.Notify(res.error, UIKit.Colors.Red)
+			end
 		end
 	end)
 end

@@ -6,28 +6,14 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
 local DataService = require(script.Parent.DataService)
-local PetService = require(script.Parent.PetService)
+local Rewards = require(script.Parent.Rewards)
 
 local RewardService = {}
 
 local DAY = 20 * 3600 -- يمكن الاستلام كل 20 ساعة
 local RESET = 48 * 3600
 
-local function grant(player: Player, reward: any)
-	if reward.Coins then
-		DataService.AddCoins(player, reward.Coins)
-	end
-	if reward.Diamonds then
-		DataService.AddDiamonds(player, reward.Diamonds)
-	end
-	if reward.Potion then
-		DataService.GivePotion(player, reward.Potion)
-	end
-	if reward.Pet then
-		PetService.Add(player, reward.Pet, reward.Variant or "Normal", true)
-	end
-	DataService.MarkDirty(player)
-end
+local grant = Rewards.Grant
 
 function RewardService.ClaimDaily(player: Player): { ok: boolean, error: string?, reward: any? }
 	local p = DataService.Get(player)
@@ -89,9 +75,30 @@ function RewardService.RedeemCode(player: Player, code: string): { ok: boolean, 
 	return { ok = true }
 end
 
+function RewardService.ClaimVIPDaily(player: Player): { ok: boolean, error: string? }
+	local p = DataService.Get(player)
+	if not p then
+		return { ok = false, error = "لم يتم تحميل البيانات" }
+	end
+	if not DataService.HasGamepass(player, "VIP") then
+		return { ok = false, error = "لأعضاء VIP فقط" }
+	end
+	local day = math.floor(os.time() / 86400)
+	if p.VIPDaily == day then
+		return { ok = false, error = "استلمت صندوق اليوم" }
+	end
+	p.VIPDaily = day
+	grant(player, { Diamonds = Config.VIPDailyDiamonds })
+	DataService.Notify(player, "👑 صندوق VIP اليومي: 💎 " .. Config.VIPDailyDiamonds, Color3.fromRGB(255, 215, 0))
+	return { ok = true }
+end
+
 function RewardService.Init()
 	Remotes.Function("ClaimDaily").OnServerInvoke = function(player)
 		return RewardService.ClaimDaily(player)
+	end
+	Remotes.Function("ClaimVIPDaily").OnServerInvoke = function(player)
+		return RewardService.ClaimVIPDaily(player)
 	end
 	Remotes.Function("ClaimPlaytime").OnServerInvoke = function(player, index)
 		return RewardService.ClaimPlaytime(player, tonumber(index) or 0)

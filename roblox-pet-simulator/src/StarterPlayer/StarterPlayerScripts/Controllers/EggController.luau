@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
 local Eggs = require(Shared.Data.Eggs)
 local Pets = require(Shared.Data.Pets)
 local Rarities = require(Shared.Data.Rarities)
@@ -27,42 +28,70 @@ local panel: Frame
 local panelTitle: TextLabel
 local panelList: Frame
 local tripleBtn: TextButton
+local octBtn: TextButton
 local autoBtn: TextButton
+local variantBtns: { [string]: TextButton } = {}
+local currentVariant = "Normal"
 local overlay: Frame
 local overlayContent: Frame
 local panelEgg: string? = nil
 local hatching = false
 local autoHatch = false
 local eggModels: { Model } = {}
+local refreshPanel: () -> ()
 
 local function buildPanel(gui: ScreenGui)
-	panel = UIKit.Frame({ Name = "EggPanel", Size = UDim2.fromOffset(560, 230), Position = UDim2.new(0.5, -280, 1, -250), BackgroundColor3 = UIKit.Colors.Panel, BackgroundTransparency = 0.05, Visible = false, Parent = gui })
+	panel = UIKit.Frame({ Name = "EggPanel", Size = UDim2.fromOffset(640, 270), Position = UDim2.new(0.5, -320, 1, -290), BackgroundColor3 = UIKit.Colors.Panel, BackgroundTransparency = 0.05, Visible = false, Parent = gui })
 	UIKit.Corner(panel, 18)
 	UIKit.Stroke(panel, UIKit.Colors.Gold, 3)
-	panelTitle = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 34), Position = UDim2.fromOffset(0, 6), MaxTextSize = 26, Parent = panel })
+	panelTitle = UIKit.Label({ Text = "", Size = UDim2.new(1, -230, 0, 34), Position = UDim2.fromOffset(8, 6), TextXAlignment = Enum.TextXAlignment.Left, MaxTextSize = 22, Parent = panel })
+	local variants = UIKit.Frame({ Size = UDim2.fromOffset(220, 30), Position = UDim2.new(1, -228, 0, 8), BackgroundTransparency = 1, Parent = panel })
+	UIKit.List(variants, 4, true)
+	for _, v in ipairs({ { "Normal", "عادي", UIKit.Colors.Panel3 }, { "Golden", "ذهبي x5", UIKit.Colors.Gold }, { "Rainbow", "قوس قزح x25", UIKit.Colors.Pink } }) do
+		variantBtns[v[1]] = UIKit.Button({ Text = v[2], Color = v[3], Size = UDim2.fromOffset(70, 30), MaxTextSize = 12, Parent = variants }, function()
+			currentVariant = v[1]
+			refreshPanel()
+		end)
+	end
 	panelList = UIKit.Frame({ Size = UDim2.new(1, -16, 0, 120), Position = UDim2.fromOffset(8, 44), BackgroundTransparency = 1, Parent = panel })
 	UIKit.List(panelList, 6, true, true)
 	local buttons = UIKit.Frame({ Size = UDim2.new(1, -16, 0, 44), Position = UDim2.new(0, 8, 1, -52), BackgroundTransparency = 1, Parent = panel })
 	UIKit.List(buttons, 8, true, true)
-	UIKit.Button({ Text = "فتح (E)", Color = UIKit.Colors.Green, Size = UDim2.fromOffset(170, 44), MaxTextSize = 20, Parent = buttons }, function()
+	UIKit.Button({ Text = "فتح (E)", Color = UIKit.Colors.Green, Size = UDim2.fromOffset(145, 44), MaxTextSize = 18, Parent = buttons }, function()
 		EggController.Hatch(1)
 	end)
-	tripleBtn = UIKit.Button({ Text = "فتح 3 (R)", Color = UIKit.Colors.Gold, Size = UDim2.fromOffset(170, 44), MaxTextSize = 20, Parent = buttons }, function()
+	tripleBtn = UIKit.Button({ Text = "فتح 3 (R)", Color = UIKit.Colors.Gold, Size = UDim2.fromOffset(145, 44), MaxTextSize = 18, Parent = buttons }, function()
 		EggController.Hatch(3)
 	end)
-	autoBtn = UIKit.Button({ Text = "تلقائي (T)", Color = UIKit.Colors.Purple, Size = UDim2.fromOffset(170, 44), MaxTextSize = 20, Parent = buttons }, function()
+	octBtn = UIKit.Button({ Text = "فتح 8 (F)", Color = UIKit.Colors.Cyan, Size = UDim2.fromOffset(145, 44), MaxTextSize = 18, Parent = buttons }, function()
+		EggController.Hatch(8)
+	end)
+	autoBtn = UIKit.Button({ Text = "تلقائي (T)", Color = UIKit.Colors.Purple, Size = UDim2.fromOffset(145, 44), MaxTextSize = 18, Parent = buttons }, function()
 		EggController.ToggleAuto()
 	end)
 end
 
-local function refreshPanel()
+function refreshPanel()
 	if not panelEgg then
 		return
 	end
 	local egg = Eggs.Get(panelEgg) :: Eggs.EggDef
 	local p = DataController.Profile
 	local luck = p and p.Luck or 1
-	panelTitle.Text = egg.Name .. "   " .. (egg.Currency == "Coins" and "💰 " or "💎 ") .. Format.Number(egg.Cost) .. (luck > 1 and ("   🍀 x" .. string.format("%.2f", luck)) or "")
+	if egg.Currency ~= "Coins" then
+		currentVariant = "Normal"
+	end
+	for v, btn in pairs(variantBtns) do
+		btn.Visible = egg.Currency == "Coins"
+		local stroke = btn:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			stroke.Color = v == currentVariant and Color3.new(1, 1, 1) or Color3.new(0, 0, 0)
+			stroke.Thickness = v == currentVariant and 3 or 2
+		end
+	end
+	local currencyIcon = egg.Currency == "Coins" and "💰 " or (egg.Currency == "Diamonds" and "💎 " or "🔁 ")
+	local cost = egg.Cost * (Config.EggVariantCost[currentVariant] or 1)
+	panelTitle.Text = egg.Name .. (currentVariant ~= "Normal" and (" (" .. currentVariant .. ")") or "") .. "   " .. currencyIcon .. Format.Number(cost) .. (luck > 1 and ("   🍀 x" .. string.format("%.2f", luck)) or "")
 	for _, c in ipairs(panelList:GetChildren()) do
 		if c:IsA("Frame") then
 			c:Destroy()
@@ -74,11 +103,12 @@ local function refreshPanel()
 		UIKit.Corner(card, 10)
 		UIKit.Stroke(card, Rarities.Color(def.Rarity), 2)
 		local vp = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 70), BackgroundTransparency = 1, Parent = card })
-		PetViewport.Create(vp, def.Id, "Normal")
+		PetViewport.Create(vp, def.Id, currentVariant)
 		UIKit.Label({ Text = def.Name, Size = UDim2.new(1, -4, 0, 20), Position = UDim2.fromOffset(2, 72), MaxTextSize = 12, Parent = card })
 		UIKit.Label({ Text = Format.Percent(entry.Chance), Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, 94), TextColor3 = Rarities.Color(def.Rarity), MaxTextSize = 14, Parent = card })
 	end
 	tripleBtn.BackgroundColor3 = DataController.Owns("TripleHatch") and UIKit.Colors.Gold or UIKit.Colors.Panel3
+	octBtn.BackgroundColor3 = DataController.Owns("OctupleHatch") and UIKit.Colors.Cyan or UIKit.Colors.Panel3
 	autoBtn.BackgroundColor3 = autoHatch and UIKit.Colors.Green or (DataController.Owns("AutoHatch") and UIKit.Colors.Purple or UIKit.Colors.Panel3)
 	autoBtn.Text = autoHatch and "إيقاف (T)" or "تلقائي (T)"
 end
@@ -94,7 +124,7 @@ end
 
 local function eggViewport(parent: Instance, egg: Eggs.EggDef): (ViewportFrame, Model)
 	local vp = Instance.new("ViewportFrame")
-	vp.Size = UDim2.fromOffset(260, 300)
+	vp.Size = UDim2.fromScale(1, 0.85)
 	vp.BackgroundTransparency = 1
 	vp.Ambient = Color3.fromRGB(200, 200, 200)
 	vp.LightDirection = Vector3.new(-1, -1, -1)
@@ -143,8 +173,9 @@ local function playHatch(eggId: string, results: { any })
 		end
 	end
 	local slots = {}
+	local many = #results > 3
 	for _, res in ipairs(results) do
-		local holder = UIKit.Frame({ Size = UDim2.fromOffset(260, 360), BackgroundTransparency = 1, ZIndex = 11, Parent = overlayContent })
+		local holder = UIKit.Frame({ Size = many and UDim2.fromOffset(150, 240) or UDim2.fromOffset(260, 360), BackgroundTransparency = 1, ZIndex = 11, Parent = overlayContent })
 		local vp, model = eggViewport(holder, egg)
 		table.insert(slots, { Holder = holder, Vp = vp, Model = model, Result = res })
 	end
@@ -158,13 +189,14 @@ local function playHatch(eggId: string, results: { any })
 			skipped = true
 		end
 	end)
-	while os.clock() - t0 < 1.6 and not skipped do
+	local fast = DataController.Owns("FastHatch")
+	while os.clock() - t0 < (fast and 0.8 or 1.6) and not skipped do
 		local dt = os.clock() - t0
 		for _, s in ipairs(slots) do
 			local ang = math.sin(dt * 28) * 0.28 * math.min(1, dt * 2)
 			local scale = 1 + math.sin(dt * 10) * 0.04
 			s.Model:PivotTo(CFrame.new(0, math.abs(math.sin(dt * 14)) * 0.4, 0) * CFrame.Angles(0, 0, ang))
-			s.Vp.Size = UDim2.fromOffset(260 * scale, 300 * scale)
+			s.Vp.Size = UDim2.fromScale(scale, 0.85 * scale)
 		end
 		RunService.RenderStepped:Wait()
 	end
@@ -172,15 +204,16 @@ local function playHatch(eggId: string, results: { any })
 	for _, s in ipairs(slots) do
 		s.Vp:Destroy()
 		local def = Pets.Get(s.Result.Id) :: Pets.PetDef
-		local card = UIKit.Frame({ Size = UDim2.fromOffset(240, 340), BackgroundColor3 = UIKit.Colors.Panel, ZIndex = 12, Parent = s.Holder })
+		local card = UIKit.Frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = UIKit.Colors.Panel, ZIndex = 12, Parent = s.Holder })
 		UIKit.Corner(card, 18)
 		UIKit.Stroke(card, Rarities.Color(def.Rarity), 4)
-		local vpHolder = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 240), BackgroundTransparency = 1, ZIndex = 12, Parent = card })
+		local vpHolder = UIKit.Frame({ Size = UDim2.new(1, 0, 0.66, 0), BackgroundTransparency = 1, ZIndex = 12, Parent = card })
 		local vp = PetViewport.Create(vpHolder, s.Result.Id, s.Result.Variant, true)
 		vp.ZIndex = 12
-		UIKit.Label({ Text = PetUtil.DisplayName(s.Result), Size = UDim2.new(1, -8, 0, 34), Position = UDim2.fromOffset(4, 244), MaxTextSize = 24, ZIndex = 13, Parent = card })
-		UIKit.Label({ Text = def.Rarity .. " • " .. (Rarities.Info[def.Rarity] and Rarities.Info[def.Rarity].Arabic or ""), Size = UDim2.new(1, 0, 0, 26), Position = UDim2.fromOffset(0, 278), TextColor3 = Rarities.Color(def.Rarity), MaxTextSize = 20, ZIndex = 13, Parent = card })
-		UIKit.Label({ Text = "⚔️ " .. Format.Number(PetUtil.BasePower(s.Result)), Size = UDim2.new(1, 0, 0, 26), Position = UDim2.fromOffset(0, 304), TextColor3 = UIKit.Colors.Pink, MaxTextSize = 20, ZIndex = 13, Parent = card })
+		local inst = { Uid = s.Result.Uid, Id = s.Result.Id, Variant = s.Result.Variant, Locked = false, Equipped = false, Time = 0, Level = 1, XP = 0, Enchants = {} }
+		UIKit.Label({ Text = PetUtil.DisplayName(inst), Size = UDim2.new(1, -8, 0.1, 0), Position = UDim2.new(0, 4, 0.67, 0), MaxTextSize = 22, ZIndex = 13, Parent = card })
+		UIKit.Label({ Text = def.Rarity .. " • " .. (Rarities.Info[def.Rarity] and Rarities.Info[def.Rarity].Arabic or ""), Size = UDim2.new(1, 0, 0.08, 0), Position = UDim2.new(0, 0, 0.78, 0), TextColor3 = Rarities.Color(def.Rarity), MaxTextSize = 18, ZIndex = 13, Parent = card })
+		UIKit.Label({ Text = s.Result.Deleted and "🗑️ حُذف تلقائياً" or ("⚔️ " .. Format.Number(PetUtil.BasePower(inst))), Size = UDim2.new(1, 0, 0.08, 0), Position = UDim2.new(0, 0, 0.87, 0), TextColor3 = s.Result.Deleted and UIKit.Colors.Muted or UIKit.Colors.Pink, MaxTextSize = 18, ZIndex = 13, Parent = card })
 		UIKit.Pop(card)
 		if Rarities.Rank(def.Rarity) >= 5 then
 			UIController.Notify("🌟 حصلت على " .. def.Name .. " (" .. def.Rarity .. ")!", Rarities.Color(def.Rarity))
@@ -188,7 +221,7 @@ local function playHatch(eggId: string, results: { any })
 	end
 	local t1 = os.clock()
 	skipped = false
-	while os.clock() - t1 < (autoHatch and 1.4 or 2.6) and not skipped do
+	while os.clock() - t1 < ((autoHatch or fast) and 1.2 or 2.6) and not skipped do
 		task.wait(0.05)
 	end
 	conn:Disconnect()
@@ -200,12 +233,16 @@ function EggController.Hatch(count: number)
 	if hatching or not panelEgg then
 		return
 	end
-	if count == 3 and not DataController.Owns("TripleHatch") then
+	if count >= 3 and not DataController.Owns("TripleHatch") then
 		Remotes.Event("PromptPurchase"):FireServer("Gamepass", "TripleHatch")
 		return
 	end
+	if count == 8 and not DataController.Owns("OctupleHatch") then
+		Remotes.Event("PromptPurchase"):FireServer("Gamepass", "OctupleHatch")
+		return
+	end
 	local eggId = panelEgg
-	local res = Remotes.Function("HatchEgg"):InvokeServer(eggId, count)
+	local res = Remotes.Function("HatchEgg"):InvokeServer(eggId, count, currentVariant)
 	if res.ok and res.pets and #res.pets > 0 then
 		playHatch(eggId, res.pets)
 	elseif res.error then
@@ -286,7 +323,7 @@ function EggController.Init()
 		while true do
 			task.wait(0.3)
 			if autoHatch and panelEgg and not hatching then
-				EggController.Hatch(DataController.Owns("TripleHatch") and 3 or 1)
+				EggController.Hatch(DataController.Owns("OctupleHatch") and 8 or (DataController.Owns("TripleHatch") and 3 or 1))
 			end
 		end
 	end)
@@ -331,6 +368,8 @@ function EggController.Init()
 			EggController.Hatch(1)
 		elseif input.KeyCode == Enum.KeyCode.R then
 			EggController.Hatch(3)
+		elseif input.KeyCode == Enum.KeyCode.F then
+			EggController.Hatch(8)
 		elseif input.KeyCode == Enum.KeyCode.T then
 			EggController.ToggleAuto()
 		end
