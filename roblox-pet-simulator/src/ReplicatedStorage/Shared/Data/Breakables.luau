@@ -1,0 +1,37 @@
+--!strict
+-- الصناديق والعملات القابلة للكسر. الأرقام الأساسية تُضرب في مضاعف المنطقة.
+local Breakables = {}
+
+export type BreakableDef = {
+	Name: string,
+	Arabic: string,
+	Health: number,
+	Coins: number,
+	Diamonds: number,
+	Respawn: number,
+	Size: Vector3,
+	Color: Color3,
+	Shape: string, -- "pile" | "chest" | "crystal" | "giant" | "gift"
+	Material: Enum.Material,
+}
+
+Breakables.Types = {
+	CoinPile = { Name = "Coin Pile", Arabic = "كومة عملات", Health = 25, Coins = 12, Diamonds = 0, Respawn = 4,
+		Size = Vector3.new(4, 2.5, 4), Color = Color3.fromRGB(255, 200, 40), Shape = "pile", Material = Enum.Material.Metal },
+	CoinChest = { Name = "Coin Chest", Arabic = "صندوق عملات", Health = 150, Coins = 90, Diamonds = 0, Respawn = 12,
+		Size = Vector3.new(5, 4, 4), Color = Color3.fromRGB(140, 90, 40), Shape = "chest", Material = Enum.Material.Wood },
+	DiamondCrystal = { Name = "Diamond Crystal", Arabic = "بلورة ألماس", Health = 600, Coins = 0, Diamonds = 3, Respawn = 45,
+		Size = Vector3.new(3, 6, 3), Color = Color3.fromRGB(120, 230, 255), Shape = "crystal", Material = Enum.Material.Glass },
+	VIPChest = { Name = "VIP Chest", Arabic = "صندوق VIP", Health = 400, Coins = 300, Diamonds = 2, Respawn = 20,
+		Size = Vector3.new(6, 5, 5), Color = Color3.fromRGB(255, 215, 0), Shape = "chest", Material = Enum.Material.Metal },
+	GiantChest = { Name = "Giant Chest", Arabic = "الصندوق العملاق", Health = 250000, Coins = 25000, Diamonds = 150, Respawn = 600,
+		Size = Vector3.new(14, 11, 11), Color = Color3.fromRGB(200, 60, 200), Shape = "giant", Material = Enum.Material.Metal },
+	MysteryBox = { Name = "Mystery Box", Arabic = "صندوق الغموض", Health = 5000, Coins = 2000, Diamonds = 25, Respawn = 240,
+		Size = Vector3.new(6, 6, 6), Color = Color3.fromRGB(80, 60, 200), Shape = "gift", Material = Enum.Material.Neon },
+}
+
+function Breakables.Get(t: string): BreakableDef?
+	return Breakables.Types[t]
+end
+
+return Breakables

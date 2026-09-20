@@ -1,0 +1,186 @@
+--!strict
+-- تعريف كل الحيوانات. القوة تُحسب من مستوى المنطقة × مضاعف الندرة.
+local Pets = {}
+
+local function hex(h: string): Color3
+	return Color3.fromRGB(
+		tonumber(h:sub(1, 2), 16) :: number,
+		tonumber(h:sub(3, 4), 16) :: number,
+		tonumber(h:sub(5, 6), 16) :: number
+	)
+end
+
+export type PetDef = {
+	Id: string,
+	Name: string,
+	Rarity: string,
+	Power: number,
+	Shape: string,
+	Primary: Color3,
+	Secondary: Color3,
+	Egg: string,
+	Tier: number,
+}
+
+local RARITY_MULT = { Common = 1, Uncommon = 1.6, Rare = 2.6, Epic = 4.2, Legendary = 7, Mythical = 12, Exclusive = 20 }
+
+local list: { PetDef } = {}
+local byId: { [string]: PetDef } = {}
+
+-- egg: معرف البيضة, tier: مستوى المنطقة, base: القوة الأساسية للمنطقة
+local function egg(eggId: string, tier: number, base: number, pets: { { string } })
+	for _, p in ipairs(pets) do
+		local id, name, rarity, shape, c1, c2 = p[1], p[2], p[3], p[4], p[5], p[6]
+		local def: PetDef = {
+			Id = id,
+			Name = name,
+			Rarity = rarity,
+			Power = math.floor(base * (RARITY_MULT[rarity] or 1) + 0.5),
+			Shape = shape,
+			Primary = hex(c1),
+			Secondary = hex(c2),
+			Egg = eggId,
+			Tier = tier,
+		}
+		table.insert(list, def)
+		byId[id] = def
+	end
+end
+
+-- المنطقة 1: البلدة
+egg("StarterEgg", 1, 3, {
+	{ "cat", "Cat", "Common", "cat", "F2F2F2", "FFB6C1" },
+	{ "dog", "Dog", "Common", "dog", "C68642", "8D5524" },
+	{ "bunny", "Bunny", "Uncommon", "bunny", "FFFFFF", "FFC0CB" },
+	{ "bear", "Bear", "Rare", "bear", "8B5A2B", "D2A679" },
+	{ "fox", "Fox", "Epic", "fox", "FF7F27", "FFFFFF" },
+	{ "dragon_hatchling", "Dragon Hatchling", "Legendary", "dragon", "3CB371", "F5DEB3" },
+})
+
+egg("DiamondEgg", 1, 25, {
+	{ "crystal_cat", "Crystal Cat", "Rare", "cat", "9FE2FF", "FFFFFF" },
+	{ "diamond_dog", "Diamond Dog", "Epic", "dog", "B9F2FF", "E0FFFF" },
+	{ "sapphire_bird", "Sapphire Bird", "Legendary", "bird", "0F52BA", "9FE2FF" },
+	{ "emerald_dragon", "Emerald Dragon", "Mythical", "dragon", "50C878", "B9F2FF" },
+})
+
+-- المنطقة 2: الغابة
+egg("ForestEgg", 2, 15, {
+	{ "squirrel", "Squirrel", "Common", "fox", "A0522D", "F4E4C1" },
+	{ "owl", "Owl", "Common", "bird", "8B7355", "F5F5DC" },
+	{ "deer", "Deer", "Uncommon", "unicorn", "C19A6B", "FFFFFF" },
+	{ "mushroom_blob", "Mushroom Blob", "Rare", "blob", "FF4040", "FFFFFF" },
+	{ "forest_spirit", "Forest Spirit", "Epic", "ghost", "7CFC00", "228B22" },
+	{ "ancient_ent", "Ancient Ent", "Legendary", "golem", "5C4033", "3CB371" },
+})
+
+-- المنطقة 3: الشاطئ
+egg("BeachEgg", 3, 75, {
+	{ "crab", "Crab", "Common", "blob", "FF4500", "FFA07A" },
+	{ "fish", "Fish", "Common", "fish", "1E90FF", "FFD700" },
+	{ "turtle", "Turtle", "Uncommon", "blob", "2E8B57", "8FBC8F" },
+	{ "seagull", "Seagull", "Rare", "bird", "FFFFFF", "FFD700" },
+	{ "octopus", "Octopus", "Epic", "alien", "9932CC", "DA70D6" },
+	{ "kraken", "Kraken", "Legendary", "demon", "191970", "00CED1" },
+})
+
+-- المنطقة 4: الصحراء
+egg("DesertEgg", 4, 375, {
+	{ "scorpion", "Scorpion", "Common", "robot", "8B0000", "FFD700" },
+	{ "camel", "Camel", "Common", "unicorn", "D2B48C", "8B7355" },
+	{ "cobra", "Cobra", "Uncommon", "fish", "556B2F", "FFD700" },
+	{ "sand_golem", "Sand Golem", "Rare", "golem", "EDC9AF", "C2B280" },
+	{ "mummy_cat", "Mummy Cat", "Epic", "cat", "F5F5DC", "DAA520" },
+	{ "pharaoh_dragon", "Pharaoh Dragon", "Legendary", "dragon", "FFD700", "1E90FF" },
+})
+
+-- المنطقة 5: الجليد
+egg("FrozenEgg", 5, 1875, {
+	{ "penguin", "Penguin", "Common", "bird", "2F2F2F", "FFFFFF" },
+	{ "snow_bunny", "Snow Bunny", "Common", "bunny", "F0FFFF", "B0E0E6" },
+	{ "seal", "Seal", "Uncommon", "fish", "C0C0C0", "F8F8FF" },
+	{ "yeti", "Yeti", "Rare", "bear", "F8F8FF", "87CEEB" },
+	{ "ice_golem", "Ice Golem", "Epic", "golem", "ADD8E6", "FFFFFF" },
+	{ "frost_dragon", "Frost Dragon", "Legendary", "dragon", "87CEFA", "FFFFFF" },
+})
+
+-- المنطقة 6: البركان
+egg("LavaEgg", 6, 9375, {
+	{ "magma_slime", "Magma Slime", "Common", "blob", "FF4500", "FFD700" },
+	{ "fire_fox", "Fire Fox", "Common", "fox", "FF6347", "FFFF00" },
+	{ "lava_bird", "Lava Bird", "Uncommon", "bird", "DC143C", "FF8C00" },
+	{ "obsidian_golem", "Obsidian Golem", "Rare", "golem", "1C1C1C", "FF4500" },
+	{ "inferno_demon", "Inferno Demon", "Epic", "demon", "B22222", "FFD700" },
+	{ "phoenix", "Phoenix", "Legendary", "bird", "FF8C00", "FFD700" },
+})
+
+-- المنطقة 7: السماء
+egg("CloudEgg", 7, 46875, {
+	{ "cloud_cat", "Cloud Cat", "Common", "cat", "FFFFFF", "87CEEB" },
+	{ "angel_bunny", "Angel Bunny", "Common", "bunny", "FFFAF0", "FFD700" },
+	{ "storm_bird", "Storm Bird", "Uncommon", "bird", "4682B4", "FFFF00" },
+	{ "wind_spirit", "Wind Spirit", "Rare", "ghost", "E0FFFF", "AFEEEE" },
+	{ "thunder_dragon", "Thunder Dragon", "Epic", "dragon", "4169E1", "FFFF00" },
+	{ "celestial_unicorn", "Celestial Unicorn", "Legendary", "unicorn", "FFFFFF", "FFD700" },
+})
+
+-- المنطقة 8: الفضاء
+egg("GalaxyEgg", 8, 234375, {
+	{ "alien_blob", "Alien Blob", "Common", "alien", "7FFF00", "000000" },
+	{ "moon_cat", "Moon Cat", "Common", "cat", "C0C0C0", "FFFFE0" },
+	{ "rocket_dog", "Rocket Dog", "Uncommon", "dog", "FF4500", "C0C0C0" },
+	{ "nebula_fox", "Nebula Fox", "Rare", "fox", "8A2BE2", "FF69B4" },
+	{ "void_robot", "Void Robot", "Epic", "robot", "2F2F4F", "00FFFF" },
+	{ "cosmic_dragon", "Cosmic Dragon", "Legendary", "dragon", "191970", "FF00FF" },
+})
+
+-- المنطقة 9: قوس قزح
+egg("RainbowEgg", 9, 1171875, {
+	{ "rainbow_slime", "Rainbow Slime", "Common", "blob", "FF69B4", "00FFFF" },
+	{ "prism_cat", "Prism Cat", "Common", "cat", "FFFFFF", "FF00FF" },
+	{ "spectrum_bird", "Spectrum Bird", "Uncommon", "bird", "FF0000", "0000FF" },
+	{ "aurora_unicorn", "Aurora Unicorn", "Rare", "unicorn", "98FB98", "DA70D6" },
+	{ "chroma_dragon", "Chroma Dragon", "Epic", "dragon", "FF1493", "00FF7F" },
+	{ "hue_overlord", "Hue Overlord", "Legendary", "demon", "FFD700", "FF00FF" },
+})
+
+-- المنطقة 10: الفراغ
+egg("VoidEgg", 10, 5859375, {
+	{ "shadow_cat", "Shadow Cat", "Common", "cat", "1A1A1A", "8A2BE2" },
+	{ "dark_ghost", "Dark Ghost", "Common", "ghost", "2F2F2F", "9400D3" },
+	{ "void_demon", "Void Demon", "Uncommon", "demon", "0B0B0B", "FF00FF" },
+	{ "null_golem", "Null Golem", "Rare", "golem", "111111", "00FFFF" },
+	{ "eclipse_dragon", "Eclipse Dragon", "Epic", "dragon", "000000", "FF4500" },
+	{ "the_overlord", "The Overlord", "Legendary", "demon", "1C1C1C", "FF0000" },
+})
+
+egg("MythicEgg", 10, 25000000, {
+	{ "titan_dragon", "Titan Dragon", "Legendary", "dragon", "8B0000", "FFD700" },
+	{ "chaos_unicorn", "Chaos Unicorn", "Mythical", "unicorn", "000000", "FF00FF" },
+	{ "omega_robot", "Omega Robot", "Mythical", "robot", "FFD700", "00FFFF" },
+	{ "dominus_cat", "Dominus Cat", "Exclusive", "cat", "000000", "FFD700" },
+})
+
+-- بيضة VIP (متاحة فقط لأصحاب VIP)
+egg("VIPEgg", 3, 400, {
+	{ "vip_cat", "VIP Cat", "Rare", "cat", "FFD700", "FFFFFF" },
+	{ "vip_dog", "VIP Dog", "Rare", "dog", "FFD700", "8B4513" },
+	{ "royal_fox", "Royal Fox", "Epic", "fox", "800080", "FFD700" },
+	{ "golden_dragon", "Golden Dragon", "Legendary", "dragon", "FFD700", "FF4500" },
+	{ "emperor_unicorn", "Emperor Unicorn", "Mythical", "unicorn", "FFFFFF", "FFD700" },
+})
+
+-- حيوانات المكافآت (لا تخرج من البيض)
+egg("Rewards", 1, 60, {
+	{ "gift_bear", "Gift Bear", "Epic", "bear", "FF0000", "00FF00" },
+	{ "party_dog", "Party Dog", "Legendary", "dog", "FF69B4", "FFFF00" },
+})
+
+Pets.List = list
+Pets.ById = byId
+
+function Pets.Get(id: string): PetDef?
+	return byId[id]
+end
+
+return Pets
