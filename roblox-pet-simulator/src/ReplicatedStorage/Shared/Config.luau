@@ -107,7 +107,35 @@ Config.EggVariantCost = { Normal = 1, Golden = 5, Rainbow = 25 }
 
 -- مستويات الحيوانات
 Config.PetMaxLevel = 50
-Config.PetLevelPowerPerLevel = 0.02 -- +2% قوة لكل مستوى
+Config.PetLevelPowerPerLevel = 0.03 -- +3% قوة لكل مستوى
+-- معالم المستوى: تضاعف قدرة الحيوان الخاصة
+Config.PetLevelMilestones = { { Level = 10, Mult = 1.5 }, { Level = 25, Mult = 2 }, { Level = 50, Mult = 3 } }
+
+-- القدرات الخاصة: كل شكل حيوان له قدرة تقوى مع الندرة والمستوى
+-- Stat: Coins / Damage / Luck / Diamonds / Crit / XP / GemChance / Agility
+Config.Abilities = {
+	cat = { Name = "Coin Finder", Arabic = "جامع العملات", Icon = "💰", Stat = "Coins", Base = 0.04, Desc = "+{v}% عملات من كل صندوق" },
+	dog = { Name = "Loyal Fang", Arabic = "الناب الوفي", Icon = "🦴", Stat = "Damage", Base = 0.04, Desc = "+{v}% قوة لكل حيواناتك" },
+	bunny = { Name = "Lucky Paws", Arabic = "الأقدام المحظوظة", Icon = "🍀", Stat = "Luck", Base = 0.03, Desc = "+{v}% حظ في البيض" },
+	bear = { Name = "Heavy Hitter", Arabic = "الضارب الثقيل", Icon = "💥", Stat = "Crit", Base = 0.02, Desc = "+{v}% فرصة ضربة قاضية x3" },
+	fox = { Name = "Gem Seeker", Arabic = "باحث الجواهر", Icon = "💠", Stat = "GemChance", Base = 0.006, Desc = "+{v}% فرصة سقوط جوهرة من أي صندوق" },
+	dragon = { Name = "Inferno", Arabic = "الجحيم", Icon = "🔥", Stat = "Damage", Base = 0.06, Desc = "+{v}% قوة لكل حيواناتك" },
+	bird = { Name = "Diamond Eye", Arabic = "عين الألماس", Icon = "💎", Stat = "Diamonds", Base = 0.05, Desc = "+{v}% ألماس من البلورات" },
+	robot = { Name = "Overclock", Arabic = "التسريع", Icon = "📈", Stat = "XP", Base = 0.08, Desc = "+{v}% خبرة لكل حيواناتك" },
+	ghost = { Name = "Phantom Luck", Arabic = "حظ الأشباح", Icon = "👻", Stat = "Luck", Base = 0.04, Desc = "+{v}% حظ في البيض" },
+	fish = { Name = "Treasure Sense", Arabic = "حاسة الكنوز", Icon = "🐚", Stat = "Coins", Base = 0.05, Desc = "+{v}% عملات من كل صندوق" },
+	golem = { Name = "Fortress", Arabic = "الحصن", Icon = "🛡️", Stat = "Damage", Base = 0.05, Desc = "+{v}% قوة لكل حيواناتك" },
+	unicorn = { Name = "Blessing", Arabic = "البركة", Icon = "✨", Stat = "Luck", Base = 0.05, Desc = "+{v}% حظ في البيض" },
+	alien = { Name = "Probe", Arabic = "المسبار", Icon = "🛸", Stat = "GemChance", Base = 0.008, Desc = "+{v}% فرصة سقوط جوهرة من أي صندوق" },
+	demon = { Name = "Wrath", Arabic = "الغضب", Icon = "😈", Stat = "Crit", Base = 0.03, Desc = "+{v}% فرصة ضربة قاضية x3" },
+	blob = { Name = "Bounce", Arabic = "الارتداد", Icon = "🟢", Stat = "Coins", Base = 0.03, Desc = "+{v}% عملات من كل صندوق" },
+}
+Config.AbilityRarityMult = { Common = 1, Uncommon = 1.3, Rare = 1.7, Epic = 2.2, Legendary = 3, Mythical = 4, Exclusive = 5, Huge = 8, Titanic = 15 }
+Config.AbilityCaps = { Coins = 3, Damage = 3, Luck = 1.5, Diamonds = 2, Crit = 0.6, XP = 2, GemChance = 0.15, Agility = 20 }
+
+-- صرّاف الجواهر: شراء جواهر بالعملات بسعر يتصاعد مع تقدمك وبسقف يومي (لتبقى الجواهر نادرة)
+Config.GemExchange = { CoinsPerGem = 4000, DailyCap = 40 }
+Config.GemDropAmount = { 1, 2 }
 function Config.XPForLevel(level: number): number
 	return math.floor(12 * (level ^ 1.6))
 end

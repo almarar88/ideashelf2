@@ -664,7 +664,8 @@ local function buildIndexWindow()
 			UIKit.Stroke(card, Rarities.Color(def.Rarity), 2)
 			local vpHolder = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 96), BackgroundTransparency = 1, Parent = card })
 			local name = UIKit.Label({ Text = "???", Size = UDim2.new(1, -6, 0, 24), Position = UDim2.fromOffset(3, 98), MaxTextSize = 15, Parent = card })
-			UIKit.Label({ Text = def.Rarity, Size = UDim2.new(1, 0, 0, 16), Position = UDim2.fromOffset(0, 120), TextColor3 = Rarities.Color(def.Rarity), MaxTextSize = 13, Parent = card })
+			local ab = Config.Abilities[def.Shape]
+			UIKit.Label({ Text = (ab and (ab.Icon .. " ") or "") .. def.Rarity, Size = UDim2.new(1, 0, 0, 16), Position = UDim2.fromOffset(0, 120), TextColor3 = Rarities.Color(def.Rarity), MaxTextSize = 13, Parent = card })
 			cards[def.Id] = { Card = card, Vp = nil, Name = name }
 			cards[def.Id].Vp = PetViewport.Create(vpHolder, def.Id, "Normal")
 		end

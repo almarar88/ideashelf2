@@ -126,7 +126,35 @@ Config.EggVariantCost = { Normal = 1, Golden = 5, Rainbow = 25 }
 
 -- مستويات الحيوانات
 Config.PetMaxLevel = 50
-Config.PetLevelPowerPerLevel = 0.02 -- +2% قوة لكل مستوى
+Config.PetLevelPowerPerLevel = 0.03 -- +3% قوة لكل مستوى
+-- معالم المستوى: تضاعف قدرة الحيوان الخاصة
+Config.PetLevelMilestones = { { Level = 10, Mult = 1.5 }, { Level = 25, Mult = 2 }, { Level = 50, Mult = 3 } }
+
+-- القدرات الخاصة: كل شكل حيوان له قدرة تقوى مع الندرة والمستوى
+-- Stat: Coins / Damage / Luck / Diamonds / Crit / XP / GemChance / Agility
+Config.Abilities = {
+	cat = { Name = "Coin Finder", Arabic = "جامع العملات", Icon = "💰", Stat = "Coins", Base = 0.04, Desc = "+{v}% عملات من كل صندوق" },
+	dog = { Name = "Loyal Fang", Arabic = "الناب الوفي", Icon = "🦴", Stat = "Damage", Base = 0.04, Desc = "+{v}% قوة لكل حيواناتك" },
+	bunny = { Name = "Lucky Paws", Arabic = "الأقدام المحظوظة", Icon = "🍀", Stat = "Luck", Base = 0.03, Desc = "+{v}% حظ في البيض" },
+	bear = { Name = "Heavy Hitter", Arabic = "الضارب الثقيل", Icon = "💥", Stat = "Crit", Base = 0.02, Desc = "+{v}% فرصة ضربة قاضية x3" },
+	fox = { Name = "Gem Seeker", Arabic = "باحث الجواهر", Icon = "💠", Stat = "GemChance", Base = 0.006, Desc = "+{v}% فرصة سقوط جوهرة من أي صندوق" },
+	dragon = { Name = "Inferno", Arabic = "الجحيم", Icon = "🔥", Stat = "Damage", Base = 0.06, Desc = "+{v}% قوة لكل حيواناتك" },
+	bird = { Name = "Diamond Eye", Arabic = "عين الألماس", Icon = "💎", Stat = "Diamonds", Base = 0.05, Desc = "+{v}% ألماس من البلورات" },
+	robot = { Name = "Overclock", Arabic = "التسريع", Icon = "📈", Stat = "XP", Base = 0.08, Desc = "+{v}% خبرة لكل حيواناتك" },
+	ghost = { Name = "Phantom Luck", Arabic = "حظ الأشباح", Icon = "👻", Stat = "Luck", Base = 0.04, Desc = "+{v}% حظ في البيض" },
+	fish = { Name = "Treasure Sense", Arabic = "حاسة الكنوز", Icon = "🐚", Stat = "Coins", Base = 0.05, Desc = "+{v}% عملات من كل صندوق" },
+	golem = { Name = "Fortress", Arabic = "الحصن", Icon = "🛡️", Stat = "Damage", Base = 0.05, Desc = "+{v}% قوة لكل حيواناتك" },
+	unicorn = { Name = "Blessing", Arabic = "البركة", Icon = "✨", Stat = "Luck", Base = 0.05, Desc = "+{v}% حظ في البيض" },
+	alien = { Name = "Probe", Arabic = "المسبار", Icon = "🛸", Stat = "GemChance", Base = 0.008, Desc = "+{v}% فرصة سقوط جوهرة من أي صندوق" },
+	demon = { Name = "Wrath", Arabic = "الغضب", Icon = "😈", Stat = "Crit", Base = 0.03, Desc = "+{v}% فرصة ضربة قاضية x3" },
+	blob = { Name = "Bounce", Arabic = "الارتداد", Icon = "🟢", Stat = "Coins", Base = 0.03, Desc = "+{v}% عملات من كل صندوق" },
+}
+Config.AbilityRarityMult = { Common = 1, Uncommon = 1.3, Rare = 1.7, Epic = 2.2, Legendary = 3, Mythical = 4, Exclusive = 5, Huge = 8, Titanic = 15 }
+Config.AbilityCaps = { Coins = 3, Damage = 3, Luck = 1.5, Diamonds = 2, Crit = 0.6, XP = 2, GemChance = 0.15, Agility = 20 }
+
+-- صرّاف الجواهر: شراء جواهر بالعملات بسعر يتصاعد مع تقدمك وبسقف يومي (لتبقى الجواهر نادرة)
+Config.GemExchange = { CoinsPerGem = 4000, DailyCap = 40 }
+Config.GemDropAmount = { 1, 2 }
 function Config.XPForLevel(level: number): number
 	return math.floor(12 * (level ^ 1.6))
 end
@@ -2074,6 +2102,56 @@ function PetUtil.NextVariant(v: string): string?
 	return nil
 end
 
+-- القدرة الخاصة للحيوان وقيمتها الحالية
+function PetUtil.Ability(inst: PetInstance): (any?, number)
+	local def = Pets.Get(inst.Id)
+	if not def then
+		return nil, 0
+	end
+	local ab = Config.Abilities[def.Shape]
+	if not ab then
+		return nil, 0
+	end
+	local level = PetUtil.Level(inst)
+	local milestone = 1
+	for _, m in ipairs(Config.PetLevelMilestones) do
+		if level >= m.Level then
+			milestone = m.Mult
+		end
+	end
+	local value = ab.Base * (Config.AbilityRarityMult[def.Rarity] or 1) * (1 + (level - 1) / 25) * milestone
+	if inst.Shiny then
+		value *= 1.25
+	end
+	return ab, value
+end
+
+function PetUtil.AbilityText(inst: PetInstance): string
+	local ab, value = PetUtil.Ability(inst)
+	if not ab then
+		return ""
+	end
+	local shown = ab.Stat == "Agility" and string.format("%.1f", value) or string.format("%.1f", value * 100)
+	return ab.Icon .. " " .. ab.Arabic .. ": " .. (ab.Desc:gsub("{v}", shown))
+end
+
+-- مجموع القدرات للحيوانات المجهزة
+function PetUtil.AbilityBonuses(pets: { PetInstance }): { [string]: number }
+	local out = { Coins = 0, Damage = 0, Luck = 0, Diamonds = 0, Crit = 0, XP = 0, GemChance = 0, Agility = 0 }
+	for _, pet in ipairs(pets) do
+		if pet.Equipped then
+			local ab, value = PetUtil.Ability(pet)
+			if ab then
+				out[ab.Stat] = (out[ab.Stat] or 0) + value
+			end
+		end
+	end
+	for k, cap in pairs(Config.AbilityCaps) do
+		out[k] = math.min(out[k] or 0, cap)
+	end
+	return out
+end
+
 function PetUtil.XPToNext(level: number): number
 	return Config.XPForLevel(level)
 end
@@ -2536,15 +2614,20 @@ local function breakIt(b: Breakable)
 				end
 			end
 			local gems = 0
+			-- سقوط جواهر من قدرات الحيوانات (باحث الجواهر / المسبار)
+			local gemChance = DataService.Bonuses(player).GemChance or 0
+			if gemChance > 0 and not b.Boss and rng:NextNumber() < gemChance * share then
+				gems += rng:NextInteger(Config.GemDropAmount[1], Config.GemDropAmount[2])
+			end
 			if b.Def.Gems and b.Def.Gems > 0 then
 				local raw = b.Def.Gems * share
 				gems = math.floor(raw)
 				if rng:NextNumber() < (raw - gems) then
 					gems += 1
 				end
-				if gems > 0 then
-					DataService.AddGems(player, gems, true)
-				end
+			end
+			if gems > 0 then
+				DataService.AddGems(player, gems, true)
 			end
 			p.Stats.Breaks += 1
 			Hooks.Fire(player, "Break", 1)
@@ -3075,6 +3158,7 @@ export type Profile = {
 	RebirthUpgrades: { [string]: number },
 	Title: string,
 	Accessories: { [string]: number },
+	GemExchange: { Day: number, Count: number },
 	LastSeen: number,
 	DungeonCooldown: number,
 	IndexClaimed: { [string]: boolean },
@@ -3117,6 +3201,7 @@ local function template(): Profile
 		RebirthUpgrades = { RLuck = 0, RCoins = 0, REquip = 0, RStorage = 0, RDamage = 0 },
 		Title = "",
 		Accessories = {},
+		GemExchange = { Day = 0, Count = 0 },
 		LastSeen = 0,
 		DungeonCooldown = 0,
 		IndexClaimed = {},
@@ -3410,7 +3495,7 @@ end
 -- ===== المضاعفات =====
 local function bonuses(player: Player): { [string]: number }
 	local p = profiles[player]
-	local out = { Coins = 0, Luck = 0, Damage = 0, Diamonds = 0, XP = 0, Crit = 0, Agility = 0, EventCoins = 1, EventLuck = 1, EventDiamonds = 1, EventXP = 1 }
+	local out = { Coins = 0, Luck = 0, Damage = 0, Diamonds = 0, XP = 0, Crit = 0, Agility = 0, GemChance = 0, EventCoins = 1, EventLuck = 1, EventDiamonds = 1, EventXP = 1 }
 	if not p then
 		return out
 	end
@@ -5946,6 +6031,54 @@ function MarketService.NPCValue(pet: any): number
 	return math.floor((Config.Market.NPCValue[def.Rarity] or 1) * (Config.VariantMultipliers[pet.Variant] or 1) * (1 + (pet.Level or 1) / 50))
 end
 
+local function exchange(player: Player, payload: any)
+	local p = DataService.Get(player) :: DataService.Profile
+	local amount = math.floor(tonumber(payload.Amount) or 0)
+	if amount < 1 then
+		return fail("أدخل عدداً صحيحاً")
+	end
+	local day = math.floor(os.time() / 86400)
+	if p.GemExchange.Day ~= day then
+		p.GemExchange = { Day = day, Count = 0 }
+	end
+	if p.GemExchange.Count + amount > Config.GemExchange.DailyCap then
+		return fail("السقف اليومي " .. Config.GemExchange.DailyCap .. " جوهرة (تبقى " .. (Config.GemExchange.DailyCap - p.GemExchange.Count) .. ")")
+	end
+	local Zones = require(Shared.Data.Zones)
+	local best = 1
+	for k in pairs(p.UnlockedZones) do
+		local z = Zones.Get(tonumber(k) or 1)
+		if z then
+			best = math.max(best, z.Multiplier)
+		end
+	end
+	local price = Config.GemExchange.CoinsPerGem * best * amount
+	if not DataService.Spend(player, "Coins", price) then
+		return fail("تحتاج 💰 " .. price)
+	end
+	p.GemExchange.Count += amount
+	DataService.AddGems(player, amount, false)
+	DataService.MarkDirty(player)
+	DataService.Notify(player, "💠 اشتريت " .. amount .. " جوهرة", Color3.fromRGB(180, 120, 255))
+	return { ok = true }
+end
+
+function MarketService.ExchangePrice(player: Player): number
+	local p = DataService.Get(player)
+	if not p then
+		return 0
+	end
+	local Zones = require(Shared.Data.Zones)
+	local best = 1
+	for k in pairs(p.UnlockedZones) do
+		local z = Zones.Get(tonumber(k) or 1)
+		if z then
+			best = math.max(best, z.Multiplier)
+		end
+	end
+	return Config.GemExchange.CoinsPerGem * best
+end
+
 local function claimBooth(player: Player, payload: any)
 	local idx = math.floor(tonumber(payload.BoothId) or 0)
 	local booth = MapBuilder.Booths[idx]
@@ -6011,6 +6144,8 @@ function MarketService.Handle(player: Player, action: string, payload: any): any
 		return sellNPC(player, payload)
 	elseif action == "Booth" then
 		return claimBooth(player, payload)
+	elseif action == "Exchange" then
+		return exchange(player, payload)
 	elseif action == "Reconcile" then
 		reconcile(player)
 		return { ok = true }
@@ -6022,6 +6157,9 @@ function MarketService.Init()
 	Remotes.Function("Market").OnServerInvoke = function(player, action, payload)
 		return MarketService.Handle(player, tostring(action), payload)
 	end
+	table.insert(DataService.Extenders, function(player, payload)
+		payload.GemPrice = MarketService.ExchangePrice(player)
+	end)
 	DataService.Loaded:Connect(function(player)
 		task.delay(3, function()
 			if player.Parent == Players then
@@ -6894,6 +7032,8 @@ function PetService.Init()
 		payload.EquipCap = PetService.EquipCapacity(player)
 		payload.Power = PetService.GetPower(player)
 		payload.Enchants = PetUtil.EnchantBonuses(payload.Pets)
+		payload.Abilities = PetUtil.AbilityBonuses(payload.Pets)
+		payload.GemChance = DataService.Bonuses(player).GemChance or 0
 	end)
 	table.insert(DataService.BonusProviders, function(player)
 		local p = DataService.Get(player)
@@ -6901,6 +7041,13 @@ function PetService.Init()
 			return nil
 		end
 		return PetUtil.EnchantBonuses(p.Pets)
+	end)
+	table.insert(DataService.BonusProviders, function(player)
+		local p = DataService.Get(player)
+		if not p then
+			return nil
+		end
+		return PetUtil.AbilityBonuses(p.Pets)
 	end)
 end
 
@@ -7706,6 +7853,7 @@ type Trade = {
 	A: Player,
 	B: Player,
 	Offers: { [Player]: { string } },
+	Gems: { [Player]: number },
 	Confirmed: { [Player]: boolean },
 	Countdown: number?,
 	Token: number,
@@ -7741,6 +7889,8 @@ local function broadcast(t: Trade)
 			Partner = { Name = o.Name, UserId = o.UserId, DisplayName = o.DisplayName },
 			MyOffer = petsFor(player, t.Offers[player]),
 			TheirOffer = petsFor(o, t.Offers[o]),
+			MyGems = t.Gems[player] or 0,
+			TheirGems = t.Gems[o] or 0,
 			MyConfirmed = t.Confirmed[player],
 			TheirConfirmed = t.Confirmed[o],
 			Countdown = t.Countdown,
@@ -7788,6 +7938,15 @@ local function execute(t: Trade)
 		cancel(t, "مخزن " .. t.B.Name .. " ممتلئ")
 		return
 	end
+	local gA, gB = t.Gems[t.A] or 0, t.Gems[t.B] or 0
+	if pa.Gems < gA or pb.Gems < gB then
+		cancel(t, "أحد الطرفين لا يملك الجواهر المعروضة")
+		return
+	end
+	pa.Gems -= gA
+	pb.Gems += gA
+	pb.Gems -= gB
+	pa.Gems += gB
 	local movedA, movedB = {}, {}
 	for _, uid in ipairs(t.Offers[t.A]) do
 		table.insert(movedA, PetService.Remove(pa, uid))
@@ -7878,7 +8037,7 @@ function TradeService.Init()
 			end
 			return
 		end
-		local t: Trade = { A = requester, B = player, Offers = { [requester] = {}, [player] = {} }, Confirmed = { [requester] = false, [player] = false }, Countdown = nil, Token = 0 }
+		local t: Trade = { A = requester, B = player, Offers = { [requester] = {}, [player] = {} }, Gems = { [requester] = 0, [player] = 0 }, Confirmed = { [requester] = false, [player] = false }, Countdown = nil, Token = 0 }
 		trades[requester] = t
 		trades[player] = t
 		broadcast(t)
@@ -7908,6 +8067,15 @@ function TradeService.Init()
 				table.remove(t.Offers[player], idx)
 				resetConfirm(t)
 			end
+		elseif action == "SetGems" then
+			local p = DataService.Get(player)
+			local amount = math.floor(tonumber(payload.Amount) or 0)
+			if not p or amount < 0 or amount > p.Gems then
+				DataService.Notify(player, "لا تملك هذا العدد من الجواهر", Color3.fromRGB(255, 120, 120))
+				return
+			end
+			t.Gems[player] = amount
+			resetConfirm(t)
 		elseif action == "Confirm" then
 			t.Confirmed[player] = not t.Confirmed[player]
 			t.Countdown = nil
@@ -9462,6 +9630,10 @@ function InventoryUI.PetCard(parent: Instance, pet: any, onClick: (() -> ())?): 
 	if pet.Shiny then
 		UIKit.Label({ Name = "Shiny", Text = "✨", Size = UDim2.fromOffset(22, 22), Position = UDim2.fromOffset(4, 28), MaxTextSize = 16, Parent = card })
 	end
+	local ab = PetUtil.Ability(pet)
+	if ab then
+		UIKit.Label({ Name = "Ability", Text = ab.Icon, Size = UDim2.fromOffset(22, 22), Position = UDim2.new(1, -26, 0, 28), MaxTextSize = 16, Parent = card })
+	end
 	if pet.Variant == "Golden" then
 		UIKit.Gradient(card, Color3.fromRGB(80, 70, 30), UIKit.Colors.Panel)
 	elseif pet.Variant == "Rainbow" then
@@ -9554,6 +9726,7 @@ function InventoryUI.Init()
 	local dPower = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 22), TextColor3 = UIKit.Colors.Pink, MaxTextSize = 18, Parent = details })
 	local dLevel = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 18), TextColor3 = UIKit.Colors.Cyan, MaxTextSize = 15, Parent = details })
 	local _, xpFill, xpLabel = UIKit.ProgressBar(details, UIKit.Colors.Cyan, UDim2.new(1, 0, 0, 14))
+	local dAbility = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 44), TextColor3 = UIKit.Colors.Gold, TextYAlignment = Enum.TextYAlignment.Top, MaxTextSize = 14, Parent = details })
 	local dEnch = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 60), TextColor3 = UIKit.Colors.Green, TextYAlignment = Enum.TextYAlignment.Top, MaxTextSize = 14, Parent = details })
 	local nickBox = UIKit.New("TextBox", { Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = Color3.fromRGB(15, 16, 28), PlaceholderText = "✏️ اسم مستعار (Enter)", Text = "", Font = UIKit.Font, TextColor3 = UIKit.Colors.Text, TextSize = 15, ClearTextOnFocus = false, Parent = details }) :: TextBox
 	UIKit.Corner(nickBox, 8)
@@ -9609,7 +9782,15 @@ function InventoryUI.Init()
 		dRarity.TextColor3 = Rarities.Color(def.Rarity)
 		dPower.Text = "⚔️ القوة: " .. Format.Number(PetUtil.BasePower(pet))
 		local level = pet.Level or 1
-		dLevel.Text = "المستوى " .. level .. " / 50   (+" .. math.floor((level - 1) * 2) .. "% قوة)"
+		dLevel.Text = "المستوى " .. level .. " / 50   (+" .. math.floor((level - 1) * Config.PetLevelPowerPerLevel * 100 + 0.5) .. "% قوة)"
+		local nextMilestone
+		for _, m in ipairs(Config.PetLevelMilestones) do
+			if level < m.Level then
+				nextMilestone = m
+				break
+			end
+		end
+		dAbility.Text = PetUtil.AbilityText(pet) .. (nextMilestone and ("\n⬆️ عند المستوى " .. nextMilestone.Level .. ": القدرة x" .. nextMilestone.Mult) or "\n🏆 القدرة في أقصى قوتها")
 		local needed = PetUtil.XPToNext(level)
 		if level >= 50 then
 			xpFill.Size = UDim2.fromScale(1, 1)
@@ -10193,6 +10374,7 @@ local browseSearch = ""
 local sellUid: string? = nil
 local npcSelected: { [string]: boolean } = {}
 local cachedListings: { any } = {}
+local renderExchange: () -> () = function() end
 
 local function npcValue(pet: any): number
 	local def = Pets.Get(pet.Id)
@@ -10399,6 +10581,8 @@ function MarketUI.Refresh(force: boolean?)
 		renderSell()
 	elseif currentTab == "NPC" then
 		renderNPC()
+	elseif currentTab == "Exchange" then
+		renderExchange()
 	end
 end
 
@@ -10408,8 +10592,8 @@ function MarketUI.Init()
 
 	local tabs = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, Parent = w.Content })
 	UIKit.List(tabs, 6, true, true)
-	for _, info in ipairs({ { "Browse", "🔎 تصفح" }, { "Mine", "📦 عروضي" }, { "Sell", "💠 بيع في السوق" }, { "NPC", "🐾 بيع للتاجر" } }) do
-		tabButtons[info[1]] = UIKit.Button({ Text = info[2], Color = UIKit.Colors.Panel3, Size = UDim2.fromOffset(200, 40), MaxTextSize = 17, Parent = tabs }, function()
+	for _, info in ipairs({ { "Browse", "🔎 تصفح" }, { "Mine", "📦 عروضي" }, { "Sell", "💠 بيع في السوق" }, { "NPC", "🐾 بيع للتاجر" }, { "Exchange", "🏦 صرّاف" } }) do
+		tabButtons[info[1]] = UIKit.Button({ Text = info[2], Color = UIKit.Colors.Panel3, Size = UDim2.fromOffset(165, 40), MaxTextSize = 16, Parent = tabs }, function()
 			sellerFilter = nil
 			showTab(info[1])
 			MarketUI.Refresh()
@@ -10440,7 +10624,7 @@ function MarketUI.Init()
 	end)
 	local filterLabel = UIKit.Label({ Text = "", Size = UDim2.fromOffset(300, 36), Position = UDim2.new(1, -300, 0, 0), TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = UIKit.Colors.Muted, MaxTextSize = 15, Parent = browseHeader })
 
-	for _, name in ipairs({ "Browse", "Mine", "Sell", "NPC" }) do
+	for _, name in ipairs({ "Browse", "Mine", "Sell", "NPC", "Exchange" }) do
 		local top = (name == "Browse" or name == "Sell" or name == "NPC") and 96 or 52
 		pages[name] = UIKit.Scroll(w.Content, { Size = UDim2.new(1, name == "Sell" and -280 or 0, 1, -top), Position = UDim2.fromOffset(0, top), Visible = false })
 		UIKit.Grid(pages[name], UDim2.fromOffset(150, 190), 8)
@@ -10470,6 +10654,39 @@ function MarketUI.Init()
 		end
 	end)
 	UIKit.Label({ Text = "💡 العروض تظهر لكل السيرفرات لمدة 3 أيام. احجز كشكاً في السوق ليجدك اللاعبون بسهولة.", Size = UDim2.new(1, 0, 0, 70), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 13, TextYAlignment = Enum.TextYAlignment.Top, Parent = sellPanel })
+
+	-- الصرّاف
+	local exPanel = UIKit.Frame({ Size = UDim2.fromOffset(460, 300), Position = UDim2.new(0.5, -230, 0, 110), BackgroundColor3 = UIKit.Colors.Panel2, Visible = false, Parent = w.Content })
+	UIKit.Corner(exPanel, 14)
+	UIKit.Padding(exPanel, 14)
+	UIKit.List(exPanel, 10)
+	UIKit.Label({ Text = "🏦 الصرّاف: اشترِ جواهر بالعملات", Size = UDim2.new(1, 0, 0, 34), MaxTextSize = 22, Parent = exPanel })
+	local exInfo = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 70), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 15, TextYAlignment = Enum.TextYAlignment.Top, Parent = exPanel })
+	local exBox = UIKit.New("TextBox", { Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = Color3.fromRGB(15, 16, 28), PlaceholderText = "عدد الجواهر", Text = "", Font = UIKit.Font, TextColor3 = UIKit.Colors.Text, TextSize = 20, ClearTextOnFocus = false, Parent = exPanel }) :: TextBox
+	UIKit.Corner(exBox, 8)
+	local exTotal = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 28), TextColor3 = UIKit.Colors.Gold, MaxTextSize = 18, Parent = exPanel })
+	exBox:GetPropertyChangedSignal("Text"):Connect(function()
+		local p = DataController.Profile
+		local n = tonumber(exBox.Text) or 0
+		exTotal.Text = p and ("الإجمالي: 💰 " .. Format.Number(n * (p.GemPrice or 0))) or ""
+	end)
+	UIKit.Button({ Text = "💠 شراء", Color = UIKit.Colors.Green, Size = UDim2.new(1, 0, 0, 44), MaxTextSize = 20, Parent = exPanel }, function()
+		local res = Remotes.Function("Market"):InvokeServer("Exchange", { Amount = tonumber(exBox.Text) or 0 })
+		if not res.ok and res.error then
+			UIController.Notify(res.error, UIKit.Colors.Red)
+		else
+			exBox.Text = ""
+		end
+	end)
+	renderExchange = function()
+		local p = DataController.Profile
+		if not p then
+			return
+		end
+		local day = math.floor(DataController.ServerTime() / 86400)
+		local used = (p.GemExchange and p.GemExchange.Day == day) and p.GemExchange.Count or 0
+		exInfo.Text = "السعر الحالي: 💰 " .. Format.Number(p.GemPrice or 0) .. " لكل جوهرة (يرتفع مع أعلى منطقة فتحتها)\nالسقف اليومي: " .. used .. " / " .. Config.GemExchange.DailyCap .. "\nالجواهر أندر من العملات: مصادرها الصناديق في السوق، قدرة \"باحث الجواهر\"، الزعماء، الزنزانة، وبيع الحيوانات."
+	end
 
 	-- التاجر: شريط
 	local npcBar = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 50), BackgroundTransparency = 1, Visible = false, Parent = w.Content })
@@ -10507,6 +10724,7 @@ function MarketUI.Init()
 		browseHeader.Visible = currentTab == "Browse"
 		sellPanel.Visible = currentTab == "Sell"
 		npcBar.Visible = currentTab == "NPC"
+		exPanel.Visible = currentTab == "Exchange"
 		filterLabel.Text = sellerFilter and "عرض كشك بائع محدد" or ""
 		MarketUI.Refresh()
 	end
@@ -10516,6 +10734,7 @@ function MarketUI.Init()
 		browseHeader.Visible = name == "Browse"
 		sellPanel.Visible = name == "Sell"
 		npcBar.Visible = name == "NPC"
+		exPanel.Visible = name == "Exchange"
 		filterLabel.Text = sellerFilter and "عرض كشك بائع محدد" or ""
 	end
 	showTab("Browse")
@@ -11422,7 +11641,7 @@ function StatsUI.Init()
 	end
 
 	-- المضاعفات
-	local mult = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 96), BackgroundColor3 = UIKit.Colors.Panel2, Parent = scroll })
+	local mult = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 120), BackgroundColor3 = UIKit.Colors.Panel2, Parent = scroll })
 	UIKit.Corner(mult, 14)
 	local multLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, -20, 1, -8), Position = UDim2.fromOffset(12, 4), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, MaxTextSize = 17, Parent = mult })
 
@@ -11469,9 +11688,11 @@ function StatsUI.Init()
 		local can = p.Coins >= cost and p.UnlockedZones[tostring(Config.Rebirth.RequiredZone)]
 		rbBtn.Text = "ريبيرث #" .. next
 		rbBtn.BackgroundColor3 = can and Color3.fromRGB(255, 140, 60) or UIKit.Colors.Panel3
-		multLabel.Text = string.format("💰 عملات x%.2f    🍀 حظ x%.2f    ⚔️ قوة x%.2f    💎 ألماس x%.2f\n🔁 ريبيرث: %d    🔧 إنشانت: عملات +%d%% / قوة +%d%% / حظ +%d%% / قاضية %d%%",
-			p.CoinMult or 1, p.Luck or 1, p.DamageMult or 1, p.DiamondMult or 1, p.Rebirths or 0,
-			math.floor(((p.Enchants and p.Enchants.Coins) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Damage) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Luck) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Crit) or 0) * 100))
+		local ab = p.Abilities or {}
+		multLabel.Text = string.format("💰 عملات x%.2f    🍀 حظ x%.2f    ⚔️ قوة x%.2f    💎 ألماس x%.2f    💠 فرصة جوهرة %.1f%%\n🔁 ريبيرث: %d    🔧 إنشانت: عملات +%d%% / قوة +%d%% / حظ +%d%% / قاضية %d%%\n🐾 قدرات الحيوانات: عملات +%d%% / قوة +%d%% / حظ +%d%% / ألماس +%d%% / قاضية +%d%% / خبرة +%d%%",
+			p.CoinMult or 1, p.Luck or 1, p.DamageMult or 1, p.DiamondMult or 1, (p.GemChance or 0) * 100, p.Rebirths or 0,
+			math.floor(((p.Enchants and p.Enchants.Coins) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Damage) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Luck) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Crit) or 0) * 100),
+			math.floor((ab.Coins or 0) * 100), math.floor((ab.Damage or 0) * 100), math.floor((ab.Luck or 0) * 100), math.floor((ab.Diamonds or 0) * 100), math.floor((ab.Crit or 0) * 100), math.floor((ab.XP or 0) * 100))
 		for _, u in ipairs(Config.RebirthShop) do
 			local row = shopRows[u.Key]
 			local level = (p.RebirthUpgrades and p.RebirthUpgrades[u.Key]) or 0
@@ -11545,6 +11766,8 @@ local theirGrid: ScrollingFrame
 local invGrid: ScrollingFrame
 local statusLabel: TextLabel
 local confirmBtn: TextButton
+local myGemsBox: TextBox
+local theirGemsLabel: TextLabel
 local partnerLabel: TextLabel
 
 local function clear(parent: Instance)
@@ -11588,6 +11811,10 @@ local function refreshTrade()
 			end
 		end
 	end
+	if not myGemsBox:IsFocused() then
+		myGemsBox.Text = tostring(state.MyGems or 0)
+	end
+	theirGemsLabel.Text = "💠 " .. (state.TheirGems or 0) .. " جوهرة"
 	local mine, theirs = state.MyConfirmed, state.TheirConfirmed
 	if state.Countdown then
 		statusLabel.Text = "⏳ يتم التبادل خلال " .. state.Countdown .. "..."
@@ -11634,12 +11861,18 @@ function TradeUI.Init()
 	partnerLabel = tradeWindow.Title
 	local left = UIKit.Frame({ Size = UDim2.new(0.5, -6, 0, 250), BackgroundColor3 = UIKit.Colors.Panel2, Parent = tradeWindow.Content })
 	UIKit.Corner(left, 12)
-	UIKit.Label({ Text = "عرضي", Size = UDim2.new(1, 0, 0, 26), MaxTextSize = 18, Parent = left })
+	UIKit.Label({ Text = "عرضي", Size = UDim2.new(0.5, 0, 0, 26), MaxTextSize = 18, Parent = left })
+	myGemsBox = UIKit.New("TextBox", { Size = UDim2.new(0.5, -8, 0, 26), Position = UDim2.new(0.5, 4, 0, 0), BackgroundColor3 = Color3.fromRGB(15, 16, 28), PlaceholderText = "💠 جواهر تعرضها", Text = "0", Font = UIKit.Font, TextColor3 = Color3.fromRGB(200, 140, 255), TextSize = 16, ClearTextOnFocus = false, Parent = left }) :: TextBox
+	UIKit.Corner(myGemsBox, 8)
+	myGemsBox.FocusLost:Connect(function()
+		Remotes.Event("TradeAction"):FireServer("SetGems", { Amount = tonumber(myGemsBox.Text) or 0 })
+	end)
 	myGrid = UIKit.Scroll(left, { Size = UDim2.new(1, -8, 1, -30), Position = UDim2.fromOffset(4, 28) })
 	UIKit.Grid(myGrid, UDim2.fromOffset(100, 118), 6)
 	local right = UIKit.Frame({ Size = UDim2.new(0.5, -6, 0, 250), Position = UDim2.new(0.5, 6, 0, 0), BackgroundColor3 = UIKit.Colors.Panel2, Parent = tradeWindow.Content })
 	UIKit.Corner(right, 12)
-	UIKit.Label({ Text = "عرض الطرف الآخر", Size = UDim2.new(1, 0, 0, 26), MaxTextSize = 18, Parent = right })
+	UIKit.Label({ Text = "عرض الطرف الآخر", Size = UDim2.new(0.5, 0, 0, 26), MaxTextSize = 18, Parent = right })
+	theirGemsLabel = UIKit.Label({ Text = "💠 0", Size = UDim2.new(0.5, -8, 0, 26), Position = UDim2.new(0.5, 4, 0, 0), TextColor3 = Color3.fromRGB(200, 140, 255), MaxTextSize = 16, Parent = right })
 	theirGrid = UIKit.Scroll(right, { Size = UDim2.new(1, -8, 1, -30), Position = UDim2.fromOffset(4, 28) })
 	UIKit.Grid(theirGrid, UDim2.fromOffset(100, 118), 6)
 	statusLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, -240, 0, 40), Position = UDim2.fromOffset(0, 256), MaxTextSize = 18, Parent = tradeWindow.Content })
@@ -12365,7 +12598,8 @@ local function buildIndexWindow()
 			UIKit.Stroke(card, Rarities.Color(def.Rarity), 2)
 			local vpHolder = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 96), BackgroundTransparency = 1, Parent = card })
 			local name = UIKit.Label({ Text = "???", Size = UDim2.new(1, -6, 0, 24), Position = UDim2.fromOffset(3, 98), MaxTextSize = 15, Parent = card })
-			UIKit.Label({ Text = def.Rarity, Size = UDim2.new(1, 0, 0, 16), Position = UDim2.fromOffset(0, 120), TextColor3 = Rarities.Color(def.Rarity), MaxTextSize = 13, Parent = card })
+			local ab = Config.Abilities[def.Shape]
+			UIKit.Label({ Text = (ab and (ab.Icon .. " ") or "") .. def.Rarity, Size = UDim2.new(1, 0, 0, 16), Position = UDim2.fromOffset(0, 120), TextColor3 = Rarities.Color(def.Rarity), MaxTextSize = 13, Parent = card })
 			cards[def.Id] = { Card = card, Vp = nil, Name = name }
 			cards[def.Id].Vp = PetViewport.Create(vpHolder, def.Id, "Normal")
 		end

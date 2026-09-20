@@ -17,6 +17,7 @@ type Trade = {
 	A: Player,
 	B: Player,
 	Offers: { [Player]: { string } },
+	Gems: { [Player]: number },
 	Confirmed: { [Player]: boolean },
 	Countdown: number?,
 	Token: number,
@@ -52,6 +53,8 @@ local function broadcast(t: Trade)
 			Partner = { Name = o.Name, UserId = o.UserId, DisplayName = o.DisplayName },
 			MyOffer = petsFor(player, t.Offers[player]),
 			TheirOffer = petsFor(o, t.Offers[o]),
+			MyGems = t.Gems[player] or 0,
+			TheirGems = t.Gems[o] or 0,
 			MyConfirmed = t.Confirmed[player],
 			TheirConfirmed = t.Confirmed[o],
 			Countdown = t.Countdown,
@@ -99,6 +102,15 @@ local function execute(t: Trade)
 		cancel(t, "مخزن " .. t.B.Name .. " ممتلئ")
 		return
 	end
+	local gA, gB = t.Gems[t.A] or 0, t.Gems[t.B] or 0
+	if pa.Gems < gA or pb.Gems < gB then
+		cancel(t, "أحد الطرفين لا يملك الجواهر المعروضة")
+		return
+	end
+	pa.Gems -= gA
+	pb.Gems += gA
+	pb.Gems -= gB
+	pa.Gems += gB
 	local movedA, movedB = {}, {}
 	for _, uid in ipairs(t.Offers[t.A]) do
 		table.insert(movedA, PetService.Remove(pa, uid))
@@ -189,7 +201,7 @@ function TradeService.Init()
 			end
 			return
 		end
-		local t: Trade = { A = requester, B = player, Offers = { [requester] = {}, [player] = {} }, Confirmed = { [requester] = false, [player] = false }, Countdown = nil, Token = 0 }
+		local t: Trade = { A = requester, B = player, Offers = { [requester] = {}, [player] = {} }, Gems = { [requester] = 0, [player] = 0 }, Confirmed = { [requester] = false, [player] = false }, Countdown = nil, Token = 0 }
 		trades[requester] = t
 		trades[player] = t
 		broadcast(t)
@@ -219,6 +231,15 @@ function TradeService.Init()
 				table.remove(t.Offers[player], idx)
 				resetConfirm(t)
 			end
+		elseif action == "SetGems" then
+			local p = DataService.Get(player)
+			local amount = math.floor(tonumber(payload.Amount) or 0)
+			if not p or amount < 0 or amount > p.Gems then
+				DataService.Notify(player, "لا تملك هذا العدد من الجواهر", Color3.fromRGB(255, 120, 120))
+				return
+			end
+			t.Gems[player] = amount
+			resetConfirm(t)
 		elseif action == "Confirm" then
 			t.Confirmed[player] = not t.Confirmed[player]
 			t.Countdown = nil

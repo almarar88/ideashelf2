@@ -541,6 +541,8 @@ function PetService.Init()
 		payload.EquipCap = PetService.EquipCapacity(player)
 		payload.Power = PetService.GetPower(player)
 		payload.Enchants = PetUtil.EnchantBonuses(payload.Pets)
+		payload.Abilities = PetUtil.AbilityBonuses(payload.Pets)
+		payload.GemChance = DataService.Bonuses(player).GemChance or 0
 	end)
 	table.insert(DataService.BonusProviders, function(player)
 		local p = DataService.Get(player)
@@ -548,6 +550,13 @@ function PetService.Init()
 			return nil
 		end
 		return PetUtil.EnchantBonuses(p.Pets)
+	end)
+	table.insert(DataService.BonusProviders, function(player)
+		local p = DataService.Get(player)
+		if not p then
+			return nil
+		end
+		return PetUtil.AbilityBonuses(p.Pets)
 	end)
 end
 

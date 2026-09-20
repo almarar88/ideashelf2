@@ -153,15 +153,20 @@ local function breakIt(b: Breakable)
 				end
 			end
 			local gems = 0
+			-- سقوط جواهر من قدرات الحيوانات (باحث الجواهر / المسبار)
+			local gemChance = DataService.Bonuses(player).GemChance or 0
+			if gemChance > 0 and not b.Boss and rng:NextNumber() < gemChance * share then
+				gems += rng:NextInteger(Config.GemDropAmount[1], Config.GemDropAmount[2])
+			end
 			if b.Def.Gems and b.Def.Gems > 0 then
 				local raw = b.Def.Gems * share
 				gems = math.floor(raw)
 				if rng:NextNumber() < (raw - gems) then
 					gems += 1
 				end
-				if gems > 0 then
-					DataService.AddGems(player, gems, true)
-				end
+			end
+			if gems > 0 then
+				DataService.AddGems(player, gems, true)
 			end
 			p.Stats.Breaks += 1
 			Hooks.Fire(player, "Break", 1)

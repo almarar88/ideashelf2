@@ -73,6 +73,56 @@ function PetUtil.NextVariant(v: string): string?
 	return nil
 end
 
+-- القدرة الخاصة للحيوان وقيمتها الحالية
+function PetUtil.Ability(inst: PetInstance): (any?, number)
+	local def = Pets.Get(inst.Id)
+	if not def then
+		return nil, 0
+	end
+	local ab = Config.Abilities[def.Shape]
+	if not ab then
+		return nil, 0
+	end
+	local level = PetUtil.Level(inst)
+	local milestone = 1
+	for _, m in ipairs(Config.PetLevelMilestones) do
+		if level >= m.Level then
+			milestone = m.Mult
+		end
+	end
+	local value = ab.Base * (Config.AbilityRarityMult[def.Rarity] or 1) * (1 + (level - 1) / 25) * milestone
+	if inst.Shiny then
+		value *= 1.25
+	end
+	return ab, value
+end
+
+function PetUtil.AbilityText(inst: PetInstance): string
+	local ab, value = PetUtil.Ability(inst)
+	if not ab then
+		return ""
+	end
+	local shown = ab.Stat == "Agility" and string.format("%.1f", value) or string.format("%.1f", value * 100)
+	return ab.Icon .. " " .. ab.Arabic .. ": " .. (ab.Desc:gsub("{v}", shown))
+end
+
+-- مجموع القدرات للحيوانات المجهزة
+function PetUtil.AbilityBonuses(pets: { PetInstance }): { [string]: number }
+	local out = { Coins = 0, Damage = 0, Luck = 0, Diamonds = 0, Crit = 0, XP = 0, GemChance = 0, Agility = 0 }
+	for _, pet in ipairs(pets) do
+		if pet.Equipped then
+			local ab, value = PetUtil.Ability(pet)
+			if ab then
+				out[ab.Stat] = (out[ab.Stat] or 0) + value
+			end
+		end
+	end
+	for k, cap in pairs(Config.AbilityCaps) do
+		out[k] = math.min(out[k] or 0, cap)
+	end
+	return out
+end
+
 function PetUtil.XPToNext(level: number): number
 	return Config.XPForLevel(level)
 end

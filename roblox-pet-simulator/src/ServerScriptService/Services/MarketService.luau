@@ -334,6 +334,54 @@ function MarketService.NPCValue(pet: any): number
 	return math.floor((Config.Market.NPCValue[def.Rarity] or 1) * (Config.VariantMultipliers[pet.Variant] or 1) * (1 + (pet.Level or 1) / 50))
 end
 
+local function exchange(player: Player, payload: any)
+	local p = DataService.Get(player) :: DataService.Profile
+	local amount = math.floor(tonumber(payload.Amount) or 0)
+	if amount < 1 then
+		return fail("أدخل عدداً صحيحاً")
+	end
+	local day = math.floor(os.time() / 86400)
+	if p.GemExchange.Day ~= day then
+		p.GemExchange = { Day = day, Count = 0 }
+	end
+	if p.GemExchange.Count + amount > Config.GemExchange.DailyCap then
+		return fail("السقف اليومي " .. Config.GemExchange.DailyCap .. " جوهرة (تبقى " .. (Config.GemExchange.DailyCap - p.GemExchange.Count) .. ")")
+	end
+	local Zones = require(Shared.Data.Zones)
+	local best = 1
+	for k in pairs(p.UnlockedZones) do
+		local z = Zones.Get(tonumber(k) or 1)
+		if z then
+			best = math.max(best, z.Multiplier)
+		end
+	end
+	local price = Config.GemExchange.CoinsPerGem * best * amount
+	if not DataService.Spend(player, "Coins", price) then
+		return fail("تحتاج 💰 " .. price)
+	end
+	p.GemExchange.Count += amount
+	DataService.AddGems(player, amount, false)
+	DataService.MarkDirty(player)
+	DataService.Notify(player, "💠 اشتريت " .. amount .. " جوهرة", Color3.fromRGB(180, 120, 255))
+	return { ok = true }
+end
+
+function MarketService.ExchangePrice(player: Player): number
+	local p = DataService.Get(player)
+	if not p then
+		return 0
+	end
+	local Zones = require(Shared.Data.Zones)
+	local best = 1
+	for k in pairs(p.UnlockedZones) do
+		local z = Zones.Get(tonumber(k) or 1)
+		if z then
+			best = math.max(best, z.Multiplier)
+		end
+	end
+	return Config.GemExchange.CoinsPerGem * best
+end
+
 local function claimBooth(player: Player, payload: any)
 	local idx = math.floor(tonumber(payload.BoothId) or 0)
 	local booth = MapBuilder.Booths[idx]
@@ -399,6 +447,8 @@ function MarketService.Handle(player: Player, action: string, payload: any): any
 		return sellNPC(player, payload)
 	elseif action == "Booth" then
 		return claimBooth(player, payload)
+	elseif action == "Exchange" then
+		return exchange(player, payload)
 	elseif action == "Reconcile" then
 		reconcile(player)
 		return { ok = true }
@@ -410,6 +460,9 @@ function MarketService.Init()
 	Remotes.Function("Market").OnServerInvoke = function(player, action, payload)
 		return MarketService.Handle(player, tostring(action), payload)
 	end
+	table.insert(DataService.Extenders, function(player, payload)
+		payload.GemPrice = MarketService.ExchangePrice(player)
+	end)
 	DataService.Loaded:Connect(function(player)
 		task.delay(3, function()
 			if player.Parent == Players then

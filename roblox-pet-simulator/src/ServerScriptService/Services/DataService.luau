@@ -48,6 +48,7 @@ export type Profile = {
 	RebirthUpgrades: { [string]: number },
 	Title: string,
 	Accessories: { [string]: number },
+	GemExchange: { Day: number, Count: number },
 	LastSeen: number,
 	DungeonCooldown: number,
 	IndexClaimed: { [string]: boolean },
@@ -90,6 +91,7 @@ local function template(): Profile
 		RebirthUpgrades = { RLuck = 0, RCoins = 0, REquip = 0, RStorage = 0, RDamage = 0 },
 		Title = "",
 		Accessories = {},
+		GemExchange = { Day = 0, Count = 0 },
 		LastSeen = 0,
 		DungeonCooldown = 0,
 		IndexClaimed = {},
@@ -383,7 +385,7 @@ end
 -- ===== المضاعفات =====
 local function bonuses(player: Player): { [string]: number }
 	local p = profiles[player]
-	local out = { Coins = 0, Luck = 0, Damage = 0, Diamonds = 0, XP = 0, Crit = 0, Agility = 0, EventCoins = 1, EventLuck = 1, EventDiamonds = 1, EventXP = 1 }
+	local out = { Coins = 0, Luck = 0, Damage = 0, Diamonds = 0, XP = 0, Crit = 0, Agility = 0, GemChance = 0, EventCoins = 1, EventLuck = 1, EventDiamonds = 1, EventXP = 1 }
 	if not p then
 		return out
 	end

@@ -41,6 +41,10 @@ function InventoryUI.PetCard(parent: Instance, pet: any, onClick: (() -> ())?): 
 	if pet.Shiny then
 		UIKit.Label({ Name = "Shiny", Text = "✨", Size = UDim2.fromOffset(22, 22), Position = UDim2.fromOffset(4, 28), MaxTextSize = 16, Parent = card })
 	end
+	local ab = PetUtil.Ability(pet)
+	if ab then
+		UIKit.Label({ Name = "Ability", Text = ab.Icon, Size = UDim2.fromOffset(22, 22), Position = UDim2.new(1, -26, 0, 28), MaxTextSize = 16, Parent = card })
+	end
 	if pet.Variant == "Golden" then
 		UIKit.Gradient(card, Color3.fromRGB(80, 70, 30), UIKit.Colors.Panel)
 	elseif pet.Variant == "Rainbow" then
@@ -133,6 +137,7 @@ function InventoryUI.Init()
 	local dPower = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 22), TextColor3 = UIKit.Colors.Pink, MaxTextSize = 18, Parent = details })
 	local dLevel = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 18), TextColor3 = UIKit.Colors.Cyan, MaxTextSize = 15, Parent = details })
 	local _, xpFill, xpLabel = UIKit.ProgressBar(details, UIKit.Colors.Cyan, UDim2.new(1, 0, 0, 14))
+	local dAbility = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 44), TextColor3 = UIKit.Colors.Gold, TextYAlignment = Enum.TextYAlignment.Top, MaxTextSize = 14, Parent = details })
 	local dEnch = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 60), TextColor3 = UIKit.Colors.Green, TextYAlignment = Enum.TextYAlignment.Top, MaxTextSize = 14, Parent = details })
 	local nickBox = UIKit.New("TextBox", { Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = Color3.fromRGB(15, 16, 28), PlaceholderText = "✏️ اسم مستعار (Enter)", Text = "", Font = UIKit.Font, TextColor3 = UIKit.Colors.Text, TextSize = 15, ClearTextOnFocus = false, Parent = details }) :: TextBox
 	UIKit.Corner(nickBox, 8)
@@ -188,7 +193,15 @@ function InventoryUI.Init()
 		dRarity.TextColor3 = Rarities.Color(def.Rarity)
 		dPower.Text = "⚔️ القوة: " .. Format.Number(PetUtil.BasePower(pet))
 		local level = pet.Level or 1
-		dLevel.Text = "المستوى " .. level .. " / 50   (+" .. math.floor((level - 1) * 2) .. "% قوة)"
+		dLevel.Text = "المستوى " .. level .. " / 50   (+" .. math.floor((level - 1) * Config.PetLevelPowerPerLevel * 100 + 0.5) .. "% قوة)"
+		local nextMilestone
+		for _, m in ipairs(Config.PetLevelMilestones) do
+			if level < m.Level then
+				nextMilestone = m
+				break
+			end
+		end
+		dAbility.Text = PetUtil.AbilityText(pet) .. (nextMilestone and ("\n⬆️ عند المستوى " .. nextMilestone.Level .. ": القدرة x" .. nextMilestone.Mult) or "\n🏆 القدرة في أقصى قوتها")
 		local needed = PetUtil.XPToNext(level)
 		if level >= 50 then
 			xpFill.Size = UDim2.fromScale(1, 1)

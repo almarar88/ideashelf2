@@ -69,7 +69,7 @@ function StatsUI.Init()
 	end
 
 	-- المضاعفات
-	local mult = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 96), BackgroundColor3 = UIKit.Colors.Panel2, Parent = scroll })
+	local mult = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 120), BackgroundColor3 = UIKit.Colors.Panel2, Parent = scroll })
 	UIKit.Corner(mult, 14)
 	local multLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, -20, 1, -8), Position = UDim2.fromOffset(12, 4), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, MaxTextSize = 17, Parent = mult })
 
@@ -116,9 +116,11 @@ function StatsUI.Init()
 		local can = p.Coins >= cost and p.UnlockedZones[tostring(Config.Rebirth.RequiredZone)]
 		rbBtn.Text = "ريبيرث #" .. next
 		rbBtn.BackgroundColor3 = can and Color3.fromRGB(255, 140, 60) or UIKit.Colors.Panel3
-		multLabel.Text = string.format("💰 عملات x%.2f    🍀 حظ x%.2f    ⚔️ قوة x%.2f    💎 ألماس x%.2f\n🔁 ريبيرث: %d    🔧 إنشانت: عملات +%d%% / قوة +%d%% / حظ +%d%% / قاضية %d%%",
-			p.CoinMult or 1, p.Luck or 1, p.DamageMult or 1, p.DiamondMult or 1, p.Rebirths or 0,
-			math.floor(((p.Enchants and p.Enchants.Coins) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Damage) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Luck) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Crit) or 0) * 100))
+		local ab = p.Abilities or {}
+		multLabel.Text = string.format("💰 عملات x%.2f    🍀 حظ x%.2f    ⚔️ قوة x%.2f    💎 ألماس x%.2f    💠 فرصة جوهرة %.1f%%\n🔁 ريبيرث: %d    🔧 إنشانت: عملات +%d%% / قوة +%d%% / حظ +%d%% / قاضية %d%%\n🐾 قدرات الحيوانات: عملات +%d%% / قوة +%d%% / حظ +%d%% / ألماس +%d%% / قاضية +%d%% / خبرة +%d%%",
+			p.CoinMult or 1, p.Luck or 1, p.DamageMult or 1, p.DiamondMult or 1, (p.GemChance or 0) * 100, p.Rebirths or 0,
+			math.floor(((p.Enchants and p.Enchants.Coins) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Damage) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Luck) or 0) * 100), math.floor(((p.Enchants and p.Enchants.Crit) or 0) * 100),
+			math.floor((ab.Coins or 0) * 100), math.floor((ab.Damage or 0) * 100), math.floor((ab.Luck or 0) * 100), math.floor((ab.Diamonds or 0) * 100), math.floor((ab.Crit or 0) * 100), math.floor((ab.XP or 0) * 100))
 		for _, u in ipairs(Config.RebirthShop) do
 			local row = shopRows[u.Key]
 			local level = (p.RebirthUpgrades and p.RebirthUpgrades[u.Key]) or 0

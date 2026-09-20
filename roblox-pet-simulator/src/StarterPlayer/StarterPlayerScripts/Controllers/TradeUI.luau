@@ -20,6 +20,8 @@ local theirGrid: ScrollingFrame
 local invGrid: ScrollingFrame
 local statusLabel: TextLabel
 local confirmBtn: TextButton
+local myGemsBox: TextBox
+local theirGemsLabel: TextLabel
 local partnerLabel: TextLabel
 
 local function clear(parent: Instance)
@@ -63,6 +65,10 @@ local function refreshTrade()
 			end
 		end
 	end
+	if not myGemsBox:IsFocused() then
+		myGemsBox.Text = tostring(state.MyGems or 0)
+	end
+	theirGemsLabel.Text = "💠 " .. (state.TheirGems or 0) .. " جوهرة"
 	local mine, theirs = state.MyConfirmed, state.TheirConfirmed
 	if state.Countdown then
 		statusLabel.Text = "⏳ يتم التبادل خلال " .. state.Countdown .. "..."
@@ -109,12 +115,18 @@ function TradeUI.Init()
 	partnerLabel = tradeWindow.Title
 	local left = UIKit.Frame({ Size = UDim2.new(0.5, -6, 0, 250), BackgroundColor3 = UIKit.Colors.Panel2, Parent = tradeWindow.Content })
 	UIKit.Corner(left, 12)
-	UIKit.Label({ Text = "عرضي", Size = UDim2.new(1, 0, 0, 26), MaxTextSize = 18, Parent = left })
+	UIKit.Label({ Text = "عرضي", Size = UDim2.new(0.5, 0, 0, 26), MaxTextSize = 18, Parent = left })
+	myGemsBox = UIKit.New("TextBox", { Size = UDim2.new(0.5, -8, 0, 26), Position = UDim2.new(0.5, 4, 0, 0), BackgroundColor3 = Color3.fromRGB(15, 16, 28), PlaceholderText = "💠 جواهر تعرضها", Text = "0", Font = UIKit.Font, TextColor3 = Color3.fromRGB(200, 140, 255), TextSize = 16, ClearTextOnFocus = false, Parent = left }) :: TextBox
+	UIKit.Corner(myGemsBox, 8)
+	myGemsBox.FocusLost:Connect(function()
+		Remotes.Event("TradeAction"):FireServer("SetGems", { Amount = tonumber(myGemsBox.Text) or 0 })
+	end)
 	myGrid = UIKit.Scroll(left, { Size = UDim2.new(1, -8, 1, -30), Position = UDim2.fromOffset(4, 28) })
 	UIKit.Grid(myGrid, UDim2.fromOffset(100, 118), 6)
 	local right = UIKit.Frame({ Size = UDim2.new(0.5, -6, 0, 250), Position = UDim2.new(0.5, 6, 0, 0), BackgroundColor3 = UIKit.Colors.Panel2, Parent = tradeWindow.Content })
 	UIKit.Corner(right, 12)
-	UIKit.Label({ Text = "عرض الطرف الآخر", Size = UDim2.new(1, 0, 0, 26), MaxTextSize = 18, Parent = right })
+	UIKit.Label({ Text = "عرض الطرف الآخر", Size = UDim2.new(0.5, 0, 0, 26), MaxTextSize = 18, Parent = right })
+	theirGemsLabel = UIKit.Label({ Text = "💠 0", Size = UDim2.new(0.5, -8, 0, 26), Position = UDim2.new(0.5, 4, 0, 0), TextColor3 = Color3.fromRGB(200, 140, 255), MaxTextSize = 16, Parent = right })
 	theirGrid = UIKit.Scroll(right, { Size = UDim2.new(1, -8, 1, -30), Position = UDim2.fromOffset(4, 28) })
 	UIKit.Grid(theirGrid, UDim2.fromOffset(100, 118), 6)
 	statusLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, -240, 0, 40), Position = UDim2.fromOffset(0, 256), MaxTextSize = 18, Parent = tradeWindow.Content })

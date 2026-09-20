@@ -30,6 +30,7 @@ local browseSearch = ""
 local sellUid: string? = nil
 local npcSelected: { [string]: boolean } = {}
 local cachedListings: { any } = {}
+local renderExchange: () -> () = function() end
 
 local function npcValue(pet: any): number
 	local def = Pets.Get(pet.Id)
@@ -236,6 +237,8 @@ function MarketUI.Refresh(force: boolean?)
 		renderSell()
 	elseif currentTab == "NPC" then
 		renderNPC()
+	elseif currentTab == "Exchange" then
+		renderExchange()
 	end
 end
 
@@ -245,8 +248,8 @@ function MarketUI.Init()
 
 	local tabs = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, Parent = w.Content })
 	UIKit.List(tabs, 6, true, true)
-	for _, info in ipairs({ { "Browse", "🔎 تصفح" }, { "Mine", "📦 عروضي" }, { "Sell", "💠 بيع في السوق" }, { "NPC", "🐾 بيع للتاجر" } }) do
-		tabButtons[info[1]] = UIKit.Button({ Text = info[2], Color = UIKit.Colors.Panel3, Size = UDim2.fromOffset(200, 40), MaxTextSize = 17, Parent = tabs }, function()
+	for _, info in ipairs({ { "Browse", "🔎 تصفح" }, { "Mine", "📦 عروضي" }, { "Sell", "💠 بيع في السوق" }, { "NPC", "🐾 بيع للتاجر" }, { "Exchange", "🏦 صرّاف" } }) do
+		tabButtons[info[1]] = UIKit.Button({ Text = info[2], Color = UIKit.Colors.Panel3, Size = UDim2.fromOffset(165, 40), MaxTextSize = 16, Parent = tabs }, function()
 			sellerFilter = nil
 			showTab(info[1])
 			MarketUI.Refresh()
@@ -277,7 +280,7 @@ function MarketUI.Init()
 	end)
 	local filterLabel = UIKit.Label({ Text = "", Size = UDim2.fromOffset(300, 36), Position = UDim2.new(1, -300, 0, 0), TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = UIKit.Colors.Muted, MaxTextSize = 15, Parent = browseHeader })
 
-	for _, name in ipairs({ "Browse", "Mine", "Sell", "NPC" }) do
+	for _, name in ipairs({ "Browse", "Mine", "Sell", "NPC", "Exchange" }) do
 		local top = (name == "Browse" or name == "Sell" or name == "NPC") and 96 or 52
 		pages[name] = UIKit.Scroll(w.Content, { Size = UDim2.new(1, name == "Sell" and -280 or 0, 1, -top), Position = UDim2.fromOffset(0, top), Visible = false })
 		UIKit.Grid(pages[name], UDim2.fromOffset(150, 190), 8)
@@ -307,6 +310,39 @@ function MarketUI.Init()
 		end
 	end)
 	UIKit.Label({ Text = "💡 العروض تظهر لكل السيرفرات لمدة 3 أيام. احجز كشكاً في السوق ليجدك اللاعبون بسهولة.", Size = UDim2.new(1, 0, 0, 70), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 13, TextYAlignment = Enum.TextYAlignment.Top, Parent = sellPanel })
+
+	-- الصرّاف
+	local exPanel = UIKit.Frame({ Size = UDim2.fromOffset(460, 300), Position = UDim2.new(0.5, -230, 0, 110), BackgroundColor3 = UIKit.Colors.Panel2, Visible = false, Parent = w.Content })
+	UIKit.Corner(exPanel, 14)
+	UIKit.Padding(exPanel, 14)
+	UIKit.List(exPanel, 10)
+	UIKit.Label({ Text = "🏦 الصرّاف: اشترِ جواهر بالعملات", Size = UDim2.new(1, 0, 0, 34), MaxTextSize = 22, Parent = exPanel })
+	local exInfo = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 70), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 15, TextYAlignment = Enum.TextYAlignment.Top, Parent = exPanel })
+	local exBox = UIKit.New("TextBox", { Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = Color3.fromRGB(15, 16, 28), PlaceholderText = "عدد الجواهر", Text = "", Font = UIKit.Font, TextColor3 = UIKit.Colors.Text, TextSize = 20, ClearTextOnFocus = false, Parent = exPanel }) :: TextBox
+	UIKit.Corner(exBox, 8)
+	local exTotal = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 28), TextColor3 = UIKit.Colors.Gold, MaxTextSize = 18, Parent = exPanel })
+	exBox:GetPropertyChangedSignal("Text"):Connect(function()
+		local p = DataController.Profile
+		local n = tonumber(exBox.Text) or 0
+		exTotal.Text = p and ("الإجمالي: 💰 " .. Format.Number(n * (p.GemPrice or 0))) or ""
+	end)
+	UIKit.Button({ Text = "💠 شراء", Color = UIKit.Colors.Green, Size = UDim2.new(1, 0, 0, 44), MaxTextSize = 20, Parent = exPanel }, function()
+		local res = Remotes.Function("Market"):InvokeServer("Exchange", { Amount = tonumber(exBox.Text) or 0 })
+		if not res.ok and res.error then
+			UIController.Notify(res.error, UIKit.Colors.Red)
+		else
+			exBox.Text = ""
+		end
+	end)
+	renderExchange = function()
+		local p = DataController.Profile
+		if not p then
+			return
+		end
+		local day = math.floor(DataController.ServerTime() / 86400)
+		local used = (p.GemExchange and p.GemExchange.Day == day) and p.GemExchange.Count or 0
+		exInfo.Text = "السعر الحالي: 💰 " .. Format.Number(p.GemPrice or 0) .. " لكل جوهرة (يرتفع مع أعلى منطقة فتحتها)\nالسقف اليومي: " .. used .. " / " .. Config.GemExchange.DailyCap .. "\nالجواهر أندر من العملات: مصادرها الصناديق في السوق، قدرة \"باحث الجواهر\"، الزعماء، الزنزانة، وبيع الحيوانات."
+	end
 
 	-- التاجر: شريط
 	local npcBar = UIKit.Frame({ Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 50), BackgroundTransparency = 1, Visible = false, Parent = w.Content })
@@ -344,6 +380,7 @@ function MarketUI.Init()
 		browseHeader.Visible = currentTab == "Browse"
 		sellPanel.Visible = currentTab == "Sell"
 		npcBar.Visible = currentTab == "NPC"
+		exPanel.Visible = currentTab == "Exchange"
 		filterLabel.Text = sellerFilter and "عرض كشك بائع محدد" or ""
 		MarketUI.Refresh()
 	end
@@ -353,6 +390,7 @@ function MarketUI.Init()
 		browseHeader.Visible = name == "Browse"
 		sellPanel.Visible = name == "Sell"
 		npcBar.Visible = name == "NPC"
+		exPanel.Visible = name == "Exchange"
 		filterLabel.Text = sellerFilter and "عرض كشك بائع محدد" or ""
 	end
 	showTab("Browse")
