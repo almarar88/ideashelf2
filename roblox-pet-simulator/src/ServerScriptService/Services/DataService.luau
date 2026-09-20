@@ -16,6 +16,7 @@ export type Profile = {
 	Coins: number,
 	Diamonds: number,
 	Tokens: number,
+	Gems: number,
 	Spins: number,
 	Rebirths: number,
 	Pets: { any },
@@ -41,6 +42,7 @@ export type Profile = {
 	Hoverboards: { Owned: { [string]: boolean }, Equipped: string },
 	Merchant: { Rotation: number, Bought: { [string]: number } },
 	SpinDay: number,
+	MyListings: { [string]: any },
 }
 
 local function template(): Profile
@@ -48,12 +50,13 @@ local function template(): Profile
 		Coins = 0,
 		Diamonds = 0,
 		Tokens = 0,
+		Gems = 0,
 		Spins = 0,
 		Rebirths = 0,
 		Pets = {},
 		UnlockedZones = { ["1"] = true },
 		Upgrades = { Storage = 0, Equip = 0, Coins = 0, Luck = 0, Damage = 0, Speed = 0, Diamonds = 0, XP = 0 },
-		Stats = { Hatches = 0, Breaks = 0, CoinsEarned = 0, DiamondsEarned = 0, Damage = 0, Playtime = 0, BestPet = 0, Fusions = 0, Goldens = 0, Rainbows = 0, DarkMatters = 0, Rebirths = 0, BossKills = 0, Trades = 0, Enchants = 0, Spins = 0 },
+		Stats = { Hatches = 0, Breaks = 0, CoinsEarned = 0, DiamondsEarned = 0, Damage = 0, Playtime = 0, BestPet = 0, Fusions = 0, Goldens = 0, Rainbows = 0, DarkMatters = 0, Rebirths = 0, BossKills = 0, Trades = 0, Enchants = 0, Spins = 0, MarketSales = 0, GemsEarned = 0, Huges = 0, Titanics = 0 },
 		Daily = { LastClaim = 0, Streak = 0 },
 		VIPDaily = 0,
 		Codes = {},
@@ -73,6 +76,7 @@ local function template(): Profile
 		Hoverboards = { Owned = {}, Equipped = "" },
 		Merchant = { Rotation = 0, Bought = {} },
 		SpinDay = 0,
+		MyListings = {},
 	}
 end
 
@@ -149,7 +153,7 @@ local function load(player: Player)
 
 	local ls = Instance.new("Folder")
 	ls.Name = "leaderstats"
-	for _, name in ipairs({ "Coins", "Diamonds", "Rebirths" }) do
+	for _, name in ipairs({ "Coins", "Diamonds", "Gems", "Rebirths" }) do
 		local v = Instance.new("NumberValue")
 		v.Name = name
 		v.Value = (profile :: any)[name]
@@ -224,7 +228,7 @@ function DataService.Replicate(player: Player)
 	Remotes.Event("ProfileUpdate"):FireClient(player, payload)
 	local ls = player:FindFirstChild("leaderstats")
 	if ls then
-		for _, name in ipairs({ "Coins", "Diamonds", "Rebirths" }) do
+		for _, name in ipairs({ "Coins", "Diamonds", "Gems", "Rebirths" }) do
 			local v = ls:FindFirstChild(name) :: NumberValue?
 			if v then
 				v.Value = math.floor((profile :: any)[name])
@@ -272,6 +276,17 @@ function DataService.AddTokens(player: Player, amount: number)
 	end
 end
 
+function DataService.AddGems(player: Player, amount: number, earned: boolean?)
+	local p = profiles[player]
+	if p and amount > 0 then
+		p.Gems += amount
+		if earned then
+			p.Stats.GemsEarned += amount
+		end
+		dirty[player] = true
+	end
+end
+
 function DataService.AddSpins(player: Player, amount: number)
 	local p = profiles[player]
 	if p and amount > 0 then
@@ -285,7 +300,7 @@ function DataService.Spend(player: Player, currency: string, amount: number): bo
 	if not p or amount < 0 then
 		return false
 	end
-	local field = if currency == "Coins" then "Coins" elseif currency == "Diamonds" then "Diamonds" elseif currency == "Tokens" then "Tokens" elseif currency == "Spins" then "Spins" else nil
+	local field = if currency == "Coins" then "Coins" elseif currency == "Diamonds" then "Diamonds" elseif currency == "Tokens" then "Tokens" elseif currency == "Spins" then "Spins" elseif currency == "Gems" then "Gems" else nil
 	if not field then
 		return false
 	end

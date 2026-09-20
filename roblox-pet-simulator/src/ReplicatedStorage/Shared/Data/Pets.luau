@@ -23,7 +23,7 @@ export type PetDef = {
 	Scale: number,
 }
 
-local RARITY_MULT = { Common = 1, Uncommon = 1.6, Rare = 2.6, Epic = 4.2, Legendary = 7, Mythical = 12, Exclusive = 20, Huge = 60 }
+local RARITY_MULT = { Common = 1, Uncommon = 1.6, Rare = 2.6, Epic = 4.2, Legendary = 7, Mythical = 12, Exclusive = 20, Huge = 60, Titanic = 400 }
 
 local list: { PetDef } = {}
 local byId: { [string]: PetDef } = {}
@@ -42,7 +42,7 @@ local function egg(eggId: string, tier: number, base: number, pets: { { string }
 			Secondary = hex(c2),
 			Egg = eggId,
 			Tier = tier,
-			Scale = rarity == "Huge" and 3.2 or 1,
+			Scale = rarity == "Titanic" and 5 or (rarity == "Huge" and 3.2 or 1),
 		}
 		table.insert(list, def)
 		byId[id] = def
@@ -217,6 +217,76 @@ egg("QuantumEgg", 15, 18310546875, {
 	{ "nova_unicorn", "Nova Unicorn", "Epic", "unicorn", "FF69B4", "FFFF00" },
 	{ "quantum_dragon", "Quantum Dragon", "Legendary", "dragon", "00008B", "00FFFF" },
 	{ "omniverse_overlord", "Omniverse Overlord", "Mythical", "demon", "120024", "FF00FF" },
+})
+
+-- ===== العالم الثالث: العالم الأسطوري =====
+egg("EnchantedEgg", 16, 91552734375, {
+	{ "fairy_bunny", "Fairy Bunny", "Common", "bunny", "FFB7FF", "FFFFFF" },
+	{ "pixie_cat", "Pixie Cat", "Common", "cat", "DDA0DD", "FFD700" },
+	{ "mushroom_golem", "Mushroom Golem", "Uncommon", "golem", "8B4513", "FF6347" },
+	{ "moon_owl", "Moon Owl", "Rare", "bird", "191970", "F0E68C" },
+	{ "wisp_ghost", "Wisp Ghost", "Epic", "ghost", "AFEEEE", "7FFFD4" },
+	{ "elder_treant", "Elder Treant", "Legendary", "golem", "2F4F2F", "ADFF2F" },
+})
+egg("CrystalEgg", 17, 457763671875, {
+	{ "quartz_slime", "Quartz Slime", "Common", "blob", "FFF0F5", "DA70D6" },
+	{ "amethyst_fox", "Amethyst Fox", "Common", "fox", "9966CC", "E6E6FA" },
+	{ "topaz_dog", "Topaz Dog", "Uncommon", "dog", "FFC87C", "FFFFFF" },
+	{ "ruby_dragon", "Ruby Dragon", "Rare", "dragon", "E0115F", "FFD700" },
+	{ "sapphire_golem", "Sapphire Golem", "Epic", "golem", "0F52BA", "B9F2FF" },
+	{ "diamond_unicorn", "Diamond Unicorn", "Legendary", "unicorn", "F8F8FF", "B9F2FF" },
+})
+egg("DragonEgg", 18, 2288818359375, {
+	{ "wyrmling", "Wyrmling", "Common", "dragon", "8FBC8F", "F5DEB3" },
+	{ "ember_bird", "Ember Bird", "Common", "bird", "FF4500", "FFD700" },
+	{ "stone_wyvern", "Stone Wyvern", "Uncommon", "dragon", "708090", "2F4F4F" },
+	{ "storm_wyvern", "Storm Wyvern", "Rare", "dragon", "4682B4", "FFFF00" },
+	{ "inferno_wyrm", "Inferno Wyrm", "Epic", "dragon", "B22222", "FF8C00" },
+	{ "elder_dragon", "Elder Dragon", "Legendary", "dragon", "2F0A0A", "FFD700" },
+	{ "dragon_emperor", "Dragon Emperor", "Mythical", "dragon", "FFD700", "8B0000" },
+})
+egg("CelestialEgg", 19, 11444091796875, {
+	{ "cherub_bunny", "Cherub Bunny", "Common", "bunny", "FFFFFF", "FFD700" },
+	{ "halo_cat", "Halo Cat", "Common", "cat", "FFFAF0", "FFE4B5" },
+	{ "seraph_bird", "Seraph Bird", "Uncommon", "bird", "FFFFFF", "87CEFA" },
+	{ "star_fox", "Star Fox", "Rare", "fox", "FFD700", "FFFFFF" },
+	{ "archangel_unicorn", "Archangel Unicorn", "Epic", "unicorn", "FFFFFF", "FFD700" },
+	{ "celestial_guardian", "Celestial Guardian", "Legendary", "golem", "F5F5F5", "FFD700" },
+})
+egg("EternalEgg", 20, 57220458984375, {
+	{ "void_slime", "Void Slime", "Common", "blob", "0B0B0B", "FFFFFF" },
+	{ "abyss_cat", "Abyss Cat", "Common", "cat", "050505", "8A2BE2" },
+	{ "phantom_owl", "Phantom Owl", "Uncommon", "bird", "1C1C1C", "E6E6FA" },
+	{ "eternity_ghost", "Eternity Ghost", "Rare", "ghost", "FFFFFF", "000000" },
+	{ "oblivion_demon", "Oblivion Demon", "Epic", "demon", "000000", "FF0000" },
+	{ "eternal_dragon", "Eternal Dragon", "Legendary", "dragon", "000000", "FFFFFF" },
+	{ "the_creator", "The Creator", "Mythical", "unicorn", "FFFFFF", "000000" },
+	{ "genesis_overlord", "Genesis Overlord", "Exclusive", "demon", "FFFFFF", "FFD700" },
+})
+
+-- بيضة البازار (تشترى بالجواهر في السوق)
+egg("BazaarEgg", 6, 6000, {
+	{ "bazaar_cat", "Bazaar Cat", "Rare", "cat", "D2691E", "FFD700" },
+	{ "lantern_ghost", "Lantern Ghost", "Rare", "ghost", "FF8C00", "FFFF99" },
+	{ "carpet_fox", "Carpet Fox", "Epic", "fox", "8B0000", "FFD700" },
+	{ "genie_blob", "Genie Blob", "Epic", "blob", "1E90FF", "FFD700" },
+	{ "sultan_dragon", "Sultan Dragon", "Legendary", "dragon", "4B0082", "FFD700" },
+	{ "gem_golem", "Gem Golem", "Mythical", "golem", "7B68EE", "00FFFF" },
+})
+
+-- الحيوانات العملاقة الإضافية للعالم الثالث
+egg("Huge2", 16, 30000000, {
+	{ "huge_unicorn", "HUGE Unicorn", "Huge", "unicorn", "FFFFFF", "FFD700" },
+	{ "huge_demon", "HUGE Demon", "Huge", "demon", "0B0B0B", "FF0000" },
+	{ "huge_golem", "HUGE Golem", "Huge", "golem", "7B68EE", "00FFFF" },
+})
+
+-- التايتانيك: أندر الحيوانات (حجم x5، قوة هائلة)
+egg("Titanic", 12, 50000000, {
+	{ "titanic_dragon", "TITANIC Dragon", "Titanic", "dragon", "FFFFFF", "FF00FF" },
+	{ "titanic_overlord", "TITANIC Overlord", "Titanic", "demon", "FFFFFF", "FF0000" },
+	{ "titanic_cat", "TITANIC Cat", "Titanic", "cat", "FFFFFF", "00FFFF" },
+	{ "titanic_phoenix", "TITANIC Phoenix", "Titanic", "bird", "FFFFFF", "FFA500" },
 })
 
 -- بيضة الريبيرث (تشترى بتوكنات الريبيرث)

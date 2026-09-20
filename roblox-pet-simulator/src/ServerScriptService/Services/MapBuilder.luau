@@ -31,6 +31,8 @@ MapBuilder.VIPPortal = nil :: BasePart?
 MapBuilder.VIPReturnPortal = nil :: BasePart?
 MapBuilder.World2Portal = nil :: BasePart?
 MapBuilder.World1Portal = nil :: BasePart?
+MapBuilder.Portals = {} :: { [string]: BasePart }
+MapBuilder.Booths = {} :: { Model }
 
 local SPACING = Config.Map.ZoneSpacing
 local ISLAND = Config.Map.IslandSize
@@ -230,7 +232,113 @@ local function quantumOrb(parent: Instance, pos: Vector3, rng: Random)
 	ring.Transparency = 0.4
 end
 
+local function magicTree(parent: Instance, pos: Vector3, rng: Random)
+	local h = rng:NextNumber(7, 12)
+	part(parent, "Trunk", Vector3.new(1.6, h, 1.6), CFrame.new(pos + Vector3.new(0, h / 2, 0)), Color3.fromRGB(60, 30, 80), Enum.Material.Wood)
+	for i = 1, 3 do
+		local sz = (5 - i) * 1.7
+		local leaves = part(parent, "Leaves", Vector3.new(sz, sz, sz), CFrame.new(pos + Vector3.new(rng:NextNumber(-0.5, 0.5), h + i * 1.5 - 1, rng:NextNumber(-0.5, 0.5))), Color3.fromHSV(rng:NextNumber(0.75, 0.95), 0.6, 1), Enum.Material.Grass, "ball")
+		leaves.CanCollide = false
+	end
+	local glow = part(parent, "Glow", Vector3.new(1.2, 1.2, 1.2), CFrame.new(pos + Vector3.new(0, h + 2, 0)), Color3.fromRGB(255, 150, 255), Enum.Material.Neon, "ball")
+	glow.CanCollide = false
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 150, 255)
+	light.Range = 14
+	light.Parent = glow
+	local attach = Instance.new("Attachment")
+	attach.Parent = glow
+	local pe = Instance.new("ParticleEmitter")
+	pe.Color = ColorSequence.new(Color3.fromRGB(255, 180, 255))
+	pe.Size = NumberSequence.new(0.3, 0)
+	pe.Lifetime = NumberRange.new(1, 2)
+	pe.Rate = 4
+	pe.Speed = NumberRange.new(0.5, 1.5)
+	pe.SpreadAngle = Vector2.new(180, 180)
+	pe.LightEmission = 1
+	pe.Parent = attach
+end
+
+local function bigCrystal(parent: Instance, pos: Vector3, rng: Random)
+	local h = rng:NextNumber(10, 22)
+	local w = rng:NextNumber(3, 5)
+	local c = part(parent, "BigCrystal", Vector3.new(w, h, w), CFrame.new(pos + Vector3.new(0, h / 2, 0)) * CFrame.Angles(rng:NextNumber(-0.2, 0.2), rng:NextNumber(0, 6), rng:NextNumber(-0.2, 0.2)), Color3.fromHSV(rng:NextNumber(0.5, 0.7), 0.5, 1), Enum.Material.Glass, "cone")
+	c.Transparency = 0.25
+	local light = Instance.new("PointLight")
+	light.Color = c.Color
+	light.Range = 18
+	light.Parent = c
+	crystalCluster(parent, pos + Vector3.new(rng:NextNumber(-3, 3), 0, rng:NextNumber(-3, 3)), c.Color, rng, true)
+end
+
+local function peak(parent: Instance, pos: Vector3, rng: Random)
+	local h = rng:NextNumber(14, 26)
+	local w = rng:NextNumber(8, 12)
+	part(parent, "Peak", Vector3.new(w, h, w), CFrame.new(pos + Vector3.new(0, h / 2, 0)), Color3.fromRGB(90, 60, 60), Enum.Material.Rock, "cone")
+	local snow = part(parent, "Snow", Vector3.new(w * 0.35, h * 0.3, w * 0.35), CFrame.new(pos + Vector3.new(0, h * 0.85, 0)), Color3.fromRGB(255, 240, 240), Enum.Material.Snow, "cone")
+	snow.CanCollide = false
+	local lava = part(parent, "Lava", Vector3.new(w * 0.15, h * 0.12, w * 0.15), CFrame.new(pos + Vector3.new(0, h, 0)), Color3.fromRGB(255, 100, 20), Enum.Material.Neon, "ball")
+	lava.CanCollide = false
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 100, 20)
+	light.Range = 20
+	light.Parent = lava
+end
+
+local function pillar(parent: Instance, pos: Vector3, rng: Random)
+	local h = rng:NextNumber(14, 20)
+	part(parent, "Pillar", Vector3.new(3, h, 3), CFrame.new(pos + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, 0), Color3.fromRGB(250, 245, 255), Enum.Material.Marble, "cyl")
+	part(parent, "Cap", Vector3.new(4.5, 1, 4.5), CFrame.new(pos + Vector3.new(0, h + 0.5, 0)), Color3.fromRGB(255, 220, 120), Enum.Material.Metal)
+	part(parent, "Base", Vector3.new(4.5, 1, 4.5), CFrame.new(pos + Vector3.new(0, 0.5, 0)), Color3.fromRGB(255, 220, 120), Enum.Material.Metal)
+	local orb = part(parent, "Orb", Vector3.new(2.5, 2.5, 2.5), CFrame.new(pos + Vector3.new(0, h + 2.5, 0)), Color3.fromRGB(255, 240, 180), Enum.Material.Neon, "ball")
+	orb.CanCollide = false
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 240, 180)
+	light.Range = 20
+	light.Parent = orb
+end
+
+local function voidOrb(parent: Instance, pos: Vector3, rng: Random)
+	local s = rng:NextNumber(4, 9)
+	local orb = part(parent, "VoidOrb", Vector3.new(s, s, s), CFrame.new(pos + Vector3.new(0, rng:NextNumber(6, 16), 0)), Color3.new(0, 0, 0), Enum.Material.Neon, "ball")
+	orb.CanCollide = false
+	local ring = part(parent, "Ring", Vector3.new(0.4, s + 4, s + 4), orb.CFrame * CFrame.Angles(rng:NextNumber(0, 3), rng:NextNumber(0, 3), 0), Color3.new(1, 1, 1), Enum.Material.Neon, "cyl")
+	ring.CanCollide = false
+	ring.Transparency = 0.3
+	local attach = Instance.new("Attachment")
+	attach.Parent = orb
+	local pe = Instance.new("ParticleEmitter")
+	pe.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 0, 255))
+	pe.Size = NumberSequence.new(0.5, 0)
+	pe.Lifetime = NumberRange.new(1, 2)
+	pe.Rate = 8
+	pe.Speed = NumberRange.new(2, 4)
+	pe.SpreadAngle = Vector2.new(180, 180)
+	pe.LightEmission = 1
+	pe.Parent = attach
+end
+
+local function marketLantern(parent: Instance, pos: Vector3, rng: Random)
+	part(parent, "Post", Vector3.new(0.5, 8, 0.5), CFrame.new(pos + Vector3.new(0, 4, 0)), Color3.fromRGB(60, 40, 30), Enum.Material.Wood)
+	local lantern = part(parent, "Lantern", Vector3.new(1.4, 2, 1.4), CFrame.new(pos + Vector3.new(0, 8.5, 0)), rng:NextNumber() < 0.5 and Color3.fromRGB(255, 120, 40) or Color3.fromRGB(255, 200, 60), Enum.Material.Neon)
+	lantern.CanCollide = false
+	local light = Instance.new("PointLight")
+	light.Color = lantern.Color
+	light.Range = 18
+	light.Brightness = 1.2
+	light.Parent = lantern
+	-- سجادة
+	local rug = part(parent, "Rug", Vector3.new(6, 0.2, 4), CFrame.new(pos + Vector3.new(rng:NextNumber(-3, 3), 0.1, rng:NextNumber(-3, 3))) * CFrame.Angles(0, rng:NextNumber(0, 3), 0), Color3.fromHSV(rng:NextNumber(), 0.7, 0.8), Enum.Material.Fabric)
+	rug.CanCollide = false
+end
+
 local DECOR: { [string]: (Instance, Vector3, Random) -> () } = {
+	magictrees = magicTree,
+	bigcrystals = bigCrystal,
+	peaks = peak,
+	pillars = pillar,
+	voidorbs = voidOrb,
+	market = marketLantern,
 	tech = techPillar,
 	cybertrees = cyberTree,
 	city = neonBuilding,
@@ -268,7 +376,7 @@ local function buildEgg(parent: Instance, egg: Eggs.EggDef, pos: Vector3): Model
 		spot.CanCollide = false
 	end
 	model.PrimaryPart = shell
-	local currency = egg.Currency == "Coins" and "💰" or (egg.Currency == "Diamonds" and "💎" or "🔁")
+	local currency = egg.Currency == "Coins" and "💰" or (egg.Currency == "Diamonds" and "💎" or (egg.Currency == "Gems" and "💠" or "🔁"))
 	billboard(shell, egg.Name .. "\n" .. currency .. " " .. Format.Number(egg.Cost), UDim2.fromScale(12, 4), Color3.new(1, 1, 1), 5.5)
 	if egg.VIPOnly then
 		local crown = part(model, "Crown", Vector3.new(2, 2, 2), CFrame.new(pos + Vector3.new(0, 8.6, 0)), Color3.fromRGB(255, 215, 0), Enum.Material.Neon, "cone")
@@ -359,6 +467,16 @@ function MapBuilder.BuildBreakable(typeName: string, pos: Vector3, scale: number
 		local light = Instance.new("PointLight")
 		light.Color = def.Color
 		light.Range = 12
+		light.Parent = base
+	elseif def.Shape == "orb" then
+		base = part(model, "Base", size, CFrame.new(pos + Vector3.new(0, size.Y * 0.7, 0)), def.Color, def.Material, "ball")
+		base.Transparency = 0.15
+		local ring = part(model, "Ring", Vector3.new(0.3, size.X * 1.5, size.X * 1.5), CFrame.new(pos + Vector3.new(0, size.Y * 0.7, 0)) * CFrame.Angles(0, 0, math.pi / 2), Color3.new(1, 1, 1), Enum.Material.Neon, "cyl")
+		ring.CanCollide = false
+		ring.Transparency = 0.4
+		local light = Instance.new("PointLight")
+		light.Color = def.Color
+		light.Range = 14
 		light.Parent = base
 	elseif def.Shape == "boss" then
 		base = part(model, "Base", Vector3.new(size.X, size.Y * 0.8, size.Z), CFrame.new(pos + Vector3.new(0, size.Y * 0.4, 0)), def.Color, def.Material, "ball")
@@ -587,13 +705,22 @@ function MapBuilder.ZoneOfPosition(pos: Vector3): number
 	if (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(vipCenter.X, 0, vipCenter.Z)).Magnitude < 220 then
 		return 0
 	end
+	local market = Config.Map.MarketOffset
+	if (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(market.X, 0, market.Z)).Magnitude < 260 then
+		return -1
+	end
+	local w3 = Config.Map.World3Offset
+	if pos.X > w3.X - 500 then
+		local idx = Zones.WorldStart[3] + math.floor((pos.Z - w3.Z) / SPACING + 0.5)
+		return math.clamp(idx, Zones.WorldStart[3], #Zones.List)
+	end
 	local w2 = Config.Map.World2Offset
 	if pos.X > w2.X - 500 then
-		local idx = Zones.World2Start + math.floor((pos.Z - w2.Z) / SPACING + 0.5)
-		return math.clamp(idx, Zones.World2Start, #Zones.List)
+		local idx = Zones.WorldStart[2] + math.floor((pos.Z - w2.Z) / SPACING + 0.5)
+		return math.clamp(idx, Zones.WorldStart[2], Zones.WorldStart[3] - 1)
 	end
 	local idx = math.floor(pos.Z / SPACING + 0.5) + 1
-	return math.clamp(idx, 1, Zones.World2Start - 1)
+	return math.clamp(idx, 1, Zones.WorldStart[2] - 1)
 end
 
 local function buildStall(parent: Instance, pos: Vector3, kind: string, title: string, color: Color3): Model
@@ -726,6 +853,139 @@ local function buildBench(parent: Instance, pos: Vector3, rot: number)
 	end
 end
 
+-- جزيئات جوية لكل منطقة
+local AMBIENT = {
+	trees = { Color = Color3.fromRGB(120, 220, 90), Size = 0.6, Speed = 3, Rate = 14, Acc = Vector3.new(2, -4, 1) },
+	palms = { Color = Color3.fromRGB(255, 255, 255), Size = 0.4, Speed = 2, Rate = 8, Acc = Vector3.new(3, -1, 0) },
+	cactus = { Color = Color3.fromRGB(230, 200, 140), Size = 0.5, Speed = 6, Rate = 16, Acc = Vector3.new(8, -1, 0) },
+	ice = { Color = Color3.fromRGB(255, 255, 255), Size = 0.5, Speed = 2, Rate = 30, Acc = Vector3.new(1, -5, 0) },
+	lava = { Color = Color3.fromRGB(255, 120, 20), Size = 0.4, Speed = 4, Rate = 18, Acc = Vector3.new(0, 6, 0), Up = true },
+	clouds = { Color = Color3.fromRGB(255, 255, 255), Size = 0.8, Speed = 1, Rate = 6, Acc = Vector3.new(2, 0, 0) },
+	crystals = { Color = Color3.fromRGB(200, 120, 255), Size = 0.4, Speed = 1, Rate = 14, Acc = Vector3.new(0, 1, 0), Up = true },
+	gold = { Color = Color3.fromRGB(255, 220, 100), Size = 0.4, Speed = 1, Rate = 14, Acc = Vector3.new(0, 2, 0), Up = true },
+	tech = { Color = Color3.fromRGB(0, 255, 255), Size = 0.3, Speed = 3, Rate = 20, Acc = Vector3.new(0, 3, 0), Up = true },
+	cybertrees = { Color = Color3.fromRGB(57, 255, 20), Size = 0.3, Speed = 2, Rate = 20, Acc = Vector3.new(0, -3, 0) },
+	city = { Color = Color3.fromRGB(255, 45, 149), Size = 0.3, Speed = 2, Rate = 12, Acc = Vector3.new(0, -3, 0) },
+	servers = { Color = Color3.fromRGB(0, 206, 209), Size = 0.25, Speed = 4, Rate = 24, Acc = Vector3.new(0, 4, 0), Up = true },
+	quantum = { Color = Color3.fromRGB(255, 0, 255), Size = 0.5, Speed = 1, Rate = 16, Acc = Vector3.new(0, 0, 0), Up = true },
+	magictrees = { Color = Color3.fromRGB(255, 160, 255), Size = 0.4, Speed = 1, Rate = 22, Acc = Vector3.new(0, 1, 0), Up = true },
+	bigcrystals = { Color = Color3.fromRGB(150, 230, 255), Size = 0.4, Speed = 1, Rate = 18, Acc = Vector3.new(0, 1, 0), Up = true },
+	peaks = { Color = Color3.fromRGB(255, 90, 40), Size = 0.4, Speed = 5, Rate = 22, Acc = Vector3.new(3, 5, 0), Up = true },
+	pillars = { Color = Color3.fromRGB(255, 240, 180), Size = 0.5, Speed = 1, Rate = 20, Acc = Vector3.new(0, -1, 0) },
+	voidorbs = { Color = Color3.fromRGB(255, 255, 255), Size = 0.3, Speed = 2, Rate = 26, Acc = Vector3.new(0, 2, 0), Up = true },
+	market = { Color = Color3.fromRGB(255, 220, 120), Size = 0.35, Speed = 1, Rate = 12, Acc = Vector3.new(1, 1, 0), Up = true },
+}
+
+local function ambient(folder: Folder, center: Vector3, size: number, decor: string)
+	local cfg = AMBIENT[decor]
+	if not cfg then
+		return
+	end
+	local emitterPart = part(folder, "Ambient", Vector3.new(size * 0.9, 1, size * 0.9), CFrame.new(center + Vector3.new(0, cfg.Up and 2 or 45, 0)), Color3.new(1, 1, 1), Enum.Material.SmoothPlastic)
+	emitterPart.Transparency = 1
+	emitterPart.CanCollide = false
+	emitterPart.CanQuery = false
+	local pe = Instance.new("ParticleEmitter")
+	pe.Shape = Enum.ParticleEmitterShape.Box
+	pe.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	pe.Color = ColorSequence.new(cfg.Color)
+	pe.Size = NumberSequence.new(cfg.Size)
+	pe.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2, 0.2), NumberSequenceKeypoint.new(0.8, 0.2), NumberSequenceKeypoint.new(1, 1) })
+	pe.Lifetime = NumberRange.new(6, 10)
+	pe.Rate = cfg.Rate
+	pe.Speed = NumberRange.new(cfg.Speed * 0.5, cfg.Speed)
+	pe.Acceleration = cfg.Acc
+	pe.SpreadAngle = Vector2.new(180, 180)
+	pe.RotSpeed = NumberRange.new(-60, 60)
+	pe.LightEmission = 0.6
+	pe.Parent = emitterPart
+end
+
+local function portalParticles(field: BasePart, color: Color3)
+	local attach = Instance.new("Attachment")
+	attach.Parent = field
+	local pe = Instance.new("ParticleEmitter")
+	pe.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
+	pe.Size = NumberSequence.new(0.5, 0)
+	pe.Transparency = NumberSequence.new(0.2, 1)
+	pe.Lifetime = NumberRange.new(1, 2)
+	pe.Rate = 25
+	pe.Speed = NumberRange.new(2, 5)
+	pe.SpreadAngle = Vector2.new(180, 180)
+	pe.LightEmission = 1
+	pe.Parent = attach
+end
+
+-- كشك سوق للاعب
+local function buildBooth(parent: Instance, pos: Vector3, rot: number, index: number): Model
+	local model = Instance.new("Model")
+	model.Name = "Booth" .. index
+	model:SetAttribute("BoothId", index)
+	model:SetAttribute("Owner", 0)
+	model:SetAttribute("OwnerName", "")
+	model:SetAttribute("Listings", 0)
+	local cf = CFrame.new(pos) * CFrame.Angles(0, rot, 0)
+	local base = part(model, "Base", Vector3.new(12, 1, 10), cf * CFrame.new(0, 0.5, 0), Color3.fromRGB(130, 90, 55), Enum.Material.WoodPlanks)
+	part(model, "Counter", Vector3.new(10, 3, 2.2), cf * CFrame.new(0, 2.5, -3), Color3.fromRGB(160, 110, 65), Enum.Material.Wood)
+	for _, sx in ipairs({ -1, 1 }) do
+		part(model, "Pole", Vector3.new(0.6, 10, 0.6), cf * CFrame.new(sx * 5.5, 5.5, 3.5), Color3.fromRGB(90, 60, 40), Enum.Material.Wood)
+		part(model, "Pole", Vector3.new(0.6, 10, 0.6), cf * CFrame.new(sx * 5.5, 5.5, -4), Color3.fromRGB(90, 60, 40), Enum.Material.Wood)
+	end
+	local hue = (index * 0.13) % 1
+	local roof = part(model, "Roof", Vector3.new(13, 0.6, 11), cf * CFrame.new(0, 10.6, 0) * CFrame.Angles(0.1, 0, 0), Color3.fromHSV(hue, 0.7, 0.95), Enum.Material.Fabric)
+	roof.CanCollide = false
+	for i = 0, 5 do
+		local stripe = part(model, "Stripe", Vector3.new(1.3, 0.7, 11.2), cf * CFrame.new(-5.4 + i * 2.2, 10.65, 0) * CFrame.Angles(0.1, 0, 0), Color3.new(1, 1, 1), Enum.Material.Fabric)
+		stripe.CanCollide = false
+	end
+	local sign = part(model, "Sign", Vector3.new(9, 2.4, 0.4), cf * CFrame.new(0, 8.2, -5.5), Color3.fromRGB(245, 230, 200), Enum.Material.Wood)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "فتح"
+	prompt.ObjectText = "كشك " .. index
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 12
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = base
+	local bb = billboard(sign, "كشك فارغ\nاضغط للحجز", UDim2.fromScale(12, 4), Color3.new(1, 1, 1), 3)
+	bb.Name = "BoothSign"
+	model.PrimaryPart = base
+	model.Parent = parent
+	return model
+end
+
+local function buildAuctionHouse(parent: Instance, pos: Vector3): Model
+	local model = Instance.new("Model")
+	model.Name = "AuctionHouse"
+	model:SetAttribute("Machine", "Market")
+	local base = part(model, "Floor", Vector3.new(30, 1, 24), CFrame.new(pos + Vector3.new(0, 0.5, 0)), Color3.fromRGB(230, 220, 200), Enum.Material.Marble)
+	part(model, "Back", Vector3.new(30, 14, 1.5), CFrame.new(pos + Vector3.new(0, 7.5, 11)), Color3.fromRGB(200, 90, 70), Enum.Material.Brick)
+	for _, sx in ipairs({ -1, 1 }) do
+		part(model, "Wall", Vector3.new(1.5, 14, 24), CFrame.new(pos + Vector3.new(sx * 14.5, 7.5, 0)), Color3.fromRGB(200, 90, 70), Enum.Material.Brick)
+		part(model, "Column", Vector3.new(2.5, 14, 2.5), CFrame.new(pos + Vector3.new(sx * 12, 7.5, -11)), Color3.fromRGB(245, 235, 220), Enum.Material.Marble, "cyl").CFrame = CFrame.new(pos + Vector3.new(sx * 12, 7, -11)) * CFrame.Angles(0, 0, math.pi / 2)
+	end
+	local dome = part(model, "Dome", Vector3.new(30, 14, 26), CFrame.new(pos + Vector3.new(0, 14, 0)), Color3.fromRGB(60, 140, 200), Enum.Material.Metal, "ball")
+	dome.CanCollide = false
+	local spire = part(model, "Spire", Vector3.new(2, 8, 2), CFrame.new(pos + Vector3.new(0, 24, 0)), Color3.fromRGB(255, 215, 0), Enum.Material.Neon, "cone")
+	spire.CanCollide = false
+	local desk = part(model, "Desk", Vector3.new(14, 3.5, 3), CFrame.new(pos + Vector3.new(0, 2.5, 4)), Color3.fromRGB(120, 80, 50), Enum.Material.Wood)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "فتح السوق"
+	prompt.ObjectText = "السوق العالمي"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 16
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = desk
+	billboard(spire, "🏪 السوق العالمي\nبيع واشترِ الحيوانات بالجواهر 💠", UDim2.fromScale(20, 5), Color3.fromRGB(255, 220, 120), 6)
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 220, 120)
+	light.Range = 40
+	light.Brightness = 1.5
+	light.Parent = base
+	model.PrimaryPart = base
+	model.Parent = parent
+	return model
+end
+
 function MapBuilder.Build()
 	setupLighting()
 	local existing = Workspace:FindFirstChild("Map")
@@ -738,16 +998,13 @@ function MapBuilder.Build()
 
 	local rng = Random.new(2024)
 
-	-- المناطق (عالم 1 و 2)
-	local w2 = Config.Map.World2Offset
+	-- المناطق (3 عوالم)
+	local offsets = { [1] = Vector3.new(0, 0, 0), [2] = Config.Map.World2Offset, [3] = Config.Map.World3Offset }
 	for i, zone in ipairs(Zones.List) do
-		local center
-		if zone.World == 2 then
-			center = w2 + Vector3.new(0, 0, (i - Zones.World2Start) * SPACING)
-		else
-			center = Vector3.new(0, 0, (i - 1) * SPACING)
-		end
+		local start = Zones.WorldStart[zone.World] or 1
+		local center = offsets[zone.World] + Vector3.new(0, 0, (i - start) * SPACING)
 		local layout = buildIsland(zone, center, ISLAND, map, rng)
+		ambient(layout.Folder, center, ISLAND, zone.Decor)
 		MapBuilder.Zones[i] = layout
 		local prevZone = Zones.List[i - 1]
 		if prevZone and prevZone.World == zone.World then
@@ -756,13 +1013,55 @@ function MapBuilder.Build()
 		end
 	end
 
-	-- بوابة العالم الثاني (في الفراغ) وبوابة العودة (في مركز التقنية)
-	local void = MapBuilder.Zones[Zones.World2Start - 1]
-	local hub = MapBuilder.Zones[Zones.World2Start]
-	MapBuilder.World2Portal = buildPortal(void.Folder, void.Center + Vector3.new(0, 0, ISLAND / 2 - 8), Color3.fromRGB(0, 255, 255), "🌐 Tech World\nيتطلب ريبيرث + 💰 " .. Format.Number(Zones.List[Zones.World2Start].Cost))
+	-- بوابات العوالم
+	local w2s, w3s = Zones.WorldStart[2], Zones.WorldStart[3]
+	local void = MapBuilder.Zones[w2s - 1]
+	local hub = MapBuilder.Zones[w2s]
+	MapBuilder.World2Portal = buildPortal(void.Folder, void.Center + Vector3.new(0, 0, ISLAND / 2 - 8), Color3.fromRGB(0, 255, 255), "🌐 Tech World\nيتطلب ريبيرث + 💰 " .. Format.Number(Zones.List[w2s].Cost))
 	MapBuilder.World2Portal:SetAttribute("Portal", "World2")
+	portalParticles(MapBuilder.World2Portal, Color3.fromRGB(0, 255, 255))
 	MapBuilder.World1Portal = buildPortal(hub.Folder, hub.Center + Vector3.new(0, 0, -ISLAND / 2 + 30), Color3.fromRGB(120, 200, 255), "🏠 العودة للعالم الأول")
 	MapBuilder.World1Portal:SetAttribute("Portal", "World1")
+	portalParticles(MapBuilder.World1Portal, Color3.fromRGB(120, 200, 255))
+	local quantum = MapBuilder.Zones[w3s - 1]
+	local enchanted = MapBuilder.Zones[w3s]
+	MapBuilder.Portals.World3 = buildPortal(quantum.Folder, quantum.Center + Vector3.new(0, 0, ISLAND / 2 - 8), Color3.fromRGB(255, 120, 255), "✨ Mythic Realm\nيتطلب 3 ريبيرث + 💰 " .. Format.Number(Zones.List[w3s].Cost))
+	portalParticles(MapBuilder.Portals.World3, Color3.fromRGB(255, 120, 255))
+	MapBuilder.Portals.BackWorld2 = buildPortal(enchanted.Folder, enchanted.Center + Vector3.new(0, 0, -ISLAND / 2 + 30), Color3.fromRGB(0, 255, 255), "🌐 العودة للعالم الثاني")
+	portalParticles(MapBuilder.Portals.BackWorld2, Color3.fromRGB(0, 255, 255))
+
+	-- جزيرة السوق الكبير
+	local marketCenter = Config.Map.MarketOffset
+	local marketLayout = buildIsland(Zones.Market, marketCenter, 260, map, rng)
+	ambient(marketLayout.Folder, marketCenter, 260, "market")
+	MapBuilder.Zones[-1] = marketLayout
+	local mf = marketLayout.Folder
+	-- نقاط الصناديق في حلقة خارج الأكشاك
+	marketLayout.Spots = {}
+	for i = 1, 16 do
+		local ang = (i - 1) / 16 * math.pi * 2
+		local sp = marketCenter + Vector3.new(math.cos(ang) * 100, 0, math.sin(ang) * 100)
+		if not (sp.Z < -80 and math.abs(sp.X) < 30) and not (sp.X < -50 and sp.Z > 70) then
+			table.insert(marketLayout.Spots, sp)
+		end
+	end
+	buildAuctionHouse(mf, marketCenter + Vector3.new(0, 0, 80))
+	buildFountain(mf, marketCenter + Vector3.new(0, 0, 0))
+	-- الأكشاك في حلقة حول النافورة
+	for i = 1, Config.Market.Booths do
+		local ang = (i - 1) / Config.Market.Booths * math.pi * 2
+		local r = 62
+		local pos = marketCenter + Vector3.new(math.cos(ang) * r, 0, math.sin(ang) * r)
+		-- الكشك يواجه النافورة
+		local rot = -ang + math.pi / 2
+		table.insert(MapBuilder.Booths, buildBooth(mf, pos, rot, i))
+	end
+	MapBuilder.Machines.PetShop = buildStall(mf, marketCenter + Vector3.new(-70, 0, 90), "PetShop", "🐾 متجر الحيوانات\nبيع حيواناتك بالجواهر", Color3.fromRGB(60, 160, 90))
+	MapBuilder.Portals.MarketReturn = buildPortal(mf, marketCenter + Vector3.new(0, 0, -100), Color3.fromRGB(120, 200, 255), "🏠 العودة للبلدة")
+	portalParticles(MapBuilder.Portals.MarketReturn, Color3.fromRGB(120, 200, 255))
+	for _, off in ipairs({ Vector3.new(-30, 0, 40), Vector3.new(30, 0, 40), Vector3.new(-30, 0, -40), Vector3.new(30, 0, -40) }) do
+		buildLamp(mf, marketCenter + off)
+	end
 
 	-- منطقة VIP
 	local vipCenter = Config.Map.VIPOffset
@@ -770,6 +1069,8 @@ function MapBuilder.Build()
 	MapBuilder.Zones[0] = vipLayout
 	MapBuilder.VIPReturnPortal = buildPortal(vipLayout.Folder, vipCenter + Vector3.new(0, 0, -70), Color3.fromRGB(120, 200, 255), "🏠 العودة للبلدة")
 	MapBuilder.VIPReturnPortal:SetAttribute("Portal", "Return")
+	portalParticles(MapBuilder.VIPReturnPortal, Color3.fromRGB(120, 200, 255))
+	ambient(vipLayout.Folder, vipCenter, 200, "gold")
 
 	-- البلدة
 	local town = MapBuilder.Zones[1]
@@ -796,6 +1097,9 @@ function MapBuilder.Build()
 
 	MapBuilder.VIPPortal = buildPortal(tf, town.Center + Vector3.new(-118, 0, -112), Color3.fromRGB(255, 215, 0), "👑 VIP Lounge")
 	MapBuilder.VIPPortal:SetAttribute("Portal", "VIP")
+	portalParticles(MapBuilder.VIPPortal, Color3.fromRGB(255, 215, 0))
+	MapBuilder.Portals.Market = buildPortal(tf, town.Center + Vector3.new(-118, 0, -80), Color3.fromRGB(255, 140, 60), "🏪 السوق الكبير\nبيع واشترِ الحيوانات")
+	portalParticles(MapBuilder.Portals.Market, Color3.fromRGB(255, 140, 60))
 
 	-- الأكشاك والعجلة والمذبح والنافورة
 	MapBuilder.Machines.Merchant = buildStall(tf, town.Center + Vector3.new(-62, 0, -116), "Merchant", "🧳 التاجر المتجول", Color3.fromRGB(200, 60, 60))
@@ -815,7 +1119,7 @@ function MapBuilder.Build()
 	MapBuilder.Boards.Damage = buildBoard(vipLayout.Folder, vipCenter + Vector3.new(40, 0, -95), "⚔️ أعلى ضرر", Color3.fromRGB(255, 90, 120))
 
 	-- أرضية الموت تحت الجزر
-	local kill = part(map, "KillPlane", Vector3.new(4000, 1, 8000), CFrame.new(300, -120, 2000), Color3.fromRGB(20, 20, 30), Enum.Material.SmoothPlastic)
+	local kill = part(map, "KillPlane", Vector3.new(9000, 1, 9000), CFrame.new(1200, -120, 2000), Color3.fromRGB(20, 20, 30), Enum.Material.SmoothPlastic)
 	kill.Transparency = 1
 	kill.CanCollide = false
 	kill.Touched:Connect(function(hit)

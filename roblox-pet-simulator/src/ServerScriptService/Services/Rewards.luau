@@ -30,6 +30,9 @@ function Rewards.Grant(player: Player, reward: any, coinScale: number?)
 	if reward.Tokens then
 		DataService.AddTokens(player, reward.Tokens)
 	end
+	if reward.Gems then
+		DataService.AddGems(player, reward.Gems, true)
+	end
 	DataService.MarkDirty(player)
 end
 
@@ -52,6 +55,9 @@ function Rewards.Describe(reward: any, coinScale: number?): string
 	end
 	if reward.Tokens then
 		table.insert(parts, "🔁 " .. reward.Tokens)
+	end
+	if reward.Gems then
+		table.insert(parts, "💠 " .. Format.Number(reward.Gems))
 	end
 	return table.concat(parts, "  ")
 end

@@ -27,11 +27,11 @@ function ZoneService.Unlock(player: Player, index: number): { ok: boolean, error
 	if p.UnlockedZones[tostring(index)] then
 		return { ok = true }
 	end
-	if index == Zones.World2Start then
-		if p.Rebirths < 1 then
-			return { ok = false, error = "العالم الثاني يتطلب ريبيرث واحد على الأقل" }
-		end
-	elseif not p.UnlockedZones[tostring(index - 1)] then
+	local required = Zones.RebirthRequired(index)
+	if required > 0 and p.Rebirths < required then
+		return { ok = false, error = "هذا العالم يتطلب " .. required .. " ريبيرث" }
+	end
+	if not Zones.IsWorldStart(index) and not p.UnlockedZones[tostring(index - 1)] then
 		return { ok = false, error = "افتح المنطقة السابقة أولاً" }
 	end
 	if not DataService.Spend(player, "Coins", zone.Cost) then
@@ -40,6 +40,7 @@ function ZoneService.Unlock(player: Player, index: number): { ok: boolean, error
 	p.UnlockedZones[tostring(index)] = true
 	Hooks.Fire(player, "Zone", index)
 	DataService.MarkDirty(player)
+	Remotes.Event("EventEffect"):FireClient(player, { Type = "ZoneUnlock", Zone = index })
 	DataService.Notify(player, "🔓 فتحت منطقة " .. zone.Name .. " (" .. zone.Arabic .. ")!", Color3.fromRGB(120, 255, 140))
 	return { ok = true }
 end
@@ -53,9 +54,11 @@ function ZoneService.Teleport(player: Player, index: number): boolean
 		if not DataService.HasGamepass(player, "VIP") then
 			return false
 		end
+	elseif index == -1 then
+		-- السوق متاح للجميع
 	elseif not p.UnlockedZones[tostring(index)] then
 		return false
-	elseif index >= Zones.World2Start and p.Rebirths < 1 then
+	elseif p.Rebirths < Zones.RebirthRequired(index) then
 		return false
 	end
 	local layout = MapBuilder.Zones[index]
@@ -112,21 +115,28 @@ local function onPortalTouched(kind: string, hit: BasePart)
 				pcall(MarketplaceService.PromptGamePassPurchase, MarketplaceService, player, Config.Gamepasses.VIP)
 			end
 		end
-	elseif kind == "World2" then
+	elseif kind == "World2" or kind == "World3" then
 		local p = DataService.Get(player)
 		if not p then
 			return
 		end
-		if not p.UnlockedZones[tostring(Zones.World2Start)] then
-			local res = ZoneService.Unlock(player, Zones.World2Start)
+		local start = kind == "World2" and Zones.WorldStart[2] or Zones.WorldStart[3]
+		if not p.UnlockedZones[tostring(start)] then
+			local res = ZoneService.Unlock(player, start)
 			if not res.ok then
 				DataService.Notify(player, res.error or "لا يمكن الدخول", Color3.fromRGB(255, 120, 120))
 				return
 			end
 		end
-		ZoneService.Teleport(player, Zones.World2Start)
+		ZoneService.Teleport(player, start)
 	elseif kind == "World1" then
-		ZoneService.Teleport(player, Zones.World2Start - 1)
+		ZoneService.Teleport(player, Zones.WorldStart[2] - 1)
+	elseif kind == "BackWorld2" then
+		ZoneService.Teleport(player, Zones.WorldStart[3] - 1)
+	elseif kind == "Market" then
+		ZoneService.Teleport(player, -1)
+	elseif kind == "MarketReturn" then
+		ZoneService.Teleport(player, 1)
 	else
 		ZoneService.Teleport(player, 1)
 	end
@@ -210,6 +220,11 @@ function ZoneService.Init()
 	if MapBuilder.World1Portal then
 		MapBuilder.World1Portal.Touched:Connect(function(hit)
 			onPortalTouched("World1", hit)
+		end)
+	end
+	for kind, portal in pairs(MapBuilder.Portals) do
+		portal.Touched:Connect(function(hit)
+			onPortalTouched(kind, hit)
 		end)
 	end
 	-- تحديث السرعة عند تغير الإنشانتات (عبر تغير الحيوانات المجهزة)

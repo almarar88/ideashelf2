@@ -15,6 +15,8 @@ export type EggDef = {
 	Slot: number, -- مكان البيضة داخل المنطقة
 	Huge: string?, -- حيوان عملاق بفرصة نادرة جداً
 	HugeChance: number?,
+	Titanic: string?,
+	TitanicChance: number?,
 }
 
 local function pets(t: { { any } })
@@ -95,13 +97,36 @@ Eggs.List = {
 		Pets = even({ "byte_blob", "cache_cat", "server_golem", "firewall_demon", "quantum_owl", "core_guardian" }, SIX) },
 	{ Id = "QuantumEgg", Name = "Quantum Egg", Zone = 15, Cost = 250000000000000, Currency = "Coins", Slot = 1,
 		Color = Color3.fromRGB(0, 0, 30), Accent = Color3.fromRGB(255, 0, 255),
-		Pets = even({ "quark_slime", "photon_bunny", "entangled_cat", "singularity_ghost", "nova_unicorn", "quantum_dragon", "omniverse_overlord" }, { 40, 28, 16, 9, 4.5, 2, 0.5 }), Huge = "huge_dragon", HugeChance = 0.003 },
+		Pets = even({ "quark_slime", "photon_bunny", "entangled_cat", "singularity_ghost", "nova_unicorn", "quantum_dragon", "omniverse_overlord" }, { 40, 28, 16, 9, 4.5, 2, 0.5 }), Huge = "huge_dragon", HugeChance = 0.003, Titanic = "titanic_cat", TitanicChance = 0.00015 },
+	-- العالم الثالث
+	{ Id = "EnchantedEgg", Name = "Enchanted Egg", Zone = 16, Cost = 2000000000000000, Currency = "Coins", Slot = 1,
+		Color = Color3.fromRGB(120, 60, 160), Accent = Color3.fromRGB(255, 150, 255),
+		Pets = even({ "fairy_bunny", "pixie_cat", "mushroom_golem", "moon_owl", "wisp_ghost", "elder_treant" }, SIX), Huge = "huge_unicorn", HugeChance = 0.004 },
+	{ Id = "CrystalEgg", Name = "Crystal Egg", Zone = 17, Cost = 15000000000000000, Currency = "Coins", Slot = 1,
+		Color = Color3.fromRGB(150, 200, 255), Accent = Color3.fromRGB(255, 255, 255),
+		Pets = even({ "quartz_slime", "amethyst_fox", "topaz_dog", "ruby_dragon", "sapphire_golem", "diamond_unicorn" }, SIX), Huge = "huge_golem", HugeChance = 0.004 },
+	{ Id = "DragonEgg", Name = "Dragon Egg", Zone = 18, Cost = 120000000000000000, Currency = "Coins", Slot = 1,
+		Color = Color3.fromRGB(120, 30, 30), Accent = Color3.fromRGB(255, 150, 40),
+		Pets = even({ "wyrmling", "ember_bird", "stone_wyvern", "storm_wyvern", "inferno_wyrm", "elder_dragon", "dragon_emperor" }, { 40, 28, 16, 9, 4.5, 2, 0.5 }), Huge = "huge_dragon", HugeChance = 0.005, Titanic = "titanic_dragon", TitanicChance = 0.0002 },
+	{ Id = "CelestialEgg", Name = "Celestial Egg", Zone = 19, Cost = 1000000000000000000, Currency = "Coins", Slot = 1,
+		Color = Color3.fromRGB(255, 255, 255), Accent = Color3.fromRGB(255, 220, 120),
+		Pets = even({ "cherub_bunny", "halo_cat", "seraph_bird", "star_fox", "archangel_unicorn", "celestial_guardian" }, SIX), Huge = "huge_unicorn", HugeChance = 0.005, Titanic = "titanic_phoenix", TitanicChance = 0.0002 },
+	{ Id = "EternalEgg", Name = "Eternal Egg", Zone = 20, Cost = 8000000000000000000, Currency = "Coins", Slot = 1,
+		Color = Color3.fromRGB(0, 0, 0), Accent = Color3.fromRGB(255, 255, 255),
+		Pets = even({ "void_slime", "abyss_cat", "phantom_owl", "eternity_ghost", "oblivion_demon", "eternal_dragon", "the_creator", "genesis_overlord" }, { 38, 27, 16, 9, 5, 3, 1.5, 0.5 }), Huge = "huge_demon", HugeChance = 0.006, Titanic = "titanic_overlord", TitanicChance = 0.0003 },
+	-- السوق: بيضة البازار بالجواهر
+	{ Id = "BazaarEgg", Name = "Bazaar Egg", Zone = -1, Cost = 150, Currency = "Gems", Slot = 1,
+		Color = Color3.fromRGB(200, 120, 60), Accent = Color3.fromRGB(255, 215, 0),
+		Pets = even({ "bazaar_cat", "lantern_ghost", "carpet_fox", "genie_blob", "sultan_dragon", "gem_golem" }, { 35, 30, 16, 12, 5, 2 }), Huge = "huge_golem", HugeChance = 0.002, Titanic = "titanic_cat", TitanicChance = 0.0001 },
 }
 
 Eggs.ById = {} :: { [string]: EggDef }
 for _, e in ipairs(Eggs.List) do
 	if e.Huge and e.HugeChance then
 		table.insert(e.Pets, { Pet = e.Huge, Chance = e.HugeChance })
+	end
+	if e.Titanic and e.TitanicChance then
+		table.insert(e.Pets, { Pet = e.Titanic, Chance = e.TitanicChance })
 	end
 	Eggs.ById[e.Id] = e
 end

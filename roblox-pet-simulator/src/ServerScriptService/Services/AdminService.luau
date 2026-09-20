@@ -28,6 +28,8 @@ function AdminService.Run(player: Player, command: string, payload: any): { ok: 
 		p.Diamonds += n
 	elseif command == "Tokens" then
 		p.Tokens += n
+	elseif command == "Gems" then
+		p.Gems += n
 	elseif command == "Spins" then
 		p.Spins += n
 	elseif command == "Rebirths" then
@@ -39,7 +41,7 @@ function AdminService.Run(player: Player, command: string, payload: any): { ok: 
 		end
 		PetService.Add(player, id, tostring(payload.Variant or "Normal"), true)
 	elseif command == "UnlockAll" then
-		for i = 1, 15 do
+		for i = 1, 20 do
 			p.UnlockedZones[tostring(i)] = true
 		end
 	elseif command == "Event" then

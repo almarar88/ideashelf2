@@ -49,6 +49,8 @@ Config.DevProducts = {
 	LuckyPotion = 0,
 	CoinPotion = 0,
 	Spins_5 = 0,
+	Gems_500 = 0,
+	Gems_2500 = 0,
 }
 
 Config.DevProductInfo = {
@@ -60,6 +62,8 @@ Config.DevProductInfo = {
 	{ Key = "LuckyPotion", Name = "3 جرعات حظ", Icon = "🧪", Potion = "Lucky", Count = 3 },
 	{ Key = "CoinPotion", Name = "3 جرعات عملات", Icon = "🧪", Potion = "Coins", Count = 3 },
 	{ Key = "Spins_5", Name = "5 لفات عجلة الحظ", Icon = "🎡", Spins = 5 },
+	{ Key = "Gems_500", Name = "500 جوهرة (عملة السوق)", Icon = "💠", Gems = 500 },
+	{ Key = "Gems_2500", Name = "2,500 جوهرة", Icon = "💠", Gems = 2500 },
 }
 
 Config.BaseEquip = 3
@@ -132,6 +136,26 @@ Config.Rebirth = {
 	DiamondsPerRebirth = 0.10,
 	TokensPerRebirth = 1,
 }
+
+-- السوق (Gems = عملة السوق 💠)
+Config.Market = {
+	ListingTTL = 3 * 86400,
+	MaxListings = 6,
+	FeePercent = 10,
+	MinPrice = 1,
+	MaxPrice = 1000000000,
+	Booths = 12,
+	CacheSeconds = 8,
+	-- قيمة بيع الحيوان للتاجر بالجوهرة حسب الندرة (× مضاعف النوع × (1 + المستوى/50))
+	NPCValue = { Common = 1, Uncommon = 2, Rare = 5, Epic = 15, Legendary = 60, Mythical = 250, Exclusive = 800, Huge = 5000, Titanic = 50000 },
+}
+
+-- الحيوانات التايتانيك: فرصة سقوط من الزعيم
+Config.TitanicBossChance = 0.004
+Config.TitanicPets = { "titanic_dragon", "titanic_overlord", "titanic_cat", "titanic_phoenix" }
+
+-- متطلبات الريبيرث لكل عالم
+Config.WorldRebirths = { [1] = 0, [2] = 1, [3] = 3 }
 
 -- الهوفربورد
 Config.Hoverboards = {
@@ -224,6 +248,11 @@ Config.Achievements = {
 	{ Id = "boss_5", Name = "قاتل الزعماء", Stat = "BossKills", Target = 5, Reward = { Diamonds = 400 } },
 	{ Id = "trade_5", Name = "تاجر", Stat = "Trades", Target = 5, Reward = { Diamonds = 200 } },
 	{ Id = "enchant_25", Name = "ساحر", Stat = "Enchants", Target = 25, Reward = { Diamonds = 300 } },
+	{ Id = "sales_5", Name = "بائع", Stat = "MarketSales", Target = 5, Reward = { Gems = 100 } },
+	{ Id = "sales_50", Name = "تاجر السوق", Stat = "MarketSales", Target = 50, Reward = { Gems = 1000, Diamonds = 1000 } },
+	{ Id = "gems_1000", Name = "جامع الجواهر", Stat = "GemsEarned", Target = 1000, Reward = { Diamonds = 500 } },
+	{ Id = "huge_1", Name = "عملاق!", Stat = "Huges", Target = 1, Reward = { Diamonds = 2500, Gems = 500 } },
+	{ Id = "titanic_1", Name = "تايتانيك!!!", Stat = "Titanics", Target = 1, Reward = { Diamonds = 10000, Gems = 5000 } },
 }
 
 -- الدليل التعليمي للمبتدئين (خطوات متسلسلة)
@@ -253,6 +282,8 @@ Config.Codes = {
 	GIANT = { Diamonds = 1000, Potion = "Damage" },
 	SPIN = { Spins = 3 },
 	TECHWORLD = { Diamonds = 750 },
+	MARKET = { Gems = 100 },
+	TITANIC = { Diamonds = 2000, Gems = 250 },
 }
 
 Config.DailyRewards = {
@@ -262,7 +293,7 @@ Config.DailyRewards = {
 	{ Diamonds = 150 },
 	{ Diamonds = 200, Spins = 1 },
 	{ Diamonds = 300 },
-	{ Diamonds = 750, Potion = "Lucky", Spins = 2 },
+	{ Diamonds = 750, Potion = "Lucky", Spins = 2, Gems = 50 },
 }
 Config.VIPDailyDiamonds = 300
 
@@ -297,7 +328,9 @@ Config.Map = {
 	IslandSize = 300,
 	BridgeLength = 120,
 	VIPOffset = Vector3.new(-750, 0, 0),
+	MarketOffset = Vector3.new(-750, 0, 700),
 	World2Offset = Vector3.new(1500, 0, 0),
+	World3Offset = Vector3.new(3000, 0, 0),
 }
 
 -- أثناء التجربة في Studio: اعتبر كل الجيم باس مملوكة (عطّلها قبل النشر)
@@ -316,6 +349,8 @@ Config.Sounds = {
 	Unlock = 0,
 	Spin = 0,
 	Boss = 0,
+	Sell = 0,
+	Firework = 0,
 }
 
 return Config

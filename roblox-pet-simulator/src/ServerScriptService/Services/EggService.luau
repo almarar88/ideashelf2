@@ -58,9 +58,9 @@ function EggService.Hatch(player: Player, eggId: string, count: number, variant:
 	if egg.Zone > 0 and not p.UnlockedZones[tostring(egg.Zone)] then
 		return { ok = false, error = "افتح المنطقة أولاً" }
 	end
-	local zone = Zones.Get(egg.Zone)
-	if zone and zone.World == 2 and p.Rebirths < 1 then
-		return { ok = false, error = "العالم الثاني يتطلب ريبيرث" }
+	local required = Zones.RebirthRequired(egg.Zone)
+	if required > 0 and p.Rebirths < required then
+		return { ok = false, error = "هذا العالم يتطلب " .. required .. " ريبيرث" }
 	end
 
 	local pos = eggPositions[eggId]
@@ -82,7 +82,7 @@ function EggService.Hatch(player: Player, eggId: string, count: number, variant:
 
 	local total = egg.Cost * count * variantCost
 	if not DataService.Spend(player, egg.Currency, total) then
-		local name = egg.Currency == "Coins" and "العملات" or (egg.Currency == "Diamonds" and "الألماس" or "توكنات الريبيرث")
+		local name = egg.Currency == "Coins" and "العملات" or (egg.Currency == "Diamonds" and "الألماس" or (egg.Currency == "Gems" and "الجواهر" or "توكنات الريبيرث"))
 		return { ok = false, error = "لا تملك ما يكفي من " .. name }
 	end
 	lastHatch[player] = now
@@ -106,10 +106,14 @@ function EggService.Hatch(player: Player, eggId: string, count: number, variant:
 		table.insert(results, { Uid = inst and inst.Uid or "", Id = petId, Variant = variant, Deleted = deleted })
 		if def and rank >= 5 then
 			Remotes.Event("HatchBroadcast"):FireAllClients({ Player = player.Name, PetId = petId, Variant = variant, Rarity = def.Rarity })
-			if rank >= 8 then
+			if rank >= 9 then
+				DataService.NotifyAll("🌟🌟🌟 " .. player.Name .. " حصل على " .. def.Name .. "!!! 🌟🌟🌟", Color3.new(1, 1, 1))
+				Remotes.Event("EventEffect"):FireAllClients({ Type = "Titanic", Player = player.Name, PetId = petId })
+			elseif rank >= 8 then
 				DataService.NotifyAll("🎉 " .. player.Name .. " حصل على " .. def.Name .. "!!! 🎉", Color3.fromRGB(255, 0, 80))
 				Remotes.Event("EventEffect"):FireAllClients({ Type = "Huge", Player = player.Name, PetId = petId })
 			end
+			Remotes.Event("EventEffect"):FireClient(player, { Type = "HatchRare", Rarity = def.Rarity, EggId = eggId })
 		end
 	end
 	p.Stats.Hatches += count

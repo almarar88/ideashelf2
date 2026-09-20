@@ -44,6 +44,7 @@ Remotes.Functions = {
 	"ClaimTutorial",  -- () -> {ok, error?}
 	"ClaimVIPDaily",  -- () -> {ok, error?}
 	"Admin",          -- (command, payload) -> {ok, error?}
+	"Market",         -- (action, payload) -> {ok, error?, ...} السوق: Browse/List/Buy/Cancel/SellNPC/Booth
 }
 
 local folder: Folder

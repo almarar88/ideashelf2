@@ -110,6 +110,9 @@ local function grantProduct(player: Player, key: string): boolean
 	elseif info.Spins then
 		DataService.AddSpins(player, info.Spins)
 		DataService.Notify(player, "🎡 حصلت على " .. info.Spins .. " لفات!", Color3.fromRGB(255, 220, 60))
+	elseif info.Gems then
+		DataService.AddGems(player, info.Gems)
+		DataService.Notify(player, "💠 حصلت على " .. info.Gems .. " جوهرة!", Color3.fromRGB(180, 120, 255))
 	end
 	return true
 end

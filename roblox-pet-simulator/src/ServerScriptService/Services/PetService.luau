@@ -137,6 +137,11 @@ function PetService.Add(player: Player, petId: string, variant: string?, ignoreC
 	}
 	table.insert(p.Pets, inst)
 	p.Index[petId] = true
+	if def.Rarity == "Huge" then
+		p.Stats.Huges += 1
+	elseif def.Rarity == "Titanic" then
+		p.Stats.Titanics += 1
+	end
 	local power = PetUtil.BasePower(inst)
 	if power > (p.Stats.BestPet or 0) then
 		p.Stats.BestPet = power
@@ -403,7 +408,7 @@ function PetService.Machine(player: Player, kind: string, payload: any): { ok: b
 		local sameVariant = true
 		for _, pet in ipairs(pets) do
 			local def = Pets.Get(pet.Id)
-			if def and def.Tier > bestTier and def.Tier <= 15 then
+			if def and def.Tier > bestTier and def.Tier <= 20 then
 				bestTier = def.Tier
 			end
 			if pet.Variant ~= variant then
@@ -413,7 +418,7 @@ function PetService.Machine(player: Player, kind: string, payload: any): { ok: b
 		local upgradeChance = math.min(0.6, cfg.UpgradeChance * (#pets - 2))
 		local targetTier = bestTier
 		if rng:NextNumber() < upgradeChance then
-			targetTier = math.min(15, bestTier + 1)
+			targetTier = math.min(20, bestTier + 1)
 		end
 		local function eggForTier(tier: number)
 			for _, e in ipairs(Eggs.List) do
@@ -447,7 +452,7 @@ function PetService.Machine(player: Player, kind: string, payload: any): { ok: b
 			return { ok = false, error = "املأ الخانة السابقة أولاً" }
 		end
 		local def = Pets.Get(pet.Id) :: Pets.PetDef
-		local cost = Config.EnchantCostPerTier * math.min(def.Tier, 15)
+		local cost = Config.EnchantCostPerTier * math.min(def.Tier, 20)
 		if not DataService.Spend(player, "Diamonds", cost) then
 			return { ok = false, error = "تحتاج 💎 " .. cost }
 		end

@@ -8,6 +8,7 @@ export type BreakableDef = {
 	Health: number,
 	Coins: number,
 	Diamonds: number,
+	Gems: number?,
 	Respawn: number,
 	Size: Vector3,
 	Color: Color3,
@@ -30,6 +31,10 @@ Breakables.Types = {
 		Size = Vector3.new(4, 4, 4), Color = Color3.fromRGB(60, 200, 255), Shape = "gift", Material = Enum.Material.Metal },
 	Boss = { Name = "Slime King", Arabic = "ملك السلايم", Health = 1000, Coins = 1500, Diamonds = 40, Respawn = 999999,
 		Size = Vector3.new(16, 14, 16), Color = Color3.fromRGB(50, 205, 50), Shape = "boss", Material = Enum.Material.SmoothPlastic },
+	GemOre = { Name = "Gem Ore", Arabic = "خام الجواهر", Health = 900, Coins = 0, Diamonds = 0, Gems = 2, Respawn = 60,
+		Size = Vector3.new(4, 4, 4), Color = Color3.fromRGB(120, 60, 200), Shape = "crystal", Material = Enum.Material.Glass },
+	MagicOrb = { Name = "Magic Orb", Arabic = "كرة سحرية", Health = 32, Coins = 15, Diamonds = 0, Respawn = 4,
+		Size = Vector3.new(4, 4, 4), Color = Color3.fromRGB(255, 120, 255), Shape = "orb", Material = Enum.Material.Neon },
 	MysteryBox = { Name = "Mystery Box", Arabic = "صندوق الغموض", Health = 5000, Coins = 2000, Diamonds = 25, Respawn = 240,
 		Size = Vector3.new(6, 6, 6), Color = Color3.fromRGB(80, 60, 200), Shape = "gift", Material = Enum.Material.Neon },
 }

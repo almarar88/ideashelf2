@@ -25,6 +25,7 @@ local SpinService = require(Services.SpinService)
 local MerchantService = require(Services.MerchantService)
 local HoverboardService = require(Services.HoverboardService)
 local AdminService = require(Services.AdminService)
+local MarketService = require(Services.MarketService)
 
 MapBuilder.Build()
 
@@ -49,6 +50,7 @@ TradeService.Init()
 MerchantService.Init()
 HoverboardService.Init()
 AdminService.Init()
+MarketService.Init()
 LeaderboardService.Init()
 DataService.Init()
 

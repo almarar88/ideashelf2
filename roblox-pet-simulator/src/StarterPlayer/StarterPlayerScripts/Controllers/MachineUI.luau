@@ -16,6 +16,7 @@ local InventoryUI = require(script.Parent.InventoryUI)
 local PetViewport = require(script.Parent.PetViewport)
 
 local MachineUI = {}
+MachineUI.OnPetShop = nil :: (() -> ())?
 
 local INFO = {
 	Golden = { Title = "✨ آلة الذهب", Desc = "ضع 3 حيوانات متطابقة (عادية) لتحصل على نسخة ذهبية بقوة x2 (يحتفظ بأعلى مستوى)", Color = UIKit.Colors.Gold, Max = 3 },
@@ -294,6 +295,13 @@ function MachineUI.Init()
 			UIController.Open("Stats")
 		elseif kind == "Trade" then
 			UIController.Open("Trade")
+		elseif kind == "Market" then
+			UIController.Open("Market")
+		elseif kind == "PetShop" then
+			UIController.Open("Market")
+			if MachineUI.OnPetShop then
+				MachineUI.OnPetShop()
+			end
 		end
 	end)
 end

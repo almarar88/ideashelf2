@@ -93,6 +93,7 @@ end
 local coinsLabel: TextLabel
 local diamondsLabel: TextLabel
 local tokensLabel: TextLabel
+local gemsLabel: TextLabel
 local powerLabel: TextLabel
 local zoneLabel: TextLabel
 local rebirthLabel: TextLabel
@@ -116,7 +117,7 @@ local function buildHUD()
 	hud = UIKit.Frame({ Name = "HUD", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = gui })
 
 	-- العملات
-	local currency = UIKit.Frame({ Size = UDim2.fromOffset(220, 138), Position = UDim2.fromOffset(16, 16), BackgroundColor3 = UIKit.Colors.Panel, BackgroundTransparency = 0.15, Parent = hud })
+	local currency = UIKit.Frame({ Size = UDim2.fromOffset(220, 180), Position = UDim2.fromOffset(16, 16), BackgroundColor3 = UIKit.Colors.Panel, BackgroundTransparency = 0.15, Parent = hud })
 	UIKit.Corner(currency, 16)
 	UIKit.Stroke(currency, UIKit.Colors.Panel3, 2)
 	UIKit.Padding(currency, 8)
@@ -129,6 +130,7 @@ local function buildHUD()
 	end
 	coinsLabel = currencyRow("💰", UIKit.Colors.Gold)
 	diamondsLabel = currencyRow("💎", UIKit.Colors.Cyan)
+	gemsLabel = currencyRow("💠", Color3.fromRGB(200, 140, 255))
 	tokensLabel = currencyRow("🔁", Color3.fromRGB(255, 140, 60))
 
 	-- القوة والمنطقة والريبيرث
@@ -186,7 +188,7 @@ local function buildHUD()
 	end
 
 	-- أزرار القائمة اليسرى
-	local menu = UIKit.Frame({ BackgroundTransparency = 1, Size = UDim2.fromOffset(80, 720), Position = UDim2.fromOffset(16, 166), Parent = hud })
+	local menu = UIKit.Frame({ BackgroundTransparency = 1, Size = UDim2.fromOffset(80, 720), Position = UDim2.fromOffset(16, 206), Parent = hud })
 	UIKit.List(menu, 2)
 	local function menuBtn(icon: string, text: string, color: Color3, win: string)
 		UIKit.IconButton(menu, icon, text, color, function()
@@ -200,6 +202,7 @@ local function buildHUD()
 	menuBtn("📋", "Missions", UIKit.Colors.Cyan, "Missions")
 	menuBtn("📊", "Stats", Color3.fromRGB(255, 140, 60), "Stats")
 	menuBtn("🤝", "Trade", Color3.fromRGB(60, 120, 220), "Trade")
+	menuBtn("🏪", "Market", Color3.fromRGB(255, 140, 60), "Market")
 	menuBtn("📖", "Index", UIKit.Colors.Purple, "Index")
 
 	-- أزرار يمين
@@ -247,6 +250,7 @@ local function refreshHUD(p: any)
 	tweenNumber(diamondsLabel, lastDiamonds, p.Diamonds)
 	lastCoins, lastDiamonds = p.Coins, p.Diamonds
 	tokensLabel.Text = tostring(p.Tokens or 0)
+	gemsLabel.Text = Format.Number(p.Gems or 0)
 	powerLabel.Text = "⚔️ " .. Format.Number(p.Power or 0)
 	rebirthLabel.Text = "🔁 " .. (p.Rebirths or 0)
 	adminButton.Parent.Visible = p.IsAdmin == true
@@ -335,14 +339,21 @@ local function updateTimers()
 	if hrp then
 		local pos = hrp.Position
 		local vip = Config.Map.VIPOffset
+		local market = Config.Map.MarketOffset
 		local w2 = Config.Map.World2Offset
+		local w3 = Config.Map.World3Offset
+		local flat = Vector3.new(pos.X, 0, pos.Z)
 		local idx
-		if (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(vip.X, 0, vip.Z)).Magnitude < 220 then
+		if (flat - Vector3.new(vip.X, 0, vip.Z)).Magnitude < 220 then
 			idx = 0
+		elseif (flat - Vector3.new(market.X, 0, market.Z)).Magnitude < 260 then
+			idx = -1
+		elseif pos.X > w3.X - 500 then
+			idx = math.clamp(Zones.WorldStart[3] + math.floor((pos.Z - w3.Z) / Config.Map.ZoneSpacing + 0.5), Zones.WorldStart[3], #Zones.List)
 		elseif pos.X > w2.X - 500 then
-			idx = math.clamp(Zones.World2Start + math.floor((pos.Z - w2.Z) / Config.Map.ZoneSpacing + 0.5), Zones.World2Start, #Zones.List)
+			idx = math.clamp(Zones.WorldStart[2] + math.floor((pos.Z - w2.Z) / Config.Map.ZoneSpacing + 0.5), Zones.WorldStart[2], Zones.WorldStart[3] - 1)
 		else
-			idx = math.clamp(math.floor(pos.Z / Config.Map.ZoneSpacing + 0.5) + 1, 1, Zones.World2Start - 1)
+			idx = math.clamp(math.floor(pos.Z / Config.Map.ZoneSpacing + 0.5) + 1, 1, Zones.WorldStart[2] - 1)
 		end
 		local zone = Zones.Get(idx)
 		if zone then
@@ -359,9 +370,14 @@ local function buildZonesWindow()
 	local rows: { [number]: { Frame: Frame, Button: TextButton, Status: TextLabel } } = {}
 	local all = table.clone(Zones.List)
 	table.insert(all, Zones.VIP)
+	table.insert(all, Zones.Market)
 	for _, zone in ipairs(all) do
-		if zone.Index == Zones.World2Start then
+		if zone.Index == Zones.WorldStart[2] then
 			UIKit.Label({ Text = "🌐 العالم الثاني — Tech World (يتطلب ريبيرث)", Size = UDim2.new(1, -8, 0, 30), TextColor3 = UIKit.Colors.Cyan, MaxTextSize = 20, Parent = scroll })
+		elseif zone.Index == Zones.WorldStart[3] then
+			UIKit.Label({ Text = "✨ العالم الثالث — Mythic Realm (يتطلب 3 ريبيرث)", Size = UDim2.new(1, -8, 0, 30), TextColor3 = UIKit.Colors.Pink, MaxTextSize = 20, Parent = scroll })
+		elseif zone.Index == 0 then
+			UIKit.Label({ Text = "🏝️ جزر خاصة", Size = UDim2.new(1, -8, 0, 30), TextColor3 = UIKit.Colors.Gold, MaxTextSize = 20, Parent = scroll })
 		end
 		local row = UIKit.Frame({ Size = UDim2.new(1, -8, 0, 64), BackgroundColor3 = UIKit.Colors.Panel2, Parent = scroll })
 		UIKit.Corner(row, 12)
@@ -384,6 +400,10 @@ local function buildZonesWindow()
 				else
 					Remotes.Event("PromptPurchase"):FireServer("Gamepass", "VIP")
 				end
+				return
+			elseif zone.Index == -1 then
+				Remotes.Event("Teleport"):FireServer(-1)
+				UIController.Close()
 				return
 			end
 			if p.UnlockedZones[tostring(zone.Index)] then
@@ -409,15 +429,19 @@ local function buildZonesWindow()
 				row.Button.Text = owns and "انتقال" or "👑 شراء VIP"
 				row.Button.BackgroundColor3 = owns and UIKit.Colors.Green or UIKit.Colors.Gold
 				row.Status.Text = "منطقة حصرية لأعضاء VIP"
-			elseif zone.World == 2 and (p.Rebirths or 0) < 1 then
+			elseif idx == -1 then
+				row.Button.Text = "انتقال"
+				row.Button.BackgroundColor3 = Color3.fromRGB(255, 140, 60)
+				row.Status.Text = "سوق عالمي، أكشاك، بيضة البازار 💠"
+			elseif (p.Rebirths or 0) < Zones.RebirthRequired(idx) then
 				row.Button.Text = "🔁 ريبيرث"
 				row.Button.BackgroundColor3 = UIKit.Colors.Panel3
-				row.Status.Text = "يتطلب ريبيرث واحد على الأقل"
+				row.Status.Text = "يتطلب " .. Zones.RebirthRequired(idx) .. " ريبيرث"
 			elseif p.UnlockedZones[tostring(idx)] then
 				row.Button.Text = "انتقال"
 				row.Button.BackgroundColor3 = UIKit.Colors.Green
 				row.Status.Text = "✅ مفتوحة  •  x" .. Format.Number(zone.Multiplier)
-			elseif idx == Zones.World2Start or p.UnlockedZones[tostring(idx - 1)] then
+			elseif Zones.IsWorldStart(idx) or p.UnlockedZones[tostring(idx - 1)] then
 				row.Button.Text = "🔓 " .. Format.Number(zone.Cost)
 				row.Button.BackgroundColor3 = p.Coins >= zone.Cost and UIKit.Colors.Gold or UIKit.Colors.Panel3
 				row.Status.Text = "💰 " .. Format.Number(zone.Cost) .. " لفتحها"

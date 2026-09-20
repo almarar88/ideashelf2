@@ -89,7 +89,12 @@ local function onBossKilled(contributors: { [Player]: number })
 		if p and player.Parent == Players then
 			p.Stats.BossKills += 1
 			Hooks.Fire(player, "Boss", 1)
-			if rng:NextNumber() < bossCfg.PetChance then
+			if rng:NextNumber() < Config.TitanicBossChance then
+				local tid = Config.TitanicPets[rng:NextInteger(1, #Config.TitanicPets)]
+				PetService.Add(player, tid, "Normal", true)
+				DataService.NotifyAll("🌟🌟 " .. player.Name .. " حصل على " .. tid .. " من الزعيم!!! 🌟🌟", Color3.new(1, 1, 1))
+				Remotes.Event("EventEffect"):FireAllClients({ Type = "Titanic", Player = player.Name, PetId = tid })
+			elseif rng:NextNumber() < bossCfg.PetChance then
 				local inst = PetService.Add(player, bossCfg.Pet, "Normal", true)
 				if inst then
 					DataService.Notify(player, "👑 حصلت على " .. bossCfg.Name .. " من الزعيم!", Color3.fromRGB(255, 200, 40))

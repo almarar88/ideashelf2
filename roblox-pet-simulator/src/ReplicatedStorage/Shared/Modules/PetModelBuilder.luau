@@ -388,6 +388,64 @@ function Builder.Build(petId: string, variant: string?): Model?
 		light.Parent = body
 	end
 
+	-- أثر خلف الحيوانات النادرة
+	if variant == "Rainbow" or variant == "DarkMatter" then
+		local a0 = Instance.new("Attachment")
+		a0.Position = Vector3.new(-0.6, -0.5, 0.8)
+		a0.Parent = body
+		local a1 = Instance.new("Attachment")
+		a1.Position = Vector3.new(0.6, -0.5, 0.8)
+		a1.Parent = body
+		local trail = Instance.new("Trail")
+		trail.Attachment0 = a0
+		trail.Attachment1 = a1
+		trail.Lifetime = 0.6
+		trail.LightEmission = 1
+		trail.Transparency = NumberSequence.new(0.3, 1)
+		trail.WidthScale = NumberSequence.new(1, 0)
+		if variant == "Rainbow" then
+			trail.Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+				ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+				ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 120, 255)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 255)),
+			})
+		else
+			trail.Color = ColorSequence.new(DARK2, Color3.fromRGB(40, 0, 80))
+		end
+		trail.Parent = body
+	end
+
+	-- هالة للعملاق والتايتانيك
+	if def.Rarity == "Huge" or def.Rarity == "Titanic" then
+		local titanic = def.Rarity == "Titanic"
+		local attach = Instance.new("Attachment")
+		attach.Parent = body
+		local pe = Instance.new("ParticleEmitter")
+		pe.Color = titanic and ColorSequence.new(Color3.new(1, 1, 1), c2) or ColorSequence.new(Color3.fromRGB(255, 0, 80), Color3.fromRGB(255, 200, 0))
+		pe.Size = NumberSequence.new(titanic and 1.2 or 0.6, 0)
+		pe.Transparency = NumberSequence.new(0.1, 1)
+		pe.Lifetime = NumberRange.new(1, 1.8)
+		pe.Rate = titanic and 30 or 15
+		pe.Speed = NumberRange.new(2, 5)
+		pe.SpreadAngle = Vector2.new(180, 180)
+		pe.LightEmission = 1
+		pe.Parent = attach
+		local light = Instance.new("PointLight")
+		light.Color = titanic and c2 or Color3.fromRGB(255, 0, 80)
+		light.Range = titanic and 30 or 16
+		light.Brightness = titanic and 3 or 1.5
+		light.Parent = body
+		if titanic then
+			for _, p in ipairs(model:GetDescendants()) do
+				if p:IsA("BasePart") and p.Name ~= "Eye" and p.Name ~= "Shine" then
+					p.Material = Enum.Material.Neon
+					p.Reflectance = 0.3
+				end
+			end
+		end
+	end
+
 	return model
 end
 

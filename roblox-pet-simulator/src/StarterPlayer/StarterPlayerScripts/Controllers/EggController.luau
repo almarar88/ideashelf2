@@ -89,7 +89,7 @@ function refreshPanel()
 			stroke.Thickness = v == currentVariant and 3 or 2
 		end
 	end
-	local currencyIcon = egg.Currency == "Coins" and "💰 " or (egg.Currency == "Diamonds" and "💎 " or "🔁 ")
+	local currencyIcon = egg.Currency == "Coins" and "💰 " or (egg.Currency == "Diamonds" and "💎 " or (egg.Currency == "Gems" and "💠 " or "🔁 "))
 	local cost = egg.Cost * (Config.EggVariantCost[currentVariant] or 1)
 	panelTitle.Text = egg.Name .. (currentVariant ~= "Normal" and (" (" .. currentVariant .. ")") or "") .. "   " .. currencyIcon .. Format.Number(cost) .. (luck > 1 and ("   🍀 x" .. string.format("%.2f", luck)) or "")
 	for _, c in ipairs(panelList:GetChildren()) do

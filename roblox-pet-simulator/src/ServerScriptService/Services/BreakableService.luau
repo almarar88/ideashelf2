@@ -50,9 +50,11 @@ local function canUseZone(player: Player, zone: number): boolean
 	end
 	if zone == 0 then
 		return DataService.HasGamepass(player, "VIP")
+	elseif zone == -1 then
+		return true
 	end
-	local z = Zones.Get(zone)
-	if z and z.World == 2 and p.Rebirths < 1 then
+	local required = Zones.RebirthRequired(zone)
+	if required > 0 and p.Rebirths < required then
 		return false
 	end
 	return p.UnlockedZones[tostring(zone)] == true
@@ -146,10 +148,21 @@ local function breakIt(b: Breakable)
 					Hooks.Fire(player, "Diamonds", diamonds)
 				end
 			end
+			local gems = 0
+			if b.Def.Gems and b.Def.Gems > 0 then
+				local raw = b.Def.Gems * share
+				gems = math.floor(raw)
+				if rng:NextNumber() < (raw - gems) then
+					gems += 1
+				end
+				if gems > 0 then
+					DataService.AddGems(player, gems, true)
+				end
+			end
 			p.Stats.Breaks += 1
 			Hooks.Fire(player, "Break", 1)
-			PetService.GrantXP(player, Config.XPPerBreakBase * (b.Zone == 0 and 3 or b.Zone) * (b.Boss and 25 or 1))
-			Remotes.Event("RewardPopup"):FireClient(player, { Position = b.Position + Vector3.new(0, b.Def.Size.Y, 0), Coins = coins, Diamonds = diamonds })
+			PetService.GrantXP(player, Config.XPPerBreakBase * (b.Zone <= 0 and 3 or b.Zone) * (b.Boss and 25 or 1))
+			Remotes.Event("RewardPopup"):FireClient(player, { Position = b.Position + Vector3.new(0, b.Def.Size.Y, 0), Coins = coins, Diamonds = diamonds, Gems = gems, Color = b.Def.Color })
 		end
 	end
 	for player, id in pairs(targets) do

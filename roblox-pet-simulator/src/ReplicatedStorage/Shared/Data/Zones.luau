@@ -80,7 +80,55 @@ Zones.List = {
 		Ground = Color3.fromRGB(5, 0, 25), Accent = Color3.fromRGB(255, 0, 255), Sky = Color3.fromRGB(0, 0, 0),
 		Material = Enum.Material.Neon, Decor = "quantum",
 		Breakables = { { Type = "TechCrate", Count = 12 }, { Type = "CoinChest", Count = 6 }, { Type = "DiamondCrystal", Count = 5 } } },
+	-- ===== العالم الثالث: العالم الأسطوري (يتطلب 3 ريبيرث) =====
+	{ Index = 16, Id = "EnchantedForest", Name = "Enchanted Forest", Arabic = "الغابة المسحورة", Cost = 8000000000000000, Multiplier = 28000000000000, World = 3,
+		Ground = Color3.fromRGB(70, 40, 110), Accent = Color3.fromRGB(255, 120, 255), Sky = Color3.fromRGB(40, 10, 60),
+		Material = Enum.Material.Grass, Decor = "magictrees",
+		Breakables = { { Type = "MagicOrb", Count = 12 }, { Type = "CoinChest", Count = 6 }, { Type = "DiamondCrystal", Count = 5 } } },
+	{ Index = 17, Id = "CrystalCaves", Name = "Crystal Caves", Arabic = "كهوف الكريستال", Cost = 60000000000000000, Multiplier = 220000000000000, World = 3,
+		Ground = Color3.fromRGB(40, 30, 60), Accent = Color3.fromRGB(120, 220, 255), Sky = Color3.fromRGB(10, 10, 30),
+		Material = Enum.Material.Slate, Decor = "bigcrystals",
+		Breakables = { { Type = "MagicOrb", Count = 12 }, { Type = "CoinChest", Count = 6 }, { Type = "DiamondCrystal", Count = 6 } } },
+	{ Index = 18, Id = "DragonPeaks", Name = "Dragon Peaks", Arabic = "قمم التنانين", Cost = 500000000000000000, Multiplier = 1800000000000000, World = 3,
+		Ground = Color3.fromRGB(90, 60, 60), Accent = Color3.fromRGB(255, 90, 40), Sky = Color3.fromRGB(80, 20, 20),
+		Material = Enum.Material.Rock, Decor = "peaks",
+		Breakables = { { Type = "MagicOrb", Count = 12 }, { Type = "CoinChest", Count = 6 }, { Type = "DiamondCrystal", Count = 6 } } },
+	{ Index = 19, Id = "CelestialPalace", Name = "Celestial Palace", Arabic = "القصر السماوي", Cost = 4000000000000000000, Multiplier = 14000000000000000, World = 3,
+		Ground = Color3.fromRGB(245, 240, 255), Accent = Color3.fromRGB(255, 220, 120), Sky = Color3.fromRGB(200, 220, 255),
+		Material = Enum.Material.Marble, Decor = "pillars",
+		Breakables = { { Type = "MagicOrb", Count = 12 }, { Type = "CoinChest", Count = 7 }, { Type = "DiamondCrystal", Count = 6 } } },
+	{ Index = 20, Id = "EternalVoid", Name = "Eternal Void", Arabic = "الفراغ الأبدي", Cost = 30000000000000000000, Multiplier = 110000000000000000, World = 3,
+		Ground = Color3.fromRGB(5, 0, 10), Accent = Color3.fromRGB(255, 255, 255), Sky = Color3.fromRGB(0, 0, 0),
+		Material = Enum.Material.Neon, Decor = "voidorbs",
+		Breakables = { { Type = "MagicOrb", Count = 14 }, { Type = "CoinChest", Count = 7 }, { Type = "DiamondCrystal", Count = 7 } } },
 }
+
+-- جزيرة السوق (متاحة للجميع، لا تُفتح بعملات)
+Zones.Market = { Index = -1, Id = "Market", Name = "Grand Bazaar", Arabic = "السوق الكبير", Cost = 0, Multiplier = 1, World = 1,
+	Ground = Color3.fromRGB(200, 170, 120), Accent = Color3.fromRGB(200, 60, 60), Sky = Color3.fromRGB(255, 230, 200),
+	Material = Enum.Material.Cobblestone, Decor = "market",
+	Breakables = { { Type = "GemOre", Count = 10 }, { Type = "CoinPile", Count = 6 } } }
+
+Zones.WorldStart = { [1] = 1, [2] = 11, [3] = 16 }
+
+function Zones.IsWorldStart(index: number): boolean
+	for _, start in pairs(Zones.WorldStart) do
+		if start == index then
+			return true
+		end
+	end
+	return false
+end
+
+-- عدد الريبيرث المطلوب لدخول عالم المنطقة
+function Zones.RebirthRequired(index: number): number
+	local z = Zones.List[index]
+	if not z then
+		return 0
+	end
+	local req = { [1] = 0, [2] = 1, [3] = 3 }
+	return req[z.World] or 0
+end
 
 for _, z in ipairs(Zones.List) do
 	if z.World == nil then
@@ -99,6 +147,8 @@ Zones.World2Start = 11
 function Zones.Get(index: number): ZoneDef?
 	if index == 0 then
 		return Zones.VIP
+	elseif index == -1 then
+		return Zones.Market
 	end
 	return Zones.List[index]
 end

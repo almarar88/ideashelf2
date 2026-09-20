@@ -11,6 +11,7 @@ local Format = require(Shared.Modules.Format)
 local Remotes = require(Shared.Remotes)
 local UIKit = require(script.Parent.UIKit)
 local DataController = require(script.Parent.DataController)
+local EffectsController = require(script.Parent.EffectsController)
 
 local BreakableController = {}
 
@@ -57,6 +58,9 @@ local function attach(model: Model)
 		local p = DataController.Profile
 		if by == Players.LocalPlayer.UserId and type(dmg) == "number" and p and p.Settings.DamageNumbers ~= false then
 			local crit = model:GetAttribute("LastCrit") == true
+			if crit then
+				EffectsController.Shockwave(root.Position, Color3.fromRGB(255, 200, 40))
+			end
 			local anchor = Instance.new("Part")
 			anchor.Anchored = true
 			anchor.CanCollide = false
@@ -94,9 +98,14 @@ local function popup(data: any)
 	if data.Diamonds and data.Diamonds > 0 then
 		text = text .. "  +" .. data.Diamonds .. " 💎"
 	end
+	if data.Gems and data.Gems > 0 then
+		text = text .. "  +" .. data.Gems .. " 💠"
+	end
 	if text == "" then
 		return
 	end
+	EffectsController.Burst(pos, data.Color or Color3.fromRGB(255, 200, 40), 24, 0.5)
+	EffectsController.Play("Break")
 	local anchor = Instance.new("Part")
 	anchor.Anchored = true
 	anchor.CanCollide = false
