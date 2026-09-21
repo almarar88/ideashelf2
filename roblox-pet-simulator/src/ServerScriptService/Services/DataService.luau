@@ -98,7 +98,18 @@ local function template(): Profile
 	}
 end
 
-local store = DataStoreService:GetDataStore(Config.DataStoreName)
+-- إنشاء المتجر بأمان: في Studio بدون نشر/تفعيل API يفشل الاتصال، فنلعب بدون حفظ
+local store: any = nil
+do
+	local ok, res = pcall(function()
+		return DataStoreService:GetDataStore(Config.DataStoreName)
+	end)
+	if ok then
+		store = res
+	else
+		warn("[DataService] DataStore غير متاح: " .. tostring(res) .. " — اللعب بدون حفظ")
+	end
+end
 local profiles: { [Player]: Profile } = {}
 local dirty: { [Player]: boolean } = {}
 local noSave: { [Player]: boolean } = {}
@@ -157,9 +168,12 @@ local function retry<T>(fn: () -> T, attempts: number): (boolean, T?)
 end
 
 local function load(player: Player)
-	local ok, data = retry(function()
-		return store:GetAsync(key(player))
-	end, RunService:IsStudio() and 1 or 3)
+	local ok, data = false, nil
+	if store then
+		ok, data = retry(function()
+			return store:GetAsync(key(player))
+		end, RunService:IsStudio() and 1 or 3)
+	end
 	if not ok then
 		if RunService:IsStudio() then
 			-- في Studio بدون تفعيل API Services: العب بدون حفظ
@@ -200,7 +214,7 @@ local function save(player: Player, remove: boolean?)
 	if not profile then
 		return
 	end
-	if noSave[player] then
+	if noSave[player] or not store then
 		if remove then
 			profiles[player] = nil
 			dirty[player] = nil

@@ -19,8 +19,26 @@ local Hooks = require(script.Parent.Hooks)
 
 local MarketService = {}
 
-local listings = MemoryStoreService:GetSortedMap("PetKingdom_Market_v1")
-local mailbox = DataStoreService:GetDataStore("PetKingdom_Mailbox_v1")
+local listings: any = nil
+local mailbox: any = nil
+do
+	local ok1, res1 = pcall(function()
+		return MemoryStoreService:GetSortedMap("PetKingdom_Market_v1")
+	end)
+	local ok2, res2 = pcall(function()
+		return DataStoreService:GetDataStore("PetKingdom_Mailbox_v1")
+	end)
+	if ok1 then
+		listings = res1
+	else
+		warn("[Market] MemoryStore غير متاح: " .. tostring(res1))
+	end
+	if ok2 then
+		mailbox = res2
+	else
+		warn("[Market] Mailbox DataStore غير متاح: " .. tostring(res2))
+	end
+end
 local TTL = Config.Market.ListingTTL
 
 local cache: { any } = {}
@@ -34,6 +52,9 @@ end
 
 -- ===== قراءة العروض (مع كاش) =====
 local function fetchAll(force: boolean?): { any }
+	if not listings then
+		return {}
+	end
 	if not force and os.clock() - cacheTime < Config.Market.CacheSeconds then
 		return cache
 	end
@@ -75,6 +96,9 @@ end
 
 -- ===== صندوق البريد =====
 local function pushMail(userId: number, entry: any)
+	if not mailbox then
+		return
+	end
 	pcall(function()
 		mailbox:UpdateAsync("m_" .. userId, function(old)
 			old = type(old) == "table" and old or {}
@@ -86,7 +110,7 @@ end
 
 local function reconcile(player: Player)
 	local p = DataService.Get(player)
-	if not p then
+	if not p or not listings or not mailbox then
 		return
 	end
 	local mailKey = "m_" .. player.UserId
@@ -149,6 +173,9 @@ end
 
 -- ===== الإجراءات =====
 local function list(player: Player, payload: any)
+	if not listings then
+		return fail("السوق العالمي غير متاح في Studio قبل النشر")
+	end
 	local p = DataService.Get(player) :: DataService.Profile
 	local uid = tostring(payload.Uid)
 	local price = math.floor(tonumber(payload.Price) or 0)
@@ -200,6 +227,9 @@ local function list(player: Player, payload: any)
 end
 
 local function buy(player: Player, payload: any)
+	if not listings then
+		return fail("السوق العالمي غير متاح في Studio قبل النشر")
+	end
 	local p = DataService.Get(player) :: DataService.Profile
 	local id = tostring(payload.Id)
 	local okGet, value = pcall(listings.GetAsync, listings, id)
@@ -268,6 +298,9 @@ local function buy(player: Player, payload: any)
 end
 
 local function cancel(player: Player, payload: any)
+	if not listings then
+		return fail("السوق العالمي غير متاح في Studio قبل النشر")
+	end
 	local p = DataService.Get(player) :: DataService.Profile
 	local id = tostring(payload.Id)
 	local listing = p.MyListings[id]

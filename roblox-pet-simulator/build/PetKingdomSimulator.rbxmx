@@ -2340,7 +2340,10 @@ local TitleService = require(Services.TitleService)
 local OfflineService = require(Services.OfflineService)
 local FriendService = require(Services.FriendService)
 
-MapBuilder.Build()
+local okMap, mapErr = pcall(MapBuilder.Build)
+if not okMap then
+	warn("[PetKingdom] فشل بناء الخريطة: " .. tostring(mapErr))
+end
 
 for _, layout in pairs(MapBuilder.Zones) do
 	for eggId, pos in pairs(layout.Eggs) do
@@ -2349,31 +2352,39 @@ for _, layout in pairs(MapBuilder.Zones) do
 end
 
 -- الترتيب مهم: الخدمات التي تسجل مزودي المكافآت قبل تحميل اللاعبين
-PetService.Init()
-EventService.Init()
-MissionService.Init()
-RebirthService.Init()
-SpinService.Init()
-EggService.Init()
-BreakableService.Init()
-ZoneService.Init()
-ShopService.Init()
-RewardService.Init()
-TradeService.Init()
-MerchantService.Init()
-HoverboardService.Init()
-AdminService.Init()
-MarketService.Init()
-SeasonService.Init()
-CraftService.Init()
-CosmeticService.Init()
-DungeonService.Init()
-TreasureService.Init()
-TitleService.Init()
-OfflineService.Init()
-FriendService.Init()
-LeaderboardService.Init()
-DataService.Init()
+-- كل خدمة معزولة بـ pcall حتى لا يوقف خطأ واحد اللعبة كلها
+local function safeInit(name: string, service: any)
+	local ok, err = pcall(service.Init)
+	if not ok then
+		warn("[PetKingdom] فشل تشغيل " .. name .. ": " .. tostring(err))
+	end
+end
+
+safeInit("PetService", PetService)
+safeInit("EventService", EventService)
+safeInit("MissionService", MissionService)
+safeInit("RebirthService", RebirthService)
+safeInit("SpinService", SpinService)
+safeInit("EggService", EggService)
+safeInit("BreakableService", BreakableService)
+safeInit("ZoneService", ZoneService)
+safeInit("ShopService", ShopService)
+safeInit("RewardService", RewardService)
+safeInit("TradeService", TradeService)
+safeInit("MerchantService", MerchantService)
+safeInit("HoverboardService", HoverboardService)
+safeInit("AdminService", AdminService)
+safeInit("MarketService", MarketService)
+safeInit("SeasonService", SeasonService)
+safeInit("CraftService", CraftService)
+safeInit("CosmeticService", CosmeticService)
+safeInit("DungeonService", DungeonService)
+safeInit("TreasureService", TreasureService)
+safeInit("TitleService", TitleService)
+safeInit("OfflineService", OfflineService)
+safeInit("FriendService", FriendService)
+safeInit("LeaderboardService", LeaderboardService)
+safeInit("DataService", DataService)
 
 -- دورة الليل والنهار
 if Config.DayNight.Enabled then
@@ -3208,7 +3219,18 @@ local function template(): Profile
 	}
 end
 
-local store = DataStoreService:GetDataStore(Config.DataStoreName)
+-- إنشاء المتجر بأمان: في Studio بدون نشر/تفعيل API يفشل الاتصال، فنلعب بدون حفظ
+local store: any = nil
+do
+	local ok, res = pcall(function()
+		return DataStoreService:GetDataStore(Config.DataStoreName)
+	end)
+	if ok then
+		store = res
+	else
+		warn("[DataService] DataStore غير متاح: " .. tostring(res) .. " — اللعب بدون حفظ")
+	end
+end
 local profiles: { [Player]: Profile } = {}
 local dirty: { [Player]: boolean } = {}
 local noSave: { [Player]: boolean } = {}
@@ -3267,9 +3289,12 @@ local function retry<T>(fn: () -> T, attempts: number): (boolean, T?)
 end
 
 local function load(player: Player)
-	local ok, data = retry(function()
-		return store:GetAsync(key(player))
-	end, RunService:IsStudio() and 1 or 3)
+	local ok, data = false, nil
+	if store then
+		ok, data = retry(function()
+			return store:GetAsync(key(player))
+		end, RunService:IsStudio() and 1 or 3)
+	end
 	if not ok then
 		if RunService:IsStudio() then
 			-- في Studio بدون تفعيل API Services: العب بدون حفظ
@@ -3310,7 +3335,7 @@ local function save(player: Player, remove: boolean?)
 	if not profile then
 		return
 	end
-	if noSave[player] then
+	if noSave[player] or not store then
 		if remove then
 			profiles[player] = nil
 			dirty[player] = nil
@@ -4451,14 +4476,24 @@ local LeaderboardService = {}
 local Remotes = require(Shared.Remotes)
 local cached: { [string]: { any } } = {}
 
-local stores = {
-	Coins = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Coins"),
-	Hatches = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Hatches"),
-	Rebirths = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Rebirths"),
-	Damage = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Damage"),
-}
+local stores: { [string]: any } = {}
+do
+	local ok = pcall(function()
+		stores.Coins = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Coins")
+		stores.Hatches = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Hatches")
+		stores.Rebirths = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Rebirths")
+		stores.Damage = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Damage")
+	end)
+	if not ok then
+		warn("[Leaderboard] OrderedDataStore غير متاح، اللوحات معطلة في هذه الجلسة")
+		stores = {}
+	end
+end
 
 local function refresh()
+	if not stores.Coins then
+		return
+	end
 	for _, player in ipairs(Players:GetPlayers()) do
 		local p = DataService.Get(player)
 		if p then
@@ -5732,8 +5767,26 @@ local Hooks = require(script.Parent.Hooks)
 
 local MarketService = {}
 
-local listings = MemoryStoreService:GetSortedMap("PetKingdom_Market_v1")
-local mailbox = DataStoreService:GetDataStore("PetKingdom_Mailbox_v1")
+local listings: any = nil
+local mailbox: any = nil
+do
+	local ok1, res1 = pcall(function()
+		return MemoryStoreService:GetSortedMap("PetKingdom_Market_v1")
+	end)
+	local ok2, res2 = pcall(function()
+		return DataStoreService:GetDataStore("PetKingdom_Mailbox_v1")
+	end)
+	if ok1 then
+		listings = res1
+	else
+		warn("[Market] MemoryStore غير متاح: " .. tostring(res1))
+	end
+	if ok2 then
+		mailbox = res2
+	else
+		warn("[Market] Mailbox DataStore غير متاح: " .. tostring(res2))
+	end
+end
 local TTL = Config.Market.ListingTTL
 
 local cache: { any } = {}
@@ -5747,6 +5800,9 @@ end
 
 -- ===== قراءة العروض (مع كاش) =====
 local function fetchAll(force: boolean?): { any }
+	if not listings then
+		return {}
+	end
 	if not force and os.clock() - cacheTime < Config.Market.CacheSeconds then
 		return cache
 	end
@@ -5788,6 +5844,9 @@ end
 
 -- ===== صندوق البريد =====
 local function pushMail(userId: number, entry: any)
+	if not mailbox then
+		return
+	end
 	pcall(function()
 		mailbox:UpdateAsync("m_" .. userId, function(old)
 			old = type(old) == "table" and old or {}
@@ -5799,7 +5858,7 @@ end
 
 local function reconcile(player: Player)
 	local p = DataService.Get(player)
-	if not p then
+	if not p or not listings or not mailbox then
 		return
 	end
 	local mailKey = "m_" .. player.UserId
@@ -5862,6 +5921,9 @@ end
 
 -- ===== الإجراءات =====
 local function list(player: Player, payload: any)
+	if not listings then
+		return fail("السوق العالمي غير متاح في Studio قبل النشر")
+	end
 	local p = DataService.Get(player) :: DataService.Profile
 	local uid = tostring(payload.Uid)
 	local price = math.floor(tonumber(payload.Price) or 0)
@@ -5913,6 +5975,9 @@ local function list(player: Player, payload: any)
 end
 
 local function buy(player: Player, payload: any)
+	if not listings then
+		return fail("السوق العالمي غير متاح في Studio قبل النشر")
+	end
 	local p = DataService.Get(player) :: DataService.Profile
 	local id = tostring(payload.Id)
 	local okGet, value = pcall(listings.GetAsync, listings, id)
@@ -5981,6 +6046,9 @@ local function buy(player: Player, payload: any)
 end
 
 local function cancel(player: Player, payload: any)
+	if not listings then
+		return fail("السوق العالمي غير متاح في Studio قبل النشر")
+	end
 	local p = DataService.Get(player) :: DataService.Profile
 	local id = tostring(payload.Id)
 	local listing = p.MyListings[id]
@@ -10008,6 +10076,12 @@ function LoadingScreen.Show()
 	statusLabel = UIKit.Label({ Text = "جاري تحميل بياناتك...", Size = UDim2.new(1, 0, 0, 34), Position = UDim2.new(0, 0, 0.32, 100), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 22, Parent = bg })
 	local tip = UIKit.Label({ Text = "💡 " .. TIPS[math.random(#TIPS)], Size = UDim2.new(0.8, 0, 0, 40), Position = UDim2.new(0.1, 0, 0.75, 0), TextColor3 = UIKit.Colors.Cyan, MaxTextSize = 20, Parent = bg })
 	local dots = 0
+	task.delay(20, function()
+		if gui and gui.Parent then
+			tip.Text = "⚠️ التحميل يأخذ وقتاً أطول من المعتاد. افتح View > Output في Studio وأرسل نص الخطأ."
+			tip.TextColor3 = Color3.fromRGB(255, 120, 120)
+		end
+	end)
 	task.spawn(function()
 		while gui and gui.Parent do
 			dots = (dots + 1) % 4

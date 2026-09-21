@@ -14,14 +14,24 @@ local LeaderboardService = {}
 local Remotes = require(Shared.Remotes)
 local cached: { [string]: { any } } = {}
 
-local stores = {
-	Coins = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Coins"),
-	Hatches = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Hatches"),
-	Rebirths = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Rebirths"),
-	Damage = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Damage"),
-}
+local stores: { [string]: any } = {}
+do
+	local ok = pcall(function()
+		stores.Coins = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Coins")
+		stores.Hatches = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Hatches")
+		stores.Rebirths = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Rebirths")
+		stores.Damage = DataStoreService:GetOrderedDataStore(Config.LeaderboardStore .. "_Damage")
+	end)
+	if not ok then
+		warn("[Leaderboard] OrderedDataStore غير متاح، اللوحات معطلة في هذه الجلسة")
+		stores = {}
+	end
+end
 
 local function refresh()
+	if not stores.Coins then
+		return
+	end
 	for _, player in ipairs(Players:GetPlayers()) do
 		local p = DataService.Get(player)
 		if p then

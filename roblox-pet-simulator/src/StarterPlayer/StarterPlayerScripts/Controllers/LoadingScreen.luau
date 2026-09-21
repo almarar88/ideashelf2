@@ -35,6 +35,12 @@ function LoadingScreen.Show()
 	statusLabel = UIKit.Label({ Text = "جاري تحميل بياناتك...", Size = UDim2.new(1, 0, 0, 34), Position = UDim2.new(0, 0, 0.32, 100), TextColor3 = UIKit.Colors.Muted, MaxTextSize = 22, Parent = bg })
 	local tip = UIKit.Label({ Text = "💡 " .. TIPS[math.random(#TIPS)], Size = UDim2.new(0.8, 0, 0, 40), Position = UDim2.new(0.1, 0, 0.75, 0), TextColor3 = UIKit.Colors.Cyan, MaxTextSize = 20, Parent = bg })
 	local dots = 0
+	task.delay(20, function()
+		if gui and gui.Parent then
+			tip.Text = "⚠️ التحميل يأخذ وقتاً أطول من المعتاد. افتح View > Output في Studio وأرسل نص الخطأ."
+			tip.TextColor3 = Color3.fromRGB(255, 120, 120)
+		end
+	end)
 	task.spawn(function()
 		while gui and gui.Parent do
 			dots = (dots + 1) % 4

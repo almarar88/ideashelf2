@@ -36,7 +36,10 @@ local TitleService = require(Services.TitleService)
 local OfflineService = require(Services.OfflineService)
 local FriendService = require(Services.FriendService)
 
-MapBuilder.Build()
+local okMap, mapErr = pcall(MapBuilder.Build)
+if not okMap then
+	warn("[PetKingdom] فشل بناء الخريطة: " .. tostring(mapErr))
+end
 
 for _, layout in pairs(MapBuilder.Zones) do
 	for eggId, pos in pairs(layout.Eggs) do
@@ -45,31 +48,39 @@ for _, layout in pairs(MapBuilder.Zones) do
 end
 
 -- الترتيب مهم: الخدمات التي تسجل مزودي المكافآت قبل تحميل اللاعبين
-PetService.Init()
-EventService.Init()
-MissionService.Init()
-RebirthService.Init()
-SpinService.Init()
-EggService.Init()
-BreakableService.Init()
-ZoneService.Init()
-ShopService.Init()
-RewardService.Init()
-TradeService.Init()
-MerchantService.Init()
-HoverboardService.Init()
-AdminService.Init()
-MarketService.Init()
-SeasonService.Init()
-CraftService.Init()
-CosmeticService.Init()
-DungeonService.Init()
-TreasureService.Init()
-TitleService.Init()
-OfflineService.Init()
-FriendService.Init()
-LeaderboardService.Init()
-DataService.Init()
+-- كل خدمة معزولة بـ pcall حتى لا يوقف خطأ واحد اللعبة كلها
+local function safeInit(name: string, service: any)
+	local ok, err = pcall(service.Init)
+	if not ok then
+		warn("[PetKingdom] فشل تشغيل " .. name .. ": " .. tostring(err))
+	end
+end
+
+safeInit("PetService", PetService)
+safeInit("EventService", EventService)
+safeInit("MissionService", MissionService)
+safeInit("RebirthService", RebirthService)
+safeInit("SpinService", SpinService)
+safeInit("EggService", EggService)
+safeInit("BreakableService", BreakableService)
+safeInit("ZoneService", ZoneService)
+safeInit("ShopService", ShopService)
+safeInit("RewardService", RewardService)
+safeInit("TradeService", TradeService)
+safeInit("MerchantService", MerchantService)
+safeInit("HoverboardService", HoverboardService)
+safeInit("AdminService", AdminService)
+safeInit("MarketService", MarketService)
+safeInit("SeasonService", SeasonService)
+safeInit("CraftService", CraftService)
+safeInit("CosmeticService", CosmeticService)
+safeInit("DungeonService", DungeonService)
+safeInit("TreasureService", TreasureService)
+safeInit("TitleService", TitleService)
+safeInit("OfflineService", OfflineService)
+safeInit("FriendService", FriendService)
+safeInit("LeaderboardService", LeaderboardService)
+safeInit("DataService", DataService)
 
 -- دورة الليل والنهار
 if Config.DayNight.Enabled then
