@@ -101,6 +101,7 @@ end
 local store = DataStoreService:GetDataStore(Config.DataStoreName)
 local profiles: { [Player]: Profile } = {}
 local dirty: { [Player]: boolean } = {}
+local noSave: { [Player]: boolean } = {}
 local loadedEvent = Instance.new("BindableEvent")
 
 DataService.Loaded = loadedEvent.Event
@@ -158,10 +159,17 @@ end
 local function load(player: Player)
 	local ok, data = retry(function()
 		return store:GetAsync(key(player))
-	end, 3)
+	end, RunService:IsStudio() and 1 or 3)
 	if not ok then
-		player:Kick("تعذر تحميل بياناتك، حاول مرة أخرى بعد قليل.")
-		return
+		if RunService:IsStudio() then
+			-- في Studio بدون تفعيل API Services: العب بدون حفظ
+			warn("[DataService] DataStore غير متاح في Studio (فعّل Enable Studio Access to API Services للحفظ). اللعب بدون حفظ.")
+			data = nil
+			noSave[player] = true
+		else
+			player:Kick("تعذر تحميل بياناتك، حاول مرة أخرى بعد قليل.")
+			return
+		end
 	end
 	if player.Parent ~= Players then
 		return
@@ -192,6 +200,14 @@ local function save(player: Player, remove: boolean?)
 	if not profile then
 		return
 	end
+	if noSave[player] then
+		if remove then
+			profiles[player] = nil
+			dirty[player] = nil
+			noSave[player] = nil
+		end
+		return
+	end
 	local snapshot = table.clone(profile)
 	snapshot.Gamepasses = nil :: any
 	snapshot.PlaytimeClaimed = nil :: any
@@ -203,7 +219,7 @@ local function save(player: Player, remove: boolean?)
 		return store:UpdateAsync(key(player), function()
 			return snapshot
 		end)
-	end, 3)
+	end, RunService:IsStudio() and 1 or 3)
 	if not ok then
 		warn("[DataService] failed to save " .. player.Name)
 	end

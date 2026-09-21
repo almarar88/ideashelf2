@@ -1,23 +1,7 @@
 <roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
-<Item class="Folder" referent="RBX000075"><Properties><string name="Name">PetKingdomSimulator</string></Properties>
-<Item class="StringValue" referent="RBX000076"><Properties><string name="Name">README</string><string name="Value">PET KINGDOM SIMULATOR - التركيب
-1) اسحب هذا الملف إلى نافذة Roblox Studio (أو Insert from file).
-2) افتح View &gt; Command Bar والصق السطر التالي ثم Enter:
-local m = workspace.PetKingdomSimulator m.Shared.Parent = game.ReplicatedStorage m.Server.Parent = game.ServerScriptService m.Client.Parent = game.StarterPlayer.StarterPlayerScripts m:Destroy()
-3) فعّل Game Settings &gt; Security &gt; Enable Studio Access to API Services (لحفظ البيانات).
-4) اضغط Play.</string></Properties></Item>
-<Item class="Script" referent="RBX000077"><Properties><string name="Name">AutoInstall</string><ProtectedString name="Source"><![CDATA[-- تركيب تلقائي: ينقل المجلدات لأماكنها الصحيحة عند تشغيل اللعبة ثم يحذف نفسه.
--- الأفضل تشغيل سطر التركيب من شريط الأوامر (انظر README) ليصبح التركيب دائماً.
-local root = script.Parent
-local RS = game:GetService("ReplicatedStorage")
-local SSS = game:GetService("ServerScriptService")
-local SP = game:GetService("StarterPlayer")
-if root:FindFirstChild("Shared") then root.Shared.Parent = RS end
-if root:FindFirstChild("Client") then root.Client.Parent = SP:WaitForChild("StarterPlayerScripts") end
-if root:FindFirstChild("Server") then root.Server.Parent = SSS end
-task.defer(function() root:Destroy() end)
-]]></ProtectedString></Properties></Item>
-<Item class="Folder" referent="RBX000015"><Properties><string name="Name">Shared</string></Properties><Item class="ModuleScript" referent="RBX000000"><Properties><string name="Name">Config</string><ProtectedString name="Source"><![CDATA[--!strict
+<Item class="Workspace" referent="RBX000079"><Properties><string name="Name">Workspace</string></Properties><Item class="Part" referent="RBX000078"><Properties><string name="Name">TempSpawnFloor</string><bool name="Anchored">true</bool><Vector3 name="size"><X>40</X><Y>1</Y><Z>40</Z></Vector3><CoordinateFrame name="CFrame"><X>0</X><Y>-0.5</Y><Z>-117</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame></Properties></Item></Item>
+<Item class="Lighting" referent="RBX000080"><Properties><string name="Name">Lighting</string><float name="Brightness">2</float><float name="ClockTime">14</float><Color3 name="Ambient"><R>0.47</R><G>0.47</G><B>0.55</B></Color3><Color3 name="OutdoorAmbient"><R>0.55</R><G>0.55</G><B>0.6</B></Color3><bool name="GlobalShadows">true</bool></Properties></Item>
+<Item class="ReplicatedStorage" referent="RBX000081"><Properties><string name="Name">ReplicatedStorage</string></Properties><Item class="Folder" referent="RBX000015"><Properties><string name="Name">Shared</string></Properties><Item class="ModuleScript" referent="RBX000000"><Properties><string name="Name">Config</string><ProtectedString name="Source"><![CDATA[--!strict
 -- إعدادات اللعبة العامة. عدّل الأرقام هنا بدون لمس باقي الكود.
 local Config = {}
 
@@ -2301,8 +2285,8 @@ function Remotes.State(): Folder
 end
 
 return Remotes
-]]></ProtectedString></Properties></Item></Item>
-<Item class="Folder" referent="RBX000047"><Properties><string name="Name">Server</string></Properties><Item class="Script" referent="RBX000016"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item></Item></Item>
+<Item class="ServerScriptService" referent="RBX000082"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Folder" referent="RBX000047"><Properties><string name="Name">Server</string></Properties><Item class="Script" referent="RBX000016"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[--!strict
 -- نقطة تشغيل السيرفر
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -8462,8 +8446,8 @@ function ZoneService.Init()
 end
 
 return ZoneService
-]]></ProtectedString></Properties></Item></Item></Item>
-<Item class="Folder" referent="RBX000074"><Properties><string name="Name">Client</string></Properties><Item class="LocalScript" referent="RBX000048"><Properties><string name="Name">ClientMain</string><ProtectedString name="Source"><![CDATA[--!strict
+]]></ProtectedString></Properties></Item></Item></Item></Item>
+<Item class="StarterPlayer" referent="RBX000084"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts" referent="RBX000083"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="Folder" referent="RBX000074"><Properties><string name="Name">Client</string></Properties><Item class="LocalScript" referent="RBX000048"><Properties><string name="Name">ClientMain</string><ProtectedString name="Source"><![CDATA[--!strict
 -- نقطة تشغيل العميل
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -13129,6 +13113,8 @@ function ZoneController.Init()
 end
 
 return ZoneController
-]]></ProtectedString></Properties></Item></Item></Item>
-</Item>
+]]></ProtectedString></Properties></Item></Item></Item></Item></Item>
+<Item class="StarterGui" referent="RBX000085"><Properties><string name="Name">StarterGui</string></Properties></Item>
+<Item class="SoundService" referent="RBX000086"><Properties><string name="Name">SoundService</string></Properties></Item>
+<Item class="Players" referent="RBX000087"><Properties><string name="Name">Players</string></Properties></Item>
 </roblox>

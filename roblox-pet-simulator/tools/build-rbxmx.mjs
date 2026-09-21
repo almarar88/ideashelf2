@@ -71,9 +71,31 @@ ${client}
 </roblox>
 `;
 
+// ===== ملف مكان كامل (.rbxlx): يُفتح مباشرة في Studio بدون أي خطوات =====
+function serviceItem(className, children, props = "") {
+  return `<Item class="${className}" referent="${nextRef()}"><Properties><string name="Name">${className}</string>${props}</Properties>${children.join("")}</Item>`;
+}
+const lightingProps = `<float name="Brightness">2</float><float name="ClockTime">14</float><Color3 name="Ambient"><R>0.47</R><G>0.47</G><B>0.55</B></Color3><Color3 name="OutdoorAmbient"><R>0.55</R><G>0.55</G><B>0.6</B></Color3><bool name="GlobalShadows">true</bool>`;
+const placeXml = `<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+${serviceItem("Workspace", [
+  `<Item class="Part" referent="${nextRef()}"><Properties><string name="Name">TempSpawnFloor</string><bool name="Anchored">true</bool><Vector3 name="size"><X>40</X><Y>1</Y><Z>40</Z></Vector3><CoordinateFrame name="CFrame"><X>0</X><Y>-0.5</Y><Z>-117</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame></Properties></Item>`,
+])}
+${serviceItem("Lighting", [], lightingProps)}
+${serviceItem("ReplicatedStorage", [shared])}
+${serviceItem("ServerScriptService", [server])}
+${serviceItem("StarterPlayer", [`<Item class="StarterPlayerScripts" referent="${nextRef()}"><Properties><string name="Name">StarterPlayerScripts</string></Properties>${client}</Item>`])}
+${serviceItem("StarterGui", [])}
+${serviceItem("SoundService", [])}
+${serviceItem("Players", [])}
+</roblox>
+`;
+const placeOut = join(root, "build", "PetKingdomSimulator.rbxlx");
+
 const out = join(root, "build", "PetKingdomSimulator.rbxmx");
 import("node:fs").then(({ mkdirSync }) => {
   mkdirSync(join(root, "build"), { recursive: true });
   writeFileSync(out, xml, "utf8");
   console.log("wrote", out, `${(xml.length / 1024).toFixed(1)} KB`);
+  writeFileSync(placeOut, placeXml, "utf8");
+  console.log("wrote", placeOut, `${(placeXml.length / 1024).toFixed(1)} KB`);
 });
