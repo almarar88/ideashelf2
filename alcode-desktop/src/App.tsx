@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bubble, ConfirmDialog, Section, Thinking, useAutoScroll } from './components'
 import { useAgent } from './useAgent'
 import { AppSettings, Place } from './types'
 import type { LicenseState } from '../electron/preload-api'
 import Onboarding from './Onboarding'
+import MicButton from './MicButton'
+import { isSpeaking, onSpeakingChange, stopSpeaking } from './voice'
 import {
   DayTab, HomeTab, NewsTab, PrayerTab, TimeZoneContext, Use24hContext, WeatherTab,
 } from './daily'
@@ -36,6 +38,8 @@ const SUGGESTIONS = [
 export default function App() {
   const [tab, setTab] = useState<Tab>('home')
   const [settings, setSettings] = useState<AppSettings | null>(null)
+  // النطق التلقائي يُقرأ من الإعدادات، وتغييره يسري على الرد التالي.
+  const settingsSpeak = () => settings?.autoSpeak === true
   const [toolCount, setToolCount] = useState(0)
   const [license, setLicense] = useState<LicenseState | null>(null)
   const [history, setHistory] = useState<any[]>([])
@@ -43,7 +47,8 @@ export default function App() {
   const [update, setUpdate] = useState<any>(null)
   const [platform, setPlatform] = useState<{ windows: boolean; version: string } | null>(null)
 
-  const agent = useAgent(false, true)
+  const [speaking, setSpeaking] = useState(false)
+  const agent = useAgent(false, true, settingsSpeak())
   const scrollRef = useAutoScroll(agent.messages.map((m) => m.content).join('|'))
   const [input, setInput] = useState('')
 
@@ -60,6 +65,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    onSpeakingChange(setSpeaking)
     void refreshSettings()
     void refreshLicense()
     void refreshHistory()
@@ -356,6 +362,18 @@ export default function App() {
                   fontSize: 15, padding: '10px 0',
                 }}
               />
+              <MicButton
+                disabled={agent.streaming}
+                onText={(text) => {
+                  if (settings?.voiceAutoSend) void agent.send(text)
+                  else setInput((current) => (current ? `${current} ${text}` : text))
+                }}
+              />
+              {speaking && (
+                <button className="pill" onClick={stopSpeaking} title="أسكته">
+                  🔊 إسكات
+                </button>
+              )}
               {agent.streaming ? (
                 <button className="pill" onClick={agent.stop}>إيقاف</button>
               ) : (
@@ -576,6 +594,12 @@ const DIALECTS = [
   { id: 'english', label: 'English' },
 ]
 
+const EFFORTS = [
+  { id: 'low', label: 'سريع', hint: 'الأنسب للأوامر المباشرة' },
+  { id: 'medium', label: 'متوازن', hint: 'يفكّر قبل المهام متعدّدة الخطوات' },
+  { id: 'high', label: 'عميق', hint: 'للمهام المعقّدة — أبطأ وأغلى' },
+]
+
 const HIGH_LAT = [
   { id: 'ANGLE_BASED' as const, label: 'حسب الزاوية' },
   { id: 'MIDDLE_OF_NIGHT' as const, label: 'منتصف الليل' },
@@ -679,6 +703,25 @@ function SettingsTab({ settings, onPatch, onRefresh, version, license, onLicense
                 </button>
               ))}
             </div>
+          </Field>
+
+          <Field label="عمق التفكير">
+            <div className="row wrap" style={{ gap: 8 }}>
+              {EFFORTS.map((level) => (
+                <button
+                  key={level.id}
+                  className={settings.effort === level.id ? 'pill active' : 'pill'}
+                  onClick={() => void onPatch({ effort: level.id })}
+                  title={level.hint}
+                >
+                  {level.label}
+                </button>
+              ))}
+            </div>
+            <p className="muted small" style={{ margin: '6px 0 0' }}>
+              أعلى = تخطيط أفضل للمهام المركّبة، وردّ أبطأ وأغلى. للأوامر
+              المباشرة «سريع» يكفي.
+            </p>
           </Field>
 
           <Field label="اللهجة">
@@ -847,6 +890,8 @@ function SettingsTab({ settings, onPatch, onRefresh, version, license, onLicense
       <Section title="الأخبار">
         <NewsSettings settings={settings} onPatch={onPatch} onRefresh={onRefresh} />
       </Section>
+
+      <VoiceSection settings={settings} onPatch={onPatch} onRefresh={onRefresh} />
 
       <Section title="الأمان">
         <div className="card col" style={{ gap: 14 }}>
@@ -1744,6 +1789,303 @@ function UpdateBanner({ info, onDismiss }: {
         نزّلها
       </button>
       <button className="chip" onClick={onDismiss}>لاحقًا</button>
+    </div>
+  )
+}
+
+// -------------------------------------------------------------- الصوت
+
+const STT_LANGUAGES = [
+  { id: 'ar', label: 'العربية' },
+  { id: 'en', label: 'English' },
+  { id: 'auto', label: 'كشف تلقائي' },
+]
+
+/**
+ * إعدادات الصوت.
+ *
+ * الأصوات تُجلب من حساب المستخدم لا من قائمة مضمّنة: معرّفات ElevenLabs
+ * مرتبطة بالحساب، وأي معرّف أكتبه هنا قد لا يعمل عند غيري.
+ */
+function VoiceSection({ settings, onPatch, onRefresh }: {
+  settings: AppSettings
+  onPatch: (patch: Partial<AppSettings>) => Promise<void>
+  onRefresh: () => Promise<void>
+}) {
+  const [key, setKey] = useState('')
+  const [keyState, setKeyState] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [models, setModels] = useState<{ id: string; arabic: string; hint: string }[]>([])
+  const [voices, setVoices] = useState<any[]>([])
+  const [voiceError, setVoiceError] = useState('')
+  const [loadingVoices, setLoadingVoices] = useState(false)
+  const [onlyArabic, setOnlyArabic] = useState(true)
+  const [cacheBytes, setCacheBytes] = useState(0)
+  const preview = useRef<HTMLAudioElement | null>(null)
+
+  const loadVoices = useCallback(async () => {
+    if (!settings.hasElevenKey) return
+    setLoadingVoices(true)
+    const result = await window.alcode.voice.voices()
+    setLoadingVoices(false)
+    if (result.ok) { setVoices(result.voices); setVoiceError('') }
+    else setVoiceError(result.error)
+  }, [settings.hasElevenKey])
+
+  useEffect(() => {
+    void window.alcode.voice.models().then(setModels)
+    void window.alcode.voice.cacheSize().then(setCacheBytes)
+    void loadVoices()
+  }, [loadVoices])
+
+  const saveKey = async () => {
+    if (!key.trim()) return
+    setBusy(true)
+    setKeyState('')
+    await window.alcode.voice.setKey(key.trim())
+    const result = await window.alcode.voice.testKey()
+    setBusy(false)
+    setKeyState(result.ok ? '✅ المفتاح يعمل' : `⚠️ ${result.error}`)
+    if (result.ok) { setKey(''); await onRefresh(); await loadVoices() }
+  }
+
+  const isArabic = (voice: any) =>
+    String(voice.language).startsWith('ar') || String(voice.accent).startsWith('ar')
+  const shown = onlyArabic ? voices.filter(isArabic) : voices
+
+  return (
+    <Section title="الصوت">
+      <div className="card col" style={{ gap: 18 }}>
+        <p className="muted small" style={{ margin: 0 }}>
+          أصوات ElevenLabs واقعية وتُحاسَب بالحرف على حسابك أنت. بدون مفتاح
+          يبقى النطق عاملًا بأصوات ويندوز المدمجة — مجّانًا وبلا إنترنت، لكنها
+          آلية النبرة.
+        </p>
+
+        <Field label="مفتاح ElevenLabs">
+          <div className="row" style={{ gap: 8 }}>
+            <input
+              className="field grow"
+              type="password"
+              value={key}
+              onChange={(event) => setKey(event.target.value)}
+              placeholder={settings.hasElevenKey ? 'مضبوط ✓ — الصق مفتاحًا جديدًا لتغييره' : 'sk_...'}
+              style={{ direction: 'ltr' }}
+            />
+            <button className="btn" onClick={saveKey} disabled={busy || !key.trim()}>
+              {busy ? 'أتحقّق…' : 'حفظ وتحقّق'}
+            </button>
+          </div>
+          {keyState && <div className="small" style={{ marginTop: 8 }}>{keyState}</div>}
+          <button
+            className="chip"
+            style={{ marginTop: 8 }}
+            onClick={() => window.alcode.daily.openExternal('https://elevenlabs.io/app/settings/api-keys')}
+          >
+            من وين أجيب مفتاحًا؟ ↗
+          </button>
+        </Field>
+
+        {settings.hasElevenKey && (
+          <>
+            <Field label={`الصوت (${shown.length})`}>
+              <div className="row wrap" style={{ gap: 8, marginBottom: 10 }}>
+                <button
+                  className={onlyArabic ? 'pill active' : 'pill'}
+                  onClick={() => setOnlyArabic(true)}
+                >
+                  العربية فقط
+                </button>
+                <button
+                  className={!onlyArabic ? 'pill active' : 'pill'}
+                  onClick={() => setOnlyArabic(false)}
+                >
+                  كل الأصوات
+                </button>
+                <button className="chip" onClick={() => void loadVoices()}>
+                  {loadingVoices ? 'أجلب…' : 'تحديث'}
+                </button>
+              </div>
+
+              {voiceError && (
+                <div className="small" style={{ color: 'var(--danger)' }}>{voiceError}</div>
+              )}
+
+              {shown.length === 0 && !loadingVoices && !voiceError && (
+                <p className="muted small" style={{ margin: 0 }}>
+                  ما في أصوات عربية في حسابك. أضِف صوتًا من مكتبة ElevenLabs،
+                  أو اعرض «كل الأصوات» — النماذج متعدّدة اللغات تنطق العربية
+                  بأي صوت، بجودة تتفاوت.
+                </p>
+              )}
+
+              <div className="col" style={{ gap: 4, maxHeight: 280, overflowY: 'auto' }}>
+                {shown.map((voice) => {
+                  const active = settings.voiceId === voice.id
+                  return (
+                    <div
+                      key={voice.id}
+                      className="row"
+                      style={{
+                        gap: 10, padding: '9px 12px', borderRadius: 16,
+                        background: active ? 'var(--lavender)' : 'var(--surface-high)',
+                      }}
+                    >
+                      <button
+                        className="row grow"
+                        style={{ gap: 8, textAlign: 'start' }}
+                        onClick={() => void onPatch({ voiceId: voice.id })}
+                      >
+                        <span className="grow">
+                          <span style={{ fontWeight: 700 }}>{voice.name}</span>
+                          {voice.accent && (
+                            <span className="muted small" style={{ marginInlineStart: 8 }}>
+                              {voice.accent}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                      {voice.previewUrl && (
+                        <button
+                          className="chip"
+                          title="استمع"
+                          onClick={() => {
+                            preview.current?.pause()
+                            preview.current = new Audio(voice.previewUrl)
+                            void preview.current.play().catch(() => undefined)
+                          }}
+                        >
+                          ▶
+                        </button>
+                      )}
+                      {active && <span className="chip">مختار</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            </Field>
+
+            <Field label="نموذج النطق">
+              <div className="col" style={{ gap: 6 }}>
+                {models.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => void onPatch({ voiceModel: model.id })}
+                    className="row"
+                    style={{
+                      gap: 10, padding: '9px 12px', borderRadius: 16, textAlign: 'start',
+                      background: settings.voiceModel === model.id
+                        ? 'var(--mint)' : 'var(--surface-high)',
+                    }}
+                  >
+                    <span className="grow">
+                      <span style={{ fontWeight: 700 }}>{model.arabic}</span>
+                      <span className="muted small" style={{ display: 'block' }}>{model.hint}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            <Field label="ضبط النبرة">
+              <Slider
+                label="الثبات"
+                hint="أقل = تعبير أكثر وتذبذب أكثر · أعلى = نبرة رتيبة ومستقرّة"
+                value={settings.voiceStability}
+                onChange={(value) => void onPatch({ voiceStability: value })}
+              />
+              <Slider
+                label="القرب من الصوت الأصلي"
+                value={settings.voiceSimilarity}
+                onChange={(value) => void onPatch({ voiceSimilarity: value })}
+              />
+              <Slider
+                label="السرعة"
+                min={0.7}
+                max={1.2}
+                value={settings.voiceSpeed}
+                onChange={(value) => void onPatch({ voiceSpeed: value })}
+              />
+            </Field>
+          </>
+        )}
+
+        <Field label="لغة الإملاء">
+          <div className="row wrap" style={{ gap: 8 }}>
+            {STT_LANGUAGES.map((language) => (
+              <button
+                key={language.id}
+                className={settings.sttLanguage === language.id ? 'pill active' : 'pill'}
+                onClick={() => void onPatch({ sttLanguage: language.id })}
+              >
+                {language.label}
+              </button>
+            ))}
+          </div>
+          <p className="muted small" style={{ margin: '6px 0 0' }}>
+            تحديد اللغة يرفع دقّة التفريغ. اختر الكشف التلقائي إن كنت تخلط بين
+            العربية والإنجليزية في الجملة الواحدة.
+          </p>
+        </Field>
+
+        <Toggle
+          label="انطق ردود المساعد"
+          hint="ينطق كل جملة فور اكتمالها بدل انتظار الرد كلّه"
+          value={settings.autoSpeak}
+          onChange={(value) => void onPatch({ autoSpeak: value })}
+        />
+
+        <Toggle
+          label="أرسل فور انتهاء الإملاء"
+          hint="بدل وضع النصّ في حقل الكتابة لتراجعه"
+          value={settings.voiceAutoSend}
+          onChange={(value) => void onPatch({ voiceAutoSend: value })}
+        />
+
+        <div className="row wrap" style={{ gap: 8 }}>
+          <span className="muted small grow">
+            ذاكرة النطق: {(cacheBytes / 1048576).toFixed(1)} ميغابايت
+            {' '}— العبارات المكرّرة لا تُدفَع مرّتين.
+          </span>
+          <button
+            className="chip"
+            onClick={async () => {
+              await window.alcode.voice.clearCache()
+              setCacheBytes(await window.alcode.voice.cacheSize())
+            }}
+          >
+            امسح الذاكرة
+          </button>
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+function Slider({ label, hint, value, onChange, min = 0, max = 1 }: {
+  label: string
+  hint?: string
+  value: number
+  onChange: (value: number) => void
+  min?: number
+  max?: number
+}) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div className="row" style={{ gap: 10, marginBottom: 4 }}>
+        <span className="small grow" style={{ fontWeight: 600 }}>{label}</span>
+        <span className="muted small" style={{ direction: 'ltr' }}>{value.toFixed(2)}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={0.05}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        style={{ width: '100%', accentColor: 'var(--ink)' }}
+      />
+      {hint && <div className="muted small">{hint}</div>}
     </div>
   )
 }

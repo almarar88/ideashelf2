@@ -70,6 +70,16 @@ const api = {
     deleteHabit: (id: string) => ipcRenderer.invoke('daily:deleteHabit', id),
     openExternal: (url: string) => ipcRenderer.invoke('daily:openExternal', url),
   },
+  voice: {
+    models: () => ipcRenderer.invoke('voice:models'),
+    voices: () => ipcRenderer.invoke('voice:voices'),
+    speak: (text: string) => ipcRenderer.invoke('voice:speak', text),
+    transcribe: (audio: ArrayBuffer) => ipcRenderer.invoke('voice:transcribe', audio),
+    setKey: (value: string) => ipcRenderer.invoke('voice:setKey', value),
+    testKey: () => ipcRenderer.invoke('voice:testKey'),
+    cacheSize: () => ipcRenderer.invoke('voice:cacheSize'),
+    clearCache: () => ipcRenderer.invoke('voice:clearCache'),
+  },
   chat: {
     list: () => ipcRenderer.invoke('chat:list'),
     load: (id: string) => ipcRenderer.invoke('chat:load', id),

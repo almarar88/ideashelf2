@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bubble, ConfirmDialog, Thinking, useAutoScroll } from './components'
 import { useAgent } from './useAgent'
+import MicButton from './MicButton'
 
 /**
  * الشريط السريع: ينزل بضغطة اختصار من أي مكان في ويندوز، تكتب أمرك، ينفّذ.
  * هذا مقابل «الضغط المطوّل على زر التشغيل» في نسخة الهاتف.
  */
 export default function Quick() {
-  const agent = useAgent(true)
+  // الشريط السريع ينطق دائمًا: من يفتحه باختصار لوحة مفاتيح غالبًا لا ينظر
+  // إلى الشاشة أصلًا.
+  const agent = useAgent(true, false, true)
   const [input, setInput] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const shellRef = useRef<HTMLDivElement>(null)
@@ -87,6 +90,7 @@ export default function Quick() {
             fontSize: 16, padding: '10px 0',
           }}
         />
+        <MicButton disabled={agent.streaming} onText={(text) => void agent.send(text)} />
         {agent.streaming ? (
           <button className="pill" onClick={agent.stop}>إيقاف</button>
         ) : (

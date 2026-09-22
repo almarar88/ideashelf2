@@ -1,3 +1,13 @@
+export interface VoiceOption {
+  id: string
+  name: string
+  description: string
+  language: string
+  accent: string
+  gender: string
+  previewUrl: string
+}
+
 export interface LicenseState {
   tier: 'free' | 'pro'
   source: 'licensed' | 'trial' | 'unlicensed-build' | 'none'
@@ -64,6 +74,18 @@ export interface AlcodeBridge {
     saveHabit(habit: unknown): Promise<boolean>
     deleteHabit(id: string): Promise<boolean>
     openExternal(url: string): Promise<boolean>
+  }
+  voice: {
+    models(): Promise<{ id: string; arabic: string; hint: string }[]>
+    voices(): Promise<{ ok: boolean; voices: VoiceOption[]; error: string }>
+    speak(text: string): Promise<{ ok: boolean; audio: string; cached: boolean; error: string }>
+    transcribe(audio: ArrayBuffer): Promise<{
+      ok: boolean; text: string; language: string; error: string
+    }>
+    setKey(value: string): Promise<boolean>
+    testKey(): Promise<{ ok: boolean; error: string }>
+    cacheSize(): Promise<number>
+    clearCache(): Promise<number>
   }
   chat: {
     list(): Promise<{ id: string; title: string; createdAt: number; updatedAt: number; count: number }[]>

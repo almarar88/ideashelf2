@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChatMessage, ConfirmRequest, ToolRun } from './types'
+import { enqueue, stopSpeaking, takeSentences } from './voice'
 
 /**
  * حالة المحادثة مع المساعد.
@@ -8,7 +9,7 @@ import { ChatMessage, ConfirmRequest, ToolRun } from './types'
  * نصوص مقروءة، والثاني كتل محتوى تشمل استدعاءات الأدوات ونتائجها. خلطهما
  * يكسر إعادة الإرسال في الأدوار التالية.
  */
-export function useAgent(fromQuick = false, persist = false) {
+export function useAgent(fromQuick = false, persist = false, speakReplies = false) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streaming, setStreaming] = useState(false)
   const [status, setStatus] = useState('')
@@ -24,6 +25,11 @@ export function useAgent(fromQuick = false, persist = false) {
   const conversationId = useRef('')
   const createdAt = useRef(0)
 
+  // ما لم يُنطق بعد من الرد المتدفّق.
+  const unspoken = useRef('')
+  const speaking = useRef(speakReplies)
+  speaking.current = speakReplies
+
   useEffect(() => {
     const offEvent = window.alcode.agent.onEvent((event: any) => {
       switch (event.type) {
@@ -31,6 +37,14 @@ export function useAgent(fromQuick = false, persist = false) {
           buffer.current += event.delta
           setStatus('')
           patch()
+          // ننطق كل جملة فور اكتمالها بدل انتظار الرد كلّه: الانتظار يجعل
+          // المساعد يصمت ثوانٍ ثم يتكلّم دفعة واحدة.
+          if (speaking.current) {
+            unspoken.current += event.delta
+            const { ready, rest } = takeSentences(unspoken.current)
+            unspoken.current = rest
+            for (const sentence of ready) enqueue(sentence)
+          }
           break
         case 'tool_start':
           setStatus(`أنفّذ ${event.call.name}…`)
@@ -60,6 +74,11 @@ export function useAgent(fromQuick = false, persist = false) {
           break
         case 'done':
           setStatus('')
+          // ما تبقّى بلا ترقيم ختامي يُنطق أيضًا، وإلا ضاع آخر سطر.
+          if (speaking.current && unspoken.current.trim()) {
+            enqueue(unspoken.current)
+            unspoken.current = ''
+          }
           break
       }
     })
@@ -96,6 +115,7 @@ export function useAgent(fromQuick = false, persist = false) {
     activeId.current = placeholder.id
     buffer.current = ''
     runs.current = []
+    unspoken.current = ''
 
     if (!conversationId.current) {
       conversationId.current = crypto.randomUUID()
@@ -146,11 +166,15 @@ export function useAgent(fromQuick = false, persist = false) {
 
   const stop = useCallback(() => {
     window.alcode.agent.stop()
+    stopSpeaking()
+    unspoken.current = ''
     setStreaming(false)
     setStatus('')
   }, [])
 
   const reset = useCallback(() => {
+    stopSpeaking()
+    unspoken.current = ''
     apiHistory.current = []
     conversationId.current = ''
     createdAt.current = 0

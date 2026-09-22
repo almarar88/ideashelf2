@@ -63,5 +63,16 @@ export interface AppSettings {
   newsRefreshMinutes: number
   prayerAlerts: boolean
   onboarded: boolean
+
+  // ---- الصوت (المفتاح نفسه لا يصل الواجهة، وجوده فقط)
+  hasElevenKey: boolean
+  voiceId: string
+  voiceModel: string
+  voiceStability: number
+  voiceSimilarity: number
+  voiceSpeed: number
+  sttLanguage: string
+  autoSpeak: boolean
+  voiceAutoSend: boolean
   morningBriefAt: string
 }

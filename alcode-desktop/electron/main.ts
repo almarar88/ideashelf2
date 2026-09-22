@@ -18,6 +18,10 @@ import { longGregorianAr, longHijriAr } from './daily/dates'
 import { currentState, ensureFirstRun, licensingEnabled, verifyKey } from './license'
 import { checkForUpdate } from './update'
 import {
+  clearVoiceCache, listVoices, speak, testKey as testVoiceKey, transcribe,
+  TTS_MODELS, voiceCacheSize,
+} from './voice'
+import {
   installCrashGuards, log, markBootStarted, markBootSucceeded, previousBootFailed,
   readLogTail, reportFatal, startupLogPath,
 } from './startup'
@@ -65,6 +69,23 @@ function loadInto(window: BrowserWindow, hash: string) {
   } else {
     void window.loadFile(join(__dirname, '../dist/index.html'), { hash: hash.replace('#', '') })
   }
+}
+
+/**
+ * يسمح بالميكروفون لهذه النافذة فقط، ويرفض ما عداه.
+ *
+ * Electron يرفض كل طلبات الأذونات افتراضيًا في التطبيقات المحزومة، فيفشل
+ * getUserMedia بلا رسالة. والسماح الشامل يفتح الكاميرا والموقع وغيرها بلا
+ * حاجة — فنسمّي المسموح ونرفض الباقي صراحةً.
+ */
+function allowMicrophone(window: BrowserWindow) {
+  const allowed = new Set(['media', 'audioCapture'])
+  window.webContents.session.setPermissionRequestHandler((_contents, permission, callback) => {
+    callback(allowed.has(permission))
+  })
+  window.webContents.session.setPermissionCheckHandler(
+    (_contents, permission) => allowed.has(permission),
+  )
 }
 
 function createMainWindow() {
@@ -126,6 +147,10 @@ function createMainWindow() {
     }
   })
 
+  // بلا هذا يُرفض getUserMedia بصمت ولا يعمل الأمر الصوتي أبدًا. نسمح
+  // بالميكروفون وحده: الكاميرا والموقع وغيرها تبقى مرفوضة.
+  allowMicrophone(mainWindow)
+
   loadInto(mainWindow, '#/')
 
   // الإغلاق يخفي بدل أن ينهي: التذكيرات والاختصار العام يحتاجان بقاء التطبيق.
@@ -171,6 +196,7 @@ function createQuickWindow() {
     },
   })
 
+  allowMicrophone(quickWindow)
   loadInto(quickWindow, '#/quick')
   quickWindow.on('blur', () => quickWindow?.hide())
   quickWindow.on('closed', () => { quickWindow = null })
@@ -467,16 +493,35 @@ function registerIpc() {
   ipcMain.handle('settings:get', async () => {
     const settings = await stores.settings.load()
     // المفتاح لا يغادر العملية الرئيسية — نرسل وجوده فقط.
-    return { ...settings, apiKey: '', hasApiKey: Boolean(settings.apiKey) }
+    return {
+      ...settings,
+      apiKey: '',
+      hasApiKey: Boolean(settings.apiKey),
+      elevenKey: '',
+      hasElevenKey: Boolean(settings.elevenKey),
+    }
   })
 
   ipcMain.handle('settings:set', async (_event, patch: Partial<Settings>) => {
-    const next = await stores.settings.update((current) => ({ ...current, ...patch }))
-    if (patch.hotkey !== undefined) registerHotkey(next.hotkey)
-    if (patch.launchAtLogin !== undefined && isWindows) {
+    // المفاتيح لها قنوات خاصّة بها. واجهة العرض تقرأ الإعدادات بمفاتيح فارغة،
+    // فلو مرّرت الكائن كاملًا يومًا لمحت المفتاحين بلا قصد. نحذفهما هنا مرّة
+    // واحدة بدل الاتّكال على انضباط كل مُنادٍ.
+    const safe = { ...patch }
+    delete (safe as Record<string, unknown>).apiKey
+    delete (safe as Record<string, unknown>).elevenKey
+
+    const next = await stores.settings.update((current) => ({ ...current, ...safe }))
+    if (safe.hotkey !== undefined) registerHotkey(next.hotkey)
+    if (safe.launchAtLogin !== undefined && isWindows) {
       app.setLoginItemSettings({ openAtLogin: next.launchAtLogin, args: ['--hidden'] })
     }
-    return { ...next, apiKey: '', hasApiKey: Boolean(next.apiKey) }
+    return {
+      ...next,
+      apiKey: '',
+      hasApiKey: Boolean(next.apiKey),
+      elevenKey: '',
+      hasElevenKey: Boolean(next.elevenKey),
+    }
   })
 
   ipcMain.handle('settings:setKey', async (_event, key: string) => {
@@ -675,6 +720,30 @@ function registerIpc() {
     await stores.conversations.save([])
     return true
   })
+
+  // ------------------------------------------------------------ الصوت
+
+  ipcMain.handle('voice:models', async () => TTS_MODELS)
+  ipcMain.handle('voice:voices', async () => listVoices())
+
+  ipcMain.handle('voice:speak', async (_event, text: string) => speak(String(text ?? '')))
+
+  ipcMain.handle('voice:transcribe', async (_event, audio: ArrayBuffer) => transcribe(audio))
+
+  ipcMain.handle('voice:setKey', async (_event, value: string) => {
+    await stores.settings.update((current) => ({
+      ...current, elevenKey: String(value ?? '').trim(),
+    }))
+    return true
+  })
+
+  ipcMain.handle('voice:testKey', async () => {
+    const settings = await stores.settings.load()
+    return testVoiceKey(settings.elevenKey)
+  })
+
+  ipcMain.handle('voice:cacheSize', async () => voiceCacheSize())
+  ipcMain.handle('voice:clearCache', async () => clearVoiceCache())
 
   // --------------------------------------------------------- التحديثات
 

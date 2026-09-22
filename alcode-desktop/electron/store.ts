@@ -11,6 +11,11 @@ import { join } from 'node:path'
  * لا قاعدة بيانات ولا خادم — البيانات صغيرة وتبقى على جهاز المستخدم وحده،
  * والكتابة ذرّية (ملف مؤقت ثم إعادة تسمية) حتى لا يتلف الملف عند انقطاع.
  */
+/** كائن عادي — لا مصفوفة ولا null ولا صنف. */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 export class JsonStore<T> {
   private cache: T | null = null
   private writing: Promise<void> = Promise.resolve()
@@ -25,11 +30,36 @@ export class JsonStore<T> {
     if (this.cache !== null) return this.cache
     try {
       const raw = await fs.readFile(this.path(), 'utf8')
-      this.cache = JSON.parse(raw) as T
+      this.cache = this.reconcile(JSON.parse(raw))
     } catch {
       this.cache = this.fallback
     }
     return this.cache
+  }
+
+  /**
+   * يدمج المقروء فوق الافتراضي.
+   *
+   * بدون هذا يبقى كل حقل أُضيف في نسخة لاحقة `undefined` عند من رقّى من نسخة
+   * أقدم — لأن الملف على قرصه كُتب قبل وجود الحقل. النتيجة انهيار عند أول
+   * `settings.<حقل جديد>.trim()` أو `.map()`، ولا يظهر أبدًا في اختبار على
+   * جهاز نظيف. الدمج طبقتان: الجذر، وأي كائن بسيط داخله مثل إعدادات الصلاة.
+   */
+  private reconcile(parsed: unknown): T {
+    if (!isPlainObject(this.fallback) || !isPlainObject(parsed)) {
+      // مصفوفة أو قيمة مفردة: تُؤخذ كما هي، والفارغ يعود للافتراضي.
+      return (parsed ?? this.fallback) as T
+    }
+    const base = this.fallback as Record<string, unknown>
+    const merged: Record<string, unknown> = { ...base }
+    for (const [name, value] of Object.entries(parsed)) {
+      if (value === undefined) continue
+      const fallbackValue = base[name]
+      merged[name] = isPlainObject(fallbackValue) && isPlainObject(value)
+        ? { ...fallbackValue, ...value }
+        : value
+    }
+    return merged as T
   }
 
   async save(value: T): Promise<void> {
@@ -128,6 +158,22 @@ export interface Settings {
   prayerAlerts: boolean
   /** هل أُنجزت تهيئة أول تشغيل؟ */
   onboarded: boolean
+
+  // ---- الصوت
+  /** مفتاح ElevenLabs — لا يغادر العملية الرئيسية. */
+  elevenKey: string
+  voiceId: string
+  voiceModel: string
+  /** ثبات النبرة: أقل = تعبير أكثر وتذبذب أكثر. */
+  voiceStability: number
+  voiceSimilarity: number
+  voiceSpeed: number
+  /** لغة التفريغ: رمز ISO أو «auto». */
+  sttLanguage: string
+  /** ينطق ردود المساعد تلقائيًا. */
+  autoSpeak: boolean
+  /** يرسل الأمر فور انتهاء التفريغ بدل وضعه في الحقل. */
+  voiceAutoSend: boolean
   /** ملخّص الصباح كإشعار، بالساعة والدقيقة (HH:mm) أو فراغ لتعطيله. */
   morningBriefAt: string
 }
@@ -157,6 +203,17 @@ export const defaultSettings: Settings = {
   newsRefreshMinutes: 30,
   prayerAlerts: true,
   onboarded: false,
+
+  elevenKey: '',
+  voiceId: '',
+  // الافتراضي: نموذج الحوار — جودة عالية وزمن استجابة يناسب مساعدًا يُجاوب.
+  voiceModel: 'eleven_v3_conversational',
+  voiceStability: 0.5,
+  voiceSimilarity: 0.75,
+  voiceSpeed: 1,
+  sttLanguage: 'ar',
+  autoSpeak: false,
+  voiceAutoSend: true,
   morningBriefAt: '07:00',
 }
 
