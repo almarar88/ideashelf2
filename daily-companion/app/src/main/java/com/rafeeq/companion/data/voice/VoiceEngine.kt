@@ -45,11 +45,161 @@ class VoiceEngine(private val context: Context) {
     private var onError: ((String) -> Unit)? = null
     private var onDoneSpeaking: (() -> Unit)? = null
 
+    /**
+     * النطق الواقعي بأصوات ElevenLabs.
+     *
+     * يُنشأ كسولًا ولا يعمل إلا إذا ضبط المستخدم مفتاحًا وصوتًا. حين لا يكون
+     * مضبوطًا — أو يفشل نداء — يبقى صوت النظام هو المسار، فلا يصمت المساعد.
+     */
+    private var realistic: RealisticSpeaker? = null
+
+    /** آخر خطأ صوت واقعي، ليعرضه المستخدم بدل أن يتساءل عن سبب الصوت الآلي. */
+    private val _voiceError = MutableStateFlow("")
+    val voiceError: StateFlow<String> = _voiceError.asStateFlow()
+
+    /**
+     * يضبط الصوت الواقعي. [apiKey] فارغ أو [voiceId] فارغ يعني إيقافه
+     * والعودة إلى صوت النظام.
+     */
+    fun configureRealisticVoice(
+        apiKey: String,
+        voiceId: String,
+        modelId: String,
+        stability: Float,
+        similarity: Float,
+        speed: Float,
+        cacheDir: java.io.File,
+    ) {
+        if (apiKey.isBlank() || voiceId.isBlank()) {
+            realistic?.release()
+            realistic = null
+            return
+        }
+        RealisticSpeaker.attachContext(context)
+        val speaker = realistic ?: RealisticSpeaker(
+            cacheDir = cacheDir,
+            // الجملة التي فشل نطقها واقعيًا تُقال بصوت النظام فورًا.
+            onFallback = { sentence ->
+                runCatching { tts?.speak(sentence, TextToSpeech.QUEUE_ADD, null, "fallback-" + System.nanoTime()) }
+            },
+            onStateChange = { speaking ->
+                _state.value = if (speaking) State.SPEAKING else State.IDLE
+            },
+            onError = { message -> _voiceError.value = message },
+        ).also { realistic = it }
+
+        speaker.config = RealisticSpeaker.Config(
+            apiKey = apiKey,
+            settings = ElevenLabs.SpeechSettings(
+                voiceId = voiceId,
+                modelId = modelId,
+                stability = stability,
+                similarity = similarity,
+                speed = speed,
+            ),
+        )
+    }
+
+    /** هل النطق يجري بصوت واقعي الآن؟ */
+    val usingRealisticVoice: Boolean get() = realistic?.isConfigured == true
+
     val isRecognitionAvailable: Boolean
         get() = SpeechRecognizer.isRecognitionAvailable(context)
 
     /** هل عثرنا على صوت عربي للقراءة؟ */
     val hasArabicVoice: Boolean get() = arabicAvailable
+
+    // ------------------------------------------------- الاستماع عبر Scribe
+
+    private var recorder: android.media.MediaRecorder? = null
+    private var recordFile: java.io.File? = null
+
+    /** إعدادات التفريغ عبر ElevenLabs، أو null لاستعمال محرّك النظام. */
+    @Volatile
+    private var scribe: Pair<String, String>? = null
+
+    /** [apiKey] فارغ يعني العودة إلى محرّك النظام. */
+    fun configureScribe(apiKey: String, languageCode: String) {
+        scribe = if (apiKey.isBlank()) null else apiKey to languageCode
+    }
+
+    val usingScribe: Boolean get() = scribe != null
+
+    /**
+     * يبدأ تسجيلًا للتفريغ عبر Scribe.
+     *
+     * نسجّل بأنفسنا بدل SpeechRecognizer لأن الأخير يعيد نصًّا من محرّك
+     * النظام — دقّته في اللهجات العربية أضعف بوضوح من Scribe، ولا يعطينا
+     * الصوت الخام لنرسله لغيره.
+     */
+    fun startScribeRecording(): Boolean {
+        val target = java.io.File(context.cacheDir, "speech-${System.currentTimeMillis()}.m4a")
+        return runCatching {
+            RealisticSpeaker.attachContext(context)
+            recorder = RealisticSpeaker.startRecording(target)
+            recordFile = target
+            _state.value = State.LISTENING
+            true
+        }.getOrElse { error ->
+            _state.value = State.IDLE
+            onError?.invoke(
+                if (error is SecurityException) "صلاحية الميكروفون مرفوضة."
+                else "تعذّر بدء التسجيل.",
+            )
+            false
+        }
+    }
+
+    /** يوقف التسجيل ويفرّغه. يستدعي [onResult] بالنصّ أو [onFailure] بالسبب. */
+    suspend fun stopScribeRecording(
+        onResult: (String) -> Unit,
+        onFailure: (String) -> Unit,
+    ) {
+        val active = recorder
+        val file = recordFile
+        recorder = null
+        recordFile = null
+        runCatching { active?.stop() }
+        runCatching { active?.release() }
+
+        if (file == null || !file.exists()) {
+            _state.value = State.IDLE
+            onFailure("ما في تسجيل.")
+            return
+        }
+
+        _state.value = State.PROCESSING
+        val credentials = scribe
+        if (credentials == null) {
+            _state.value = State.IDLE
+            onFailure("التفريغ الدقيق غير مضبوط.")
+            return
+        }
+
+        runCatching { ElevenLabs.transcribe(credentials.first, file, credentials.second) }
+            .onSuccess { text ->
+                _state.value = State.IDLE
+                // نحذف التسجيل فور تفريغه: صوت المستخدم لا يبقى على القرص.
+                runCatching { file.delete() }
+                if (text.isBlank()) onFailure("ما سمعت شيئًا — جرّب مرّة ثانية.")
+                else onResult(text)
+            }
+            .onFailure { error ->
+                _state.value = State.IDLE
+                runCatching { file.delete() }
+                onFailure(ElevenLabs.friendly(error))
+            }
+    }
+
+    /** يُلغي تسجيلًا جاريًا بلا تفريغ. */
+    fun cancelScribeRecording() {
+        runCatching { recorder?.stop() }
+        runCatching { recorder?.release() }
+        recorder = null
+        runCatching { recordFile?.delete() }
+        recordFile = null
+        if (_state.value == State.LISTENING) _state.value = State.IDLE
+    }
 
     // ------------------------------------------------------------ الاستماع
 
@@ -291,7 +441,10 @@ class VoiceEngine(private val context: Context) {
         streamStarted = false
         onDoneSpeaking = null
         runCatching { tts?.stop() }
+        // نُهيّئ صوت النظام دائمًا حتى لو كان الواقعي مضبوطًا: هو شبكة
+        // الأمان حين يفشل نداء ElevenLabs في منتصف الرد.
         prepareTts(languageTag)
+        realistic?.takeIf { it.isConfigured }?.begin()
     }
 
     /** يضيف جزءًا جديدًا من الرد، وينطق ما اكتمل منه من جمل. */
@@ -310,6 +463,17 @@ class VoiceEngine(private val context: Context) {
         onDoneSpeaking = onDone
         val rest = streamBuffer.toString()
         streamBuffer.setLength(0)
+
+        val speaker = realistic
+        if (speaker != null && speaker.isConfigured) {
+            enqueueChunk(rest, final = true)
+            speaker.finish {
+                onDoneSpeaking = null
+                onDone?.invoke()
+            }
+            return
+        }
+
         if (!enqueueChunk(rest, final = true) && !streamStarted) {
             // لا شيء يُنطق أصلًا.
             onDoneSpeaking = null
@@ -339,6 +503,13 @@ class VoiceEngine(private val context: Context) {
     private fun enqueueChunk(raw: String, final: Boolean): Boolean {
         val clean = stripForSpeech(raw)
         if (clean.isBlank()) return false
+
+        val speaker = realistic
+        if (speaker != null && speaker.isConfigured) {
+            speaker.enqueue(clean)
+            streamStarted = true
+            return true
+        }
         val id = (if (final) FINAL_PREFIX else "part-") + System.nanoTime()
         val mode = if (streamStarted) TextToSpeech.QUEUE_ADD else TextToSpeech.QUEUE_FLUSH
         streamStarted = true
@@ -363,6 +534,7 @@ class VoiceEngine(private val context: Context) {
     }
 
     fun stopSpeaking() {
+        realistic?.stop()
         runCatching { tts?.stop() }
         streamBuffer.setLength(0)
         streamStarted = false
@@ -396,6 +568,9 @@ class VoiceEngine(private val context: Context) {
     }
 
     fun release() {
+        cancelScribeRecording()
+        realistic?.release()
+        realistic = null
         runCatching { recognizer?.destroy() }
         runCatching { tts?.stop(); tts?.shutdown() }
         recognizer = null

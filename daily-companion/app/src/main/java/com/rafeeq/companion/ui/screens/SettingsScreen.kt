@@ -93,6 +93,7 @@ fun SettingsScreen(
     onOpenControl: () -> Unit = {},
     onOpenStats: () -> Unit = {},
     onOpenShortcuts: () -> Unit = {},
+    onOpenVoice: () -> Unit = {},
     onOpenMemory: () -> Unit = {},
     onOpenSaved: () -> Unit = {},
 ) {
@@ -349,6 +350,18 @@ fun SettingsScreen(
                         onCheckedChange = { viewModel.setContinuousVoice(it) },
                     )
                 }
+
+                SettingRow(
+                    title = "الصوت الواقعي",
+                    subtitle = if (settings.hasRealisticVoice) {
+                        "ElevenLabs · ${settings.elevenVoiceName}"
+                    } else {
+                        "أصوات ElevenLabs بمفتاحك — بدلًا من صوت الهاتف الآلي"
+                    },
+                    value = if (settings.hasRealisticVoice) "مفعّل" else "معطّل",
+                    icon = Icons.Filled.RecordVoiceOver,
+                    tint = Violet,
+                ) { onOpenVoice() }
 
                 SettingRow(
                     title = "لغة النطق والتعرّف",

@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.rafeeq.companion.core.Net
@@ -60,6 +61,17 @@ data class AppSettings(
     val responseSpeed: ClaudeClient.ResponseSpeed = ClaudeClient.ResponseSpeed.FAST,
     val voiceReplies: Boolean = true,
     val voiceLanguage: String = "ar-AE",
+
+    // ---- الصوت الواقعي (ElevenLabs)
+    val elevenKey: String = "",
+    val elevenVoiceId: String = "",
+    val elevenVoiceName: String = "",
+    val elevenModel: String = "eleven_v3_conversational",
+    val elevenStability: Float = 0.5f,
+    val elevenSimilarity: Float = 0.75f,
+    val elevenSpeed: Float = 1f,
+    /** التفريغ عبر Scribe بدل محرّك النظام — أدقّ في العربية. */
+    val useScribe: Boolean = true,
     /** لهجة المساعد في الكتابة والنطق. */
     val dialect: Dialect = Dialect.EMIRATI,
     /** البحث في الإنترنت عبر خوادم Anthropic حين يحتاج السؤال معلومة حديثة. */
@@ -84,6 +96,10 @@ data class AppSettings(
         )
 
     val hasApiKey: Boolean get() = apiKey.isNotBlank()
+
+    /** هل الصوت الواقعي جاهز للاستعمال؟ */
+    val hasRealisticVoice: Boolean
+        get() = elevenKey.isNotBlank() && elevenVoiceId.isNotBlank()
 
     /** النموذج وعمق التفكير المستخدمان فعليًا — يشتقّان من مستوى السرعة. */
     val effectiveModel: String get() = responseSpeed.model
@@ -131,6 +147,14 @@ class SettingsRepository(private val context: Context) {
         val responseSpeed = stringPreferencesKey("response_speed")
         val voiceReplies = booleanPreferencesKey("voice_replies")
         val voiceLanguage = stringPreferencesKey("voice_language")
+        val elevenKey = stringPreferencesKey("eleven_key")
+        val elevenVoiceId = stringPreferencesKey("eleven_voice_id")
+        val elevenVoiceName = stringPreferencesKey("eleven_voice_name")
+        val elevenModel = stringPreferencesKey("eleven_model")
+        val elevenStability = floatPreferencesKey("eleven_stability")
+        val elevenSimilarity = floatPreferencesKey("eleven_similarity")
+        val elevenSpeed = floatPreferencesKey("eleven_speed")
+        val useScribe = booleanPreferencesKey("use_scribe")
         val dialect = stringPreferencesKey("dialect")
         val webSearch = booleanPreferencesKey("web_search")
         val continuousVoice = booleanPreferencesKey("continuous_voice")
@@ -187,6 +211,14 @@ class SettingsRepository(private val context: Context) {
             responseSpeed = ClaudeClient.ResponseSpeed.from(p[Keys.responseSpeed]),
             voiceReplies = p[Keys.voiceReplies] ?: true,
             voiceLanguage = p[Keys.voiceLanguage] ?: Dialect.from(p[Keys.dialect]).bcp47,
+            elevenKey = p[Keys.elevenKey] ?: "",
+            elevenVoiceId = p[Keys.elevenVoiceId] ?: "",
+            elevenVoiceName = p[Keys.elevenVoiceName] ?: "",
+            elevenModel = p[Keys.elevenModel] ?: "eleven_v3_conversational",
+            elevenStability = p[Keys.elevenStability] ?: 0.5f,
+            elevenSimilarity = p[Keys.elevenSimilarity] ?: 0.75f,
+            elevenSpeed = p[Keys.elevenSpeed] ?: 1f,
+            useScribe = p[Keys.useScribe] ?: true,
             dialect = Dialect.from(p[Keys.dialect]),
             webSearch = p[Keys.webSearch] ?: true,
             continuousVoice = p[Keys.continuousVoice] ?: true,
@@ -253,6 +285,19 @@ class SettingsRepository(private val context: Context) {
         edit { it[Keys.responseSpeed] = value.name }
     suspend fun setVoiceReplies(value: Boolean) = edit { it[Keys.voiceReplies] = value }
     suspend fun setVoiceLanguage(value: String) = edit { it[Keys.voiceLanguage] = value }
+
+    suspend fun setElevenKey(value: String) = edit { it[Keys.elevenKey] = value.trim() }
+    suspend fun setElevenVoice(id: String, name: String) = edit {
+        it[Keys.elevenVoiceId] = id
+        it[Keys.elevenVoiceName] = name
+    }
+    suspend fun setElevenModel(value: String) = edit { it[Keys.elevenModel] = value }
+    suspend fun setElevenTuning(stability: Float, similarity: Float, speed: Float) = edit {
+        it[Keys.elevenStability] = stability
+        it[Keys.elevenSimilarity] = similarity
+        it[Keys.elevenSpeed] = speed
+    }
+    suspend fun setUseScribe(value: Boolean) = edit { it[Keys.useScribe] = value }
 
     /** تغيير اللهجة يغيّر لغة النطق والتعرّف معها، وإلا بقي الصوت على لهجة أخرى. */
     suspend fun setDialect(value: Dialect) = edit {

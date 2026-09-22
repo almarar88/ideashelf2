@@ -66,6 +66,7 @@ import com.rafeeq.companion.ui.screens.AzkarScreen
 import com.rafeeq.companion.ui.screens.SavedScreen
 import com.rafeeq.companion.ui.screens.SearchScreen
 import com.rafeeq.companion.ui.screens.ShortcutsScreen
+import com.rafeeq.companion.ui.screens.VoiceScreen
 import com.rafeeq.companion.ui.screens.StatsScreen
 import com.rafeeq.companion.ui.screens.ControlScreen
 import com.rafeeq.companion.ui.screens.DayScreen
@@ -97,6 +98,7 @@ object Routes {
     const val SEARCH = "search"
     const val STATS = "stats"
     const val SHORTCUTS = "shortcuts"
+    const val VOICE = "voice"
     const val MEMORY = "memory"
 }
 
@@ -182,6 +184,7 @@ fun RafeeqNavigation(
         currentRoute == Routes.SEARCH ||
         currentRoute == Routes.STATS ||
         currentRoute == Routes.SHORTCUTS ||
+        currentRoute == Routes.VOICE ||
         currentRoute == Routes.MEMORY
 
     Scaffold(
@@ -278,6 +281,7 @@ fun RafeeqNavigation(
                         onOpenControl = { navController.navigate(Routes.CONTROL) },
                         onOpenStats = { navController.navigate(Routes.STATS) },
                         onOpenShortcuts = { navController.navigate(Routes.SHORTCUTS) },
+                        onOpenVoice = { navController.navigate(Routes.VOICE) },
                         onOpenMemory = { navController.navigate(Routes.MEMORY) },
                         onOpenSaved = { navController.navigate(Routes.SAVED) },
                     )
@@ -303,6 +307,8 @@ fun RafeeqNavigation(
                 composable(Routes.STATS) { StatsScreen(viewModel) }
 
                 composable(Routes.SHORTCUTS) { ShortcutsScreen(viewModel) }
+
+                composable(Routes.VOICE) { VoiceScreen(viewModel) }
 
                 composable(Routes.MEMORY) { MemoryScreen(viewModel) }
             }

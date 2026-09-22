@@ -240,6 +240,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             rescheduleHabitReminders()
             rescheduleRoutines()
         }
+        // الصوت الواقعي يتبع الإعدادات حيًّا: تغيير الصوت أو النموذج يسري
+        // على الرد التالي بلا إعادة تشغيل.
+        viewModelScope.launch {
+            settings.collect { s ->
+                repos.voice.configureRealisticVoice(
+                    apiKey = s.elevenKey,
+                    voiceId = s.elevenVoiceId,
+                    modelId = s.elevenModel,
+                    stability = s.elevenStability,
+                    similarity = s.elevenSimilarity,
+                    speed = s.elevenSpeed,
+                    cacheDir = java.io.File(getApplication<android.app.Application>().cacheDir, "voice"),
+                )
+                repos.voice.configureScribe(
+                    apiKey = if (s.useScribe) s.elevenKey else "",
+                    languageCode = s.voiceLanguage.substringBefore('-'),
+                )
+            }
+        }
         refreshCapabilities()
     }
 
@@ -1119,6 +1138,60 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setResponseSpeed(value: ClaudeClient.ResponseSpeed) = viewModelScope.launch {
         repos.settings.setResponseSpeed(value)
+    }
+
+    /**
+     * يبدأ إدخالًا صوتيًا.
+     *
+     * مساران: Scribe حين يكون مضبوطًا (أدقّ في اللهجات العربية)، وإلا محرّك
+     * النظام. الفرق في التفاعل: محرّك النظام يقف وحده عند الصمت، وScribe
+     * يحتاج ضغطة ثانية — ولهذا تُرجع الدالة أيّ المسارين جرى.
+     */
+    fun startVoiceInput(languageTag: String): Boolean {
+        if (repos.voice.usingScribe) {
+            return repos.voice.startScribeRecording()
+        }
+        repos.voice.startListening(
+            languageTag = languageTag,
+            onResult = { sendMessage(it, spoken = true) },
+            onFailure = { showMessage(it) },
+        )
+        return false
+    }
+
+    /** ينهي الإدخال الصوتي: يفرّغ تسجيل Scribe، أو يُلغي استماع النظام. */
+    fun finishVoiceInput() {
+        if (!repos.voice.usingScribe) {
+            repos.voice.cancel()
+            return
+        }
+        viewModelScope.launch {
+            repos.voice.stopScribeRecording(
+                onResult = { sendMessage(it, spoken = true) },
+                onFailure = { showMessage(it) },
+            )
+        }
+    }
+
+    fun setElevenKey(value: String) = viewModelScope.launch {
+        repos.settings.setElevenKey(value)
+    }
+
+    fun setElevenVoice(id: String, name: String) = viewModelScope.launch {
+        repos.settings.setElevenVoice(id, name)
+    }
+
+    fun setElevenModel(value: String) = viewModelScope.launch {
+        repos.settings.setElevenModel(value)
+    }
+
+    fun setElevenTuning(stability: Float, similarity: Float, speed: Float) =
+        viewModelScope.launch {
+            repos.settings.setElevenTuning(stability, similarity, speed)
+        }
+
+    fun setUseScribe(value: Boolean) = viewModelScope.launch {
+        repos.settings.setUseScribe(value)
     }
 
     fun setVoiceReplies(value: Boolean) = viewModelScope.launch {

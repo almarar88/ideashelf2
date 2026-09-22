@@ -149,11 +149,7 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted) {
-            viewModel.voice.startListening(
-                languageTag = settings.voiceLanguage,
-                onResult = { viewModel.sendMessage(it, spoken = true) },
-                onFailure = { viewModel.showMessage(it) },
-            )
+            viewModel.startVoiceInput(settings.voiceLanguage)
         } else {
             viewModel.showMessage("أحتاج إذن الميكروفون لأسمعك.")
         }
@@ -391,7 +387,9 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                         ),
                     )
                     .clickable {
-                        if (listening) viewModel.voice.cancel()
+                        // مع Scribe الضغطة الثانية تُنهي التسجيل وتفرّغه؛
+                        // مع محرّك النظام تُلغيه لأنه يقف وحده عند الصمت.
+                        if (listening) viewModel.finishVoiceInput()
                         else micPermission.launch(Manifest.permission.RECORD_AUDIO)
                     },
                 contentAlignment = Alignment.Center,
