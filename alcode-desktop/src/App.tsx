@@ -4,6 +4,7 @@ import { useAgent } from './useAgent'
 import { AppSettings, Place } from './types'
 import type { LicenseState } from '../electron/preload-api'
 import Onboarding from './Onboarding'
+import { Icon, IconName } from './icons'
 import MicButton from './MicButton'
 import { isSpeaking, onSpeakingChange, stopSpeaking } from './voice'
 import {
@@ -14,17 +15,40 @@ type Tab =
   | 'home' | 'chat' | 'day' | 'prayer' | 'weather' | 'news'
   | 'skills' | 'memory' | 'settings'
 
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'home', label: 'الرئيسية', icon: '🏠' },
-  { id: 'chat', label: 'المساعد', icon: '✨' },
-  { id: 'day', label: 'يومي', icon: '📋' },
-  { id: 'prayer', label: 'الصلاة', icon: '🕌' },
-  { id: 'weather', label: 'الطقس', icon: '⛅' },
-  { id: 'news', label: 'الأخبار', icon: '📰' },
-  { id: 'skills', label: 'القدرات', icon: '🧩' },
-  { id: 'memory', label: 'الذاكرة', icon: '🧠' },
-  { id: 'settings', label: 'الإعدادات', icon: '⚙️' },
+/**
+ * التبويبات مجمَّعة لا مسرودة.
+ *
+ * تسعة عناصر في عمود واحد قائمةٌ يُبحث فيها. ثلاث مجموعات بعناوين تجعلها
+ * بنيةً تُفهم بنظرة: ما يُستعمل كل يوم، ثم ما يُرجَع إليه، ثم الضبط.
+ */
+const TAB_GROUPS: { label: string; items: { id: Tab; label: string; icon: IconName }[] }[] = [
+  {
+    label: 'يومك',
+    items: [
+      { id: 'home', label: 'الرئيسية', icon: 'home' },
+      { id: 'chat', label: 'المساعد', icon: 'sparkle' },
+      { id: 'day', label: 'مهامي', icon: 'list' },
+    ],
+  },
+  {
+    label: 'معلومات',
+    items: [
+      { id: 'prayer', label: 'الصلاة', icon: 'mosque' },
+      { id: 'weather', label: 'الطقس', icon: 'cloud' },
+      { id: 'news', label: 'الأخبار', icon: 'news' },
+    ],
+  },
+  {
+    label: 'التطبيق',
+    items: [
+      { id: 'skills', label: 'القدرات', icon: 'grid' },
+      { id: 'memory', label: 'الذاكرة', icon: 'brain' },
+      { id: 'settings', label: 'الإعدادات', icon: 'settings' },
+    ],
+  },
 ]
+
+const TABS = TAB_GROUPS.flatMap((group) => group.items)
 
 const SUGGESTIONS = [
   'شو حالة الجهاز؟',
@@ -179,61 +203,86 @@ export default function App() {
     <div style={{ height: '100vh', display: 'flex' }}>
       {/* ------------------------------------------------ الشريط الجانبي */}
       <aside
+        className="no-scrollbar"
         style={{
-          width: 92, padding: '16px 0', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', gap: 8,
+          width: 212, flexShrink: 0, display: 'flex', flexDirection: 'column',
+          padding: '14px 10px 12px', gap: 2, overflowY: 'auto',
+          borderInlineEnd: '1px solid var(--separator)',
         }}
       >
-        <div
-          style={{
-            width: 42, height: 42, borderRadius: '50%', background: 'var(--lavender)',
-            display: 'grid', placeItems: 'center', fontSize: 19, flexShrink: 0,
-          }}
-        >
-          ✦
+        <div className="row" style={{ gap: 10, padding: '6px 10px 14px' }}>
+          <div
+            style={{
+              width: 28, height: 28, borderRadius: 9, background: 'var(--accent)',
+              display: 'grid', placeItems: 'center', color: '#fff', flexShrink: 0,
+            }}
+          >
+            <Icon.sparkle size={17} stroke={2} />
+          </div>
+          <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: '-0.01em' }}>
+            Alcode Ai
+          </span>
         </div>
-        {/* التبويبات تسع تسعة، والنافذة قد تُصغَّر إلى ٦٠٠ بكسل، فنجعل
-            الشريط نفسه قابلاً للتمرير بدل أن تُقصّ الأزرار الأخيرة. */}
-        <nav
-          className="col no-scrollbar"
-          style={{
-            flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex',
-            flexDirection: 'column', alignItems: 'center', gap: 4, padding: '4px 0',
-            width: '100%',
-          }}
-        >
-          {TABS.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setTab(item.id)}
-              title={item.label}
-              style={{
-                width: 62, minHeight: 50, borderRadius: 18, flexShrink: 0,
-                background: tab === item.id ? 'var(--ink)' : 'transparent',
-                color: tab === item.id ? 'var(--sand)' : 'var(--ink)',
-                display: 'grid', placeItems: 'center', gap: 1,
-                transition: 'all 0.16s ease',
-              }}
-            >
-              <span style={{ fontSize: 17, lineHeight: 1 }}>{item.icon}</span>
-              <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.85 }}>{item.label}</span>
-            </button>
-          ))}
-        </nav>
+
+        {TAB_GROUPS.map((group) => (
+          <div key={group.label} style={{ marginBottom: 10 }}>
+            <div className="section-label" style={{ padding: '0 10px 6px' }}>
+              {group.label}
+            </div>
+            {group.items.map((item) => {
+              const active = tab === item.id
+              const Glyph = Icon[item.icon]
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setTab(item.id)}
+                  className="row"
+                  style={{
+                    width: '100%', gap: 11, padding: '8px 10px', borderRadius: 9,
+                    textAlign: 'start', marginBottom: 1,
+                    background: active ? 'var(--accent)' : 'transparent',
+                    color: active ? '#fff' : 'var(--label)',
+                    transition: 'background var(--fast) var(--ease)',
+                  }}
+                  onMouseEnter={(event) => {
+                    if (!active) event.currentTarget.style.background = 'var(--surface-3)'
+                  }}
+                  onMouseLeave={(event) => {
+                    if (!active) event.currentTarget.style.background = 'transparent'
+                  }}
+                >
+                  <Glyph size={18} stroke={active ? 2 : 1.75} />
+                  <span
+                    className="grow"
+                    style={{ fontSize: 13.5, fontWeight: active ? 600 : 500 }}
+                  >
+                    {item.label}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        ))}
+
+        <div className="grow" />
+
         {settings && !settings.hasApiKey && (
           <button
-            className="pill"
             onClick={() => setTab('settings')}
-            title="أضِف المفتاح"
-            style={{ background: 'var(--butter)', padding: 10, flexShrink: 0 }}
+            className="row"
+            style={{
+              gap: 10, padding: '9px 11px', borderRadius: 10, textAlign: 'start',
+              background: 'var(--amber-soft)', color: 'var(--amber)',
+            }}
           >
-            🔑
+            <Icon.key size={16} />
+            <span style={{ fontSize: 12.5, fontWeight: 600 }}>أضِف مفتاحك</span>
           </button>
         )}
       </aside>
 
       {/* ------------------------------------------------------- المحتوى */}
-      <main style={{ flex: 1, minWidth: 0, padding: '18px 22px 18px 0', overflow: 'hidden' }}>
+      <main style={{ flex: 1, minWidth: 0, padding: '20px 26px 18px', overflow: 'hidden' }}>
         <Use24hContext.Provider value={settings?.use24h ?? true}>
         <TimeZoneContext.Provider value={settings?.place?.timezone}>
         {tab === 'chat' && (
@@ -253,15 +302,17 @@ export default function App() {
                   className={showHistory ? 'pill active' : 'pill'}
                   onClick={async () => { await refreshHistory(); setShowHistory((v) => !v) }}
                   title="المحادثات السابقة"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
                 >
-                  🕘 السجل
+                  <Icon.history size={15} /> السجل
                 </button>
                 <button
                   className="pill"
                   onClick={() => { agent.reset(); void refreshHistory() }}
                   title="محادثة جديدة (Ctrl+N)"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
                 >
-                  محادثة جديدة
+                  <Icon.plus size={15} /> محادثة جديدة
                 </button>
               </div>
             </header>
@@ -300,8 +351,16 @@ export default function App() {
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: 40, marginBottom: 8 }}>✨</div>
-                    <div className="h2" style={{ marginBottom: 6 }}>كيف أساعدك؟</div>
+                    <div
+                      style={{
+                        width: 46, height: 46, borderRadius: 15, margin: '0 auto 14px',
+                        display: 'grid', placeItems: 'center',
+                        background: 'var(--accent-soft)', color: 'var(--accent)',
+                      }}
+                    >
+                      <Icon.sparkle size={24} stroke={1.9} />
+                    </div>
+                    <div className="title" style={{ marginBottom: 6 }}>كيف أساعدك؟</div>
                     <p className="muted small" style={{ maxWidth: 380, margin: '0 auto 18px' }}>
                       اطلب أي شي على جهازك — أفتح، أرتّب، أبحث، أشوف الشاشة، وأنفّذ.
                     </p>
@@ -370,15 +429,42 @@ export default function App() {
                 }}
               />
               {speaking && (
-                <button className="pill" onClick={stopSpeaking} title="أسكته">
-                  🔊 إسكات
+                <button
+                  onClick={stopSpeaking}
+                  title="أسكته"
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%', display: 'grid',
+                    placeItems: 'center', background: 'var(--surface-3)', flexShrink: 0,
+                  }}
+                >
+                  <Icon.mute size={17} />
                 </button>
               )}
               {agent.streaming ? (
-                <button className="pill" onClick={agent.stop}>إيقاف</button>
+                <button
+                  onClick={agent.stop}
+                  title="إيقاف"
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%', display: 'grid',
+                    placeItems: 'center', background: 'var(--surface-3)', flexShrink: 0,
+                  }}
+                >
+                  <Icon.stop size={16} />
+                </button>
               ) : (
-                <button className="pill active" onClick={submit} disabled={!input.trim()}>
-                  إرسال
+                <button
+                  onClick={submit}
+                  disabled={!input.trim()}
+                  title="إرسال"
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%', display: 'grid',
+                    placeItems: 'center', flexShrink: 0,
+                    background: input.trim() ? 'var(--accent)' : 'var(--surface-3)',
+                    color: input.trim() ? '#fff' : 'var(--label-4)',
+                    transition: 'background var(--fast) var(--ease)',
+                  }}
+                >
+                  <Icon.send size={16} stroke={2} />
                 </button>
               )}
             </div>

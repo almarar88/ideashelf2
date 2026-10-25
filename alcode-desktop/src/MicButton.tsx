@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Recorder, startRecording } from './voice'
+import { Icon } from './icons'
 
 /**
  * زرّ الأمر الصوتي.
@@ -75,7 +76,7 @@ export default function MicButton({ onText, disabled }: {
         onMouseUp={() => { if (state === 'recording') void finish() }}
         onMouseLeave={() => { if (state === 'recording') void finish() }}
         style={{
-          width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
+          width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
           display: 'grid', placeItems: 'center', fontSize: 17,
           background: state === 'recording' ? 'var(--danger)' : 'var(--surface-high)',
           color: state === 'recording' ? '#fff' : 'var(--ink)',
@@ -87,7 +88,11 @@ export default function MicButton({ onText, disabled }: {
           opacity: disabled ? 0.45 : 1,
         }}
       >
-        {state === 'working' ? '…' : '🎙️'}
+        {state === 'working'
+          ? <span className="row" style={{ gap: 3 }}>
+              <i className="dot" /><i className="dot" /><i className="dot" />
+            </span>
+          : <Icon.mic size={17} />}
       </button>
 
       {error && (

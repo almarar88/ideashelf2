@@ -135,3 +135,31 @@ test('التعديل اليدوي بالدقائق يُطبَّق', () => {
   assert.equal((shifted.times.fajr - base.times.fajr) / 60_000, 5)
   assert.equal(shifted.times.dhuhr, base.times.dhuhr, 'التعديل يخصّ صلاة واحدة')
 })
+
+test('الصلاة القادمة بعد العشاء هي فجر الغد لا لا شيء', () => {
+  // دبي، ٢٥ أكتوبر ٢٠٢٦، الساعة ٢١:٥٤ محليًا — بعد العشاء بساعتين.
+  const day = prayer.calculate(
+    new Date('2026-10-25T12:00:00Z'), 25.0772, 55.3093,
+    { methodId: 'DUBAI', asrFactor: 1, highLatitudeRule: 'ANGLE_BASED',
+      elevationMeters: 0, offsets: {} },
+    'Asia/Dubai',
+  )
+  const night = Date.parse('2026-10-25T17:54:00Z') // ٢١:٥٤ بتوقيت دبي
+
+  // هذا هو السلوك الذي كان يُفرّغ الشاشة: لا شيء بعد آخر فرض في اليوم.
+  assert.equal(prayer.nextPrayer(day, night), null)
+
+  // بينما جدول الغد يبدأ بالفجر، وهو ما يجب أن يُعرض.
+  const tomorrow = prayer.calculate(
+    new Date('2026-10-26T12:00:00Z'), 25.0772, 55.3093,
+    { methodId: 'DUBAI', asrFactor: 1, highLatitudeRule: 'ANGLE_BASED',
+      elevationMeters: 0, offsets: {} },
+    'Asia/Dubai',
+  )
+  const first = prayer.nextPrayer(tomorrow, 0)
+  assert.ok(first, 'جدول الغد يجب أن يعطي فرضًا')
+  assert.equal(first.key, 'fajr')
+  assert.ok(first.at > night, 'فجر الغد بعد ليلة اليوم')
+  // وأن يكون خلال العشر ساعات القادمة لا بعد يوم كامل.
+  assert.ok(first.at - night < 10 * 3_600_000)
+})

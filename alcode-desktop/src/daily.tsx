@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { Section } from './components'
+import { Icon } from './icons'
+import { suggestionsFor } from './suggest'
 
 /**
  * شاشات الرفيق اليومي: الرئيسية، الصلاة، الطقس، الأخبار، يومي.
@@ -64,13 +66,11 @@ function greeting(zone?: string): string {
 }
 
 /** أوامر جاهزة تُرسل للمساعد بنقرة واحدة. */
-const QUICK_ASKS = [
-  { icon: '🧹', text: 'رتّب مجلد التنزيلات' },
-  { icon: '👁️', text: 'شو في الشاشة؟' },
-  { icon: '💽', text: 'وين راحت مساحة القرص؟' },
-  { icon: '🪟', text: 'صغّر كل النوافذ' },
-  { icon: '📊', text: 'شو حالة الجهاز؟' },
-  { icon: '💧', text: 'ذكّرني بعد ٢٠ دقيقة أشرب ماء' },
+const QUICK_ASKS: { icon: keyof typeof Icon; text: string }[] = [
+  { icon: 'grid', text: 'رتّب مجلد التنزيلات' },
+  { icon: 'search', text: 'شو في الشاشة؟' },
+  { icon: 'bolt', text: 'شو حالة الجهاز؟' },
+  { icon: 'clock', text: 'ذكّرني بعد ٢٠ دقيقة أشرب ماء' },
 ]
 
 export function HomeTab({ onGo, onAsk, userName }: {
@@ -116,148 +116,111 @@ export function HomeTab({ onGo, onAsk, userName }: {
 
       {!day.place && <LocationCard onDone={load} onGo={onGo} />}
 
-      {/* ------------------------------------------- البلاطات الكبيرة */}
+      {/*
+        البطاقات بيضاء واللون محجوز للأيقونة والرقم وحدهما.
+        خلفية ملوّنة لكل بطاقة تجعل الشاشة لوحة ألوان لا واجهة، وتُفقد اللون
+        معناه: حين يكون كل شيء ملوّنًا لا يبرز شيء.
+      */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
-          gap: 14,
-          marginBottom: 20,
+          gridTemplateColumns: 'repeat(auto-fill, minmax(212px, 1fr))',
+          gap: 12,
+          marginBottom: 26,
         }}
       >
         {next && (
-          <button
-            className="tile hover-lift"
+          <StatCard
+            icon="mosque"
+            tone="var(--accent)"
+            label="الصلاة القادمة"
+            value={next.arabic}
+            detail={`${fmtTime(next.at)} · بعد ${remaining(next.at)}`}
             onClick={() => onGo('prayer')}
-            style={{
-              background: 'var(--peach)', color: 'var(--peach-ink)',
-              textAlign: 'start', minHeight: 150,
-            }}
-          >
-            <div className="label">الصلاة القادمة</div>
-            <div style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.2, color: 'var(--ink)' }}>
-              {next.arabic}
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>{fmtTime(next.at)}</div>
-            <div className="small" style={{ opacity: 0.85 }}>بعد {remaining(next.at)}</div>
-          </button>
+          />
         )}
 
         {weather && (
-          <button
-            className="tile hover-lift"
+          <StatCard
+            icon="cloud"
+            tone="var(--teal)"
+            label="الطقس الآن"
+            value={`${Math.round(weather.now.temperature)}°`}
+            detail={
+              `${day.weatherText}` +
+              (weather.daily?.[0]
+                ? ` · ${Math.round(weather.daily[0].max)}° / ${Math.round(weather.daily[0].min)}°`
+                : '')
+            }
             onClick={() => onGo('weather')}
-            style={{
-              background: 'var(--sky)', color: 'var(--sky-ink)',
-              textAlign: 'start', minHeight: 150,
-            }}
-          >
-            <div className="label">الطقس الآن</div>
-            <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
-              <span style={{ fontSize: 34, fontWeight: 700, color: 'var(--ink)' }}>
-                {Math.round(weather.now.temperature)}°
-              </span>
-              <span style={{ fontSize: 22 }}>{day.weatherEmoji}</span>
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>{day.weatherText}</div>
-            <div className="small" style={{ opacity: 0.85 }}>
-              {weather.daily?.[0]
-                ? `${Math.round(weather.daily[0].max)}° / ${Math.round(weather.daily[0].min)}°`
-                : ''}
-              {' · محسوسة '}{Math.round(weather.now.feelsLike)}°
-            </div>
-          </button>
+          />
         )}
 
-        <button
-          className="tile hover-lift"
+        <StatCard
+          icon="list"
+          tone="var(--green)"
+          label="مهام اليوم"
+          value={String(day.tasksOpen)}
+          detail={
+            day.tasksOpen === 0
+              ? 'ما في شي معلّق'
+              : `مفتوحة · أنجزت ${day.tasksDone} · عادات ${day.habitsDone}/${day.habitsTotal}`
+          }
           onClick={() => onGo('day')}
-          style={{
-            background: 'var(--mint)', color: 'var(--mint-ink)',
-            textAlign: 'start', minHeight: 150,
-          }}
-        >
-          <div className="label">مهام اليوم</div>
-          <div style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.2, color: 'var(--ink)' }}>
-            {day.tasksOpen}
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>
-            {day.tasksOpen === 0 ? 'ما في شي معلّق' : 'مفتوحة'}
-          </div>
-          <div className="small" style={{ opacity: 0.85 }}>
-            أنجزت {day.tasksDone} · عادات {day.habitsDone}/{day.habitsTotal}
-          </div>
-        </button>
+        />
 
         {day.qibla && (
-          <button
-            className="tile hover-lift"
+          <StatCard
+            icon="compass"
+            tone="var(--violet)"
+            label="القبلة"
+            value={`${Math.round(day.qibla.bearing)}°`}
+            detail={`${Math.round(day.qibla.distanceKm).toLocaleString('ar')} كم إلى الكعبة`}
             onClick={() => onGo('prayer')}
-            style={{
-              background: 'var(--lavender)', color: 'var(--lavender-ink)',
-              textAlign: 'start', minHeight: 150,
-            }}
-          >
-            <div className="label">القبلة</div>
-            <div className="row" style={{ gap: 10 }}>
-              <span
-                style={{
-                  fontSize: 30, display: 'inline-block',
-                  transform: `rotate(${day.qibla.bearing}deg)`,
-                }}
-              >
-                🧭
-              </span>
-              <span style={{ fontSize: 26, fontWeight: 700, color: 'var(--ink)' }}>
-                {Math.round(day.qibla.bearing)}°
-              </span>
-            </div>
-            <div className="small" style={{ opacity: 0.85 }}>
-              {Math.round(day.qibla.distanceKm).toLocaleString('ar')} كم إلى الكعبة
-            </div>
-          </button>
+            rotate={day.qibla.bearing}
+          />
         )}
       </div>
 
       {/* -------------------------------------------- اسأل المساعد */}
       <Section title="اسأل المساعد" action={<Link onClick={() => onGo('chat')} />}>
         <div className="row wrap" style={{ gap: 8 }}>
-          {QUICK_ASKS.map((ask) => (
-            <button
-              key={ask.text}
-              className="pill"
-              onClick={() => onAsk(ask.text)}
-            >
-              <span style={{ marginInlineEnd: 6 }}>{ask.icon}</span>{ask.text}
-            </button>
-          ))}
+          {suggestionsFor(
+            {
+              nextPrayer: next,
+              tasksOpen: day.tasksOpen,
+              temperature: weather?.now?.temperature ?? null,
+              rainChance: weather?.daily?.[0]?.precipitationProbability ?? null,
+              headlines: (day.headlines ?? []).length,
+              hasPlace: Boolean(day.place),
+            },
+            Date.now(),
+          ).map((ask) => {
+            const Glyph = Icon[ask.icon]
+            return (
+              <button
+                key={ask.id}
+                className="pill row"
+                onClick={() => (ask.id === 'place' ? onGo('settings') : onAsk(ask.text))}
+                style={{ gap: 7 }}
+              >
+                <Glyph size={15} />
+                {ask.text}
+              </button>
+            )
+          })}
         </div>
       </Section>
 
       {/* ---------------------------------------------- مواقيت اليوم */}
       {day.prayers && (
         <Section title="مواقيت اليوم" action={<Link onClick={() => onGo('prayer')} />}>
-          <div className="row wrap" style={{ gap: 8 }}>
-            {day.prayers.map((p: any, i: number) => {
-              const isNext = next?.key === p.key
-              const passed = p.at < Date.now() && !isNext
-              return (
-                <div
-                  key={p.key}
-                  className="tile plain"
-                  style={{
-                    flex: '1 1 118px', padding: '13px 15px', textAlign: 'center',
-                    background: isNext ? 'var(--ink)' : pastel(i),
-                    color: isNext ? 'var(--sand)' : 'var(--ink)',
-                    opacity: passed ? 0.55 : 1,
-                  }}
-                >
-                  <div className="small" style={{ opacity: 0.75 }}>{p.arabic}</div>
-                  <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtTime(p.at)}</div>
-                </div>
-              )
-            })}
-          </div>
+          {/*
+            صفّ واحد مقسَّم بخطوط شعرية، لا ستّ بطاقات ملوّنة. الوقت القادم
+            وحده يحمل اللون — وهو المعلومة التي يبحث عنها المستخدم فعلًا،
+            والماضي يُخفَت بدل أن يُزال.
+          */}
+          <PrayerRow prayers={day.prayers} nextKey={next?.key} fmtTime={fmtTime} />
         </Section>
       )}
 
@@ -435,10 +398,111 @@ function LocationCard({ onDone, onGo }: { onDone: () => void; onGo: (tab: string
   )
 }
 
+/**
+ * بطاقة رقم: أيقونة ملوّنة صغيرة، ثم القيمة كبيرة، ثم سطر تفصيل.
+ *
+ * التسلسل مقصود — العين تلتقط الرقم أولًا، واللون يدلّ على النوع بلا أن
+ * يغمر البطاقة.
+ */
+/**
+ * صفّ المواقيت: خليّة لكل صلاة مفصولة بخطوط شعرية.
+ *
+ * مشترك بين الرئيسية وشاشة الصلاة — ستّ بطاقات منفصلة كانت تلتفّ سطرين على
+ * الشاشات الضيّقة فتظهر صلاة وحيدة في سطر، والصفّ الواحد لا يلتفّ أبدًا.
+ */
+function PrayerRow({ prayers, nextKey, fmtTime, big = false }: {
+  prayers: any[]
+  nextKey?: string
+  fmtTime: (at: number) => string
+  big?: boolean
+}) {
+  return (
+    <div className="card" style={{ padding: 0, display: 'flex', overflow: 'hidden' }}>
+      {prayers.map((p: any, index: number) => {
+        const isNext = nextKey === p.key
+        const passed = p.at < Date.now() && !isNext
+        return (
+          <div
+            key={p.key}
+            style={{
+              flex: 1, textAlign: 'center', padding: big ? '18px 6px' : '14px 6px',
+              borderInlineStart: index === 0 ? 'none' : '1px solid var(--separator)',
+              background: isNext ? 'var(--accent-soft)' : 'transparent',
+              opacity: passed ? 0.45 : 1,
+            }}
+          >
+            <div
+              className="caption"
+              style={{ color: isNext ? 'var(--accent)' : undefined, fontWeight: 600 }}
+            >
+              {p.arabic}
+            </div>
+            <div
+              className="numeric"
+              style={{
+                fontSize: big ? 21 : 17, fontWeight: 600, marginTop: 3,
+                letterSpacing: '-0.015em',
+                color: isNext ? 'var(--accent)' : 'var(--label)',
+              }}
+            >
+              {fmtTime(p.at)}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function StatCard({ icon, tone, label, value, detail, onClick, rotate }: {
+  icon: keyof typeof Icon
+  tone: string
+  label: string
+  value: string
+  detail: string
+  onClick: () => void
+  rotate?: number
+}) {
+  const Glyph = Icon[icon]
+  return (
+    <button
+      className="card hover-lift"
+      onClick={onClick}
+      style={{ textAlign: 'start', padding: 16, display: 'block' }}
+    >
+      <div className="row" style={{ gap: 8, marginBottom: 10 }}>
+        <span
+          style={{
+            width: 26, height: 26, borderRadius: 8, display: 'grid',
+            placeItems: 'center', color: tone, background: 'color-mix(in srgb, ' + tone + ' 12%, transparent)',
+            // بوصلة القبلة تدور فعليًا نحو الاتجاه — الأيقونة هنا معلومة لا زينة.
+            transform: rotate === undefined ? undefined : `rotate(${rotate}deg)`,
+          }}
+        >
+          <Glyph size={15} stroke={2} />
+        </span>
+        <span className="caption">{label}</span>
+      </div>
+      <div
+        className="numeric"
+        style={{ fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.1 }}
+      >
+        {value}
+      </div>
+      <div className="footnote" style={{ marginTop: 4 }}>{detail}</div>
+    </button>
+  )
+}
+
 function Link({ onClick }: { onClick: () => void }) {
   return (
-    <button className="small" style={{ color: 'var(--amber)', fontWeight: 700 }} onClick={onClick}>
+    <button
+      className="row"
+      onClick={onClick}
+      style={{ gap: 2, color: 'var(--label-3)', fontSize: 12.5, fontWeight: 500 }}
+    >
       الكل
+      <Icon.chevron size={13} stroke={2} />
     </button>
   )
 }
@@ -481,11 +545,11 @@ function Ring({ from, to }: { from: number; to: number }) {
     <svg width="86" height="86" viewBox="0 0 86 86" style={{ flexShrink: 0 }}>
       <circle
         cx="43" cy="43" r={radius} fill="none"
-        stroke="currentColor" strokeWidth="7" opacity="0.22"
+        stroke="var(--separator-strong)" strokeWidth="6"
       />
       <circle
         cx="43" cy="43" r={radius} fill="none"
-        stroke="currentColor" strokeWidth="7" strokeLinecap="round"
+        stroke="var(--accent)" strokeWidth="6" strokeLinecap="round"
         strokeDasharray={`${circumference * done} ${circumference}`}
         transform="rotate(-90 43 43)"
       />
@@ -545,84 +609,71 @@ export function PrayerTab() {
 
       <div
         style={{
-          display: 'grid', gridTemplateColumns: 'minmax(260px, 1.1fr) 1fr', gap: 14,
-          marginBottom: 18,
+          display: 'grid', gridTemplateColumns: 'minmax(280px, 1.2fr) 1fr', gap: 12,
+          marginBottom: 12,
         }}
       >
         {day.next && (
-          <div
-            className="tile"
-            style={{ background: 'var(--peach)', color: 'var(--peach-ink)' }}
-          >
-            <div className="row" style={{ gap: 18 }}>
-              <Ring from={previousAt(day.prayers, day.next.at)} to={day.next.at} />
-              <div>
-                <div className="label">الصلاة القادمة</div>
-                <div style={{ fontSize: 38, fontWeight: 700, lineHeight: 1.2, color: 'var(--ink)' }}>
-                  {day.next.arabic}
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>{fmtTime(day.next.at)}</div>
-                <div className="small" style={{ opacity: 0.85 }}>
-                  بعد {remaining(day.next.at)}
-                </div>
+          <div className="card row" style={{ gap: 20, padding: 20 }}>
+            <Ring from={previousAt(day.prayers, day.next.at)} to={day.next.at} />
+            <div>
+              <div className="caption">الصلاة القادمة</div>
+              <div
+                style={{
+                  fontSize: 34, fontWeight: 600, letterSpacing: '-0.025em',
+                  lineHeight: 1.15, marginTop: 2,
+                }}
+              >
+                {day.next.arabic}
               </div>
+              <div className="numeric" style={{ fontSize: 15, fontWeight: 600, color: 'var(--accent)' }}>
+                {fmtTime(day.next.at)}
+              </div>
+              <div className="footnote">بعد {remaining(day.next.at)}</div>
             </div>
           </div>
         )}
 
         <div className="stack">
           {day.qibla && (
-            <div
-              className="tile"
-              style={{ background: 'var(--lavender)', color: 'var(--lavender-ink)' }}
-            >
-              <div className="label">القبلة</div>
-              <div className="row" style={{ gap: 12 }}>
-                <span
-                  style={{
-                    fontSize: 26, display: 'inline-block',
-                    transform: `rotate(${day.qibla.bearing}deg)`,
-                  }}
-                >
-                  🧭
-                </span>
-                <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>
+            <div className="card row" style={{ gap: 14, padding: 16 }}>
+              <span
+                style={{
+                  width: 34, height: 34, borderRadius: 11, display: 'grid',
+                  placeItems: 'center', color: 'var(--violet)',
+                  background: 'var(--violet-soft)',
+                  transform: `rotate(${day.qibla.bearing}deg)`,
+                }}
+              >
+                <Icon.compass size={19} stroke={2} />
+              </span>
+              <div className="grow">
+                <div className="caption">القبلة</div>
+                <div className="numeric" style={{ fontSize: 19, fontWeight: 600 }}>
                   {Math.round(day.qibla.bearing)}°
-                </span>
-                <span className="small grow" style={{ opacity: 0.85 }}>
-                  {Math.round(day.qibla.distanceKm).toLocaleString('ar')} كم إلى الكعبة
-                </span>
+                </div>
+              </div>
+              <div className="footnote">
+                {Math.round(day.qibla.distanceKm).toLocaleString('ar')} كم
               </div>
             </div>
           )}
 
-          <div className="card" style={{ padding: 14 }}>
-            <div className="row wrap" style={{ gap: 20 }}>
+          <div className="card" style={{ padding: 16 }}>
+            <div className="row" style={{ gap: 22 }}>
               <Fact label="الشروق" value={fmtTime(timeOf(day.prayers, 'sunrise'))} />
               <Fact label="الغروب" value={fmtTime(timeOf(day.prayers, 'maghrib'))} />
               <Fact
                 label="طول النهار"
-                value={spanOf(
-                  timeOf(day.prayers, 'sunrise'),
-                  timeOf(day.prayers, 'maghrib'),
-                )}
+                value={spanOf(timeOf(day.prayers, 'sunrise'), timeOf(day.prayers, 'maghrib'))}
               />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="row wrap" style={{ gap: 10, marginBottom: 18 }}>
-        {day.prayers.map((p: any, i: number) => (
-          <div
-            key={p.key}
-            className="card"
-            style={{ flex: '1 1 150px', textAlign: 'center', background: pastel(i) }}
-          >
-            <div className="small" style={{ opacity: 0.75 }}>{p.arabic}</div>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{fmtTime(p.at)}</div>
-          </div>
-        ))}
+      <div style={{ marginBottom: 14 }}>
+        <PrayerRow prayers={day.prayers} nextKey={day.next?.key} fmtTime={fmtTime} big />
       </div>
 
       <button className="btn ghost" onClick={() => setShowMonth((v) => !v)}>
@@ -708,24 +759,24 @@ export function WeatherTab() {
         </button>
       </div>
 
-      <div
-        className="tile"
-        style={{ background: 'var(--sky)', color: 'var(--sky-ink)', marginBottom: 16 }}
-      >
+      <div className="card" style={{ marginBottom: 14, padding: 20 }}>
         <div className="row wrap" style={{ gap: 22 }}>
           <div className="row" style={{ gap: 14 }}>
             <span style={{ fontSize: 52, lineHeight: 1 }}>{today?.emoji ?? ''}</span>
             <div>
-              <div style={{ fontSize: 54, fontWeight: 700, lineHeight: 1, color: 'var(--ink)' }}>
+              <div
+                className="numeric"
+                style={{ fontSize: 52, fontWeight: 600, lineHeight: 1, letterSpacing: '-0.03em' }}
+              >
                 {Math.round(now.temperature)}°
               </div>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>{today?.text ?? ''}</div>
+              <div className="headline" style={{ color: 'var(--label-2)' }}>{today?.text ?? ''}</div>
             </div>
           </div>
           <div className="grow" />
           {today && (
             <div style={{ textAlign: 'start' }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)' }}>
+              <div className="numeric" style={{ fontSize: 20, fontWeight: 600 }}>
                 {Math.round(today.max)}° / {Math.round(today.min)}°
               </div>
               <div className="small" style={{ opacity: 0.85 }}>
@@ -735,7 +786,8 @@ export function WeatherTab() {
             </div>
           )}
         </div>
-        <div className="row wrap" style={{ gap: 18, marginTop: 16 }}>
+        <hr className="hairline" style={{ margin: '16px 0' }} />
+        <div className="row wrap" style={{ gap: 22 }}>
           <Metric label="محسوسة" value={`${Math.round(now.feelsLike)}°`} />
           <Metric label="الرطوبة" value={`${now.humidity}%`} />
           <Metric label="الرياح" value={`${Math.round(now.windSpeed)} كم/س`} />

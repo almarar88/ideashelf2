@@ -69,6 +69,32 @@ export function prayersFor(settings: Settings, date: Date): DayPrayers | null {
   )
 }
 
+/**
+ * الصلاة القادمة، ولو كانت فجر الغد.
+ *
+ * `nextPrayer` يفحص يومًا واحدًا، فيعيد null بعد العشاء. النتيجة أن الشاشة
+ * الرئيسية كانت تفقد بطاقة «الصلاة القادمة» والعدّاد كل ليلة من العشاء حتى
+ * منتصف الليل — ساعات يوميًا، وهي أكثر ما يُفتح فيه التطبيق مساءً. اكتُشف
+ * بتشغيل التطبيق على توقيت دبي ليلًا، لا بقراءة الكود.
+ */
+export function upcomingPrayer(
+  settings: Settings,
+  now: Date,
+): { key: PrayerKey; arabic: string; at: number } | null {
+  const today = prayersFor(settings, now)
+  if (!today) return null
+
+  const found = nextPrayer(today, now.getTime())
+  if (found) return found
+
+  const tomorrow = new Date(now)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const next = prayersFor(settings, tomorrow)
+  if (!next) return null
+  // أول فرض في الغد هو الفجر؛ نأخذه من الجدول لا بافتراض ترتيبه.
+  return nextPrayer(next, 0)
+}
+
 export interface DayBundle {
   today: string
   gregorian: string
@@ -118,7 +144,7 @@ export async function getDay(): Promise<DayBundle> {
     prayers: day
       ? PRAYERS.map((p) => ({ key: p.key, arabic: p.arabic, at: day.times[p.key] }))
       : null,
-    next: day ? nextPrayer(day, now.getTime()) : null,
+    next: upcomingPrayer(settings, now),
     weather,
     weatherText: info.text,
     weatherEmoji: info.emoji,
@@ -164,7 +190,7 @@ export async function contextSummary(): Promise<string> {
 
   const day = prayersFor(settings, now)
   if (day) {
-    const upcoming = nextPrayer(day, now.getTime())
+    const upcoming = upcomingPrayer(settings, now)
     if (upcoming) {
       const time = new Intl.DateTimeFormat('ar', {
         hour: '2-digit', minute: '2-digit', hour12: !settings.use24h,

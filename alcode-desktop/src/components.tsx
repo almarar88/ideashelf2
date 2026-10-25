@@ -147,10 +147,15 @@ export function Section({ title, action, children }: {
   children: ReactNode
 }) {
   return (
-    <section style={{ marginBottom: 22 }}>
-      <div className="row" style={{ marginBottom: 10 }}>
-        <h2 className="h2 grow">{title}</h2>
+    <section style={{ marginBottom: 26 }}>
+      {/*
+        العنوان وفعله متجاوران لا متباعدان على طرفي السطر: «الكل» في أقصى
+        الجانب الآخر يفقد صلته بما يخصّه، ويقرأه المستخدم عنصرًا مستقلًا.
+      */}
+      <div className="row" style={{ marginBottom: 10, gap: 10 }}>
+        <h2 className="headline">{title}</h2>
         {action}
+        <div className="grow" />
       </div>
       {children}
     </section>
