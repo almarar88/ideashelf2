@@ -316,7 +316,7 @@ fun SettingsScreen(
             GlassCard(padding = PaddingValues(6.dp)) {
                 SettingRow(
                     title = "صلاحيات التحكّم",
-                    subtitle = "ما يستطيع Alcode Ai فعله بهاتفك — وتفعيله بزر التشغيل",
+                    subtitle = "ما يستطيع عون فعله بهاتفك — وتفعيله بزر التشغيل",
                     value = if (settings.controlEnabled) "مفعّل" else "معطّل",
                     icon = Icons.Filled.PhonelinkSetup,
                     tint = Emerald,
@@ -511,7 +511,7 @@ fun SettingsScreen(
 
         item {
             GlassCard {
-                Text("Alcode Ai", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text("عون", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "الإصدار ١٫٠٫٠ · يعمل بلا حسابات ولا تتبّع. " +

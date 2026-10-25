@@ -36,7 +36,7 @@ object Assistant {
         val memories: List<String> = emptyList(),
     )
 
-    private const val BASE_PERSONA = """أنت "Alcode Ai" — مساعد شخصي يومي ذكي، تتحدث العربية الفصحى المبسّطة بطبيعية.
+    private const val BASE_PERSONA = """أنت "عون" — مساعد شخصي يومي ذكي، تتحدث العربية الفصحى المبسّطة بطبيعية.
 
 أسلوبك:
 - ابدأ بالإجابة أو الخلاصة مباشرة. لا مقدمات ولا اعتذارات ولا تكرار للسؤال.

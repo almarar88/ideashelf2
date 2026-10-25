@@ -1,8 +1,9 @@
 import { app, dialog } from 'electron'
 import {
-  appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync,
+  appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync,
+  writeFileSync,
 } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 /**
  * حواجز الإقلاع.
@@ -82,7 +83,7 @@ export function reportFatal(where: string, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error)
   try {
     dialog.showErrorBox(
-      'Alcode Ai — تعذّر الإقلاع',
+      'عون — تعذّر الإقلاع',
       `وقف التطبيق عند: ${where}\n\n${message}\n\n` +
       `سجل التفاصيل:\n${startupLogPath()}\n\n` +
       'أرسل هذا السجل ليُعرف السبب بدقة.',
@@ -105,6 +106,41 @@ export function installCrashGuards(): void {
   app.on('child-process-gone', (_event, details) => {
     log('عملية فرعية انتهت', `${details.type}: ${details.reason}`)
   })
+}
+
+
+// ------------------------------------------------- ترحيل الملفّ الشخصي
+
+/** الاسم الذي كان التطبيق يحمله قبل أن يصير «عون». */
+const LEGACY_PRODUCT_NAME = 'Alcode Ai'
+
+/**
+ * ينقل بيانات المستخدم من مجلّد الاسم القديم إلى الجديد، مرّة واحدة.
+ *
+ * Electron يشتقّ مسار بيانات المستخدم من اسم المنتج، فتغيير الاسم ينقل
+ * المسار من %APPDATA%\Alcode Ai إلى %APPDATA%\Awn. بلا هذا النقل يفتح
+ * المُحدِّث على تطبيق فارغ: لا مهامّ ولا عادات ولا مدينة ولا مفتاح — وهو
+ * يرى ذلك فقدانًا لبياناته لا تغييرًا في الاسم.
+ *
+ * نسخٌ لا نقل: إن انقطعت العملية في منتصفها يبقى الأصل سليمًا ونعيد
+ * المحاولة في التشغيل التالي. ولا نلمس شيئًا إن كان للمجلّد الجديد
+ * إعدادات أصلًا، فالنسخ فوقها يمحو عمل المستخدم الجديد.
+ */
+export function migrateLegacyProfile(): void {
+  try {
+    const current = app.getPath('userData')
+    if (existsSync(join(current, 'settings.json'))) return
+
+    const legacy = join(dirname(current), LEGACY_PRODUCT_NAME)
+    if (legacy === current || !existsSync(join(legacy, 'settings.json'))) return
+
+    mkdirSync(current, { recursive: true })
+    cpSync(legacy, current, { recursive: true, errorOnExist: false })
+    log('نُقلت بيانات المستخدم من الاسم السابق', legacy)
+  } catch (error) {
+    // الفشل هنا يعني بداية نظيفة لا انهيارًا؛ نسجّله ونكمل.
+    log('تعذّر نقل بيانات الاسم السابق', String(error))
+  }
 }
 
 

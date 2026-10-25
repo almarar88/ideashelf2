@@ -1,4 +1,4 @@
-name: Build Alcode Ai for Windows
+name: Build Awn for Windows
 
 on:
   push:
@@ -48,21 +48,21 @@ jobs:
         run: npx electron-builder --win nsis dir
 
       - name: ضغط النسخة المحمولة
-        run: Compress-Archive -Path release/win-unpacked/* -DestinationPath release/AlcodeAi-win-portable.zip
+        run: Compress-Archive -Path release/win-unpacked/* -DestinationPath release/Awn-win-portable.zip
         shell: pwsh
 
       - name: رفع المُثبِّت
         uses: actions/upload-artifact@v4
         with:
-          name: AlcodeAi-Setup
+          name: Awn-Setup
           path: alcode-desktop/release/*.exe
           if-no-files-found: error
 
       - name: رفع النسخة المحمولة
         uses: actions/upload-artifact@v4
         with:
-          name: AlcodeAi-portable
-          path: alcode-desktop/release/AlcodeAi-win-portable.zip
+          name: Awn-portable
+          path: alcode-desktop/release/Awn-win-portable.zip
           if-no-files-found: error
 
       # الإصدار يعطي رابط تنزيل مباشرًا بلا تسجيل دخول وبلا حدّ حجم،
@@ -72,13 +72,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: desktop-v${{ github.run_number }}
-          name: Alcode Ai لويندوز — بناء ${{ github.run_number }}
+          name: عون لويندوز — بناء ${{ github.run_number }}
           body: |
-            نسخة ويندوز من Alcode Ai — مساعد ينفّذ أوامرك على جهازك فعلًا،
+            نسخة ويندوز من عون — مساعد ينفّذ أوامرك على جهازك فعلًا،
             ورفيق يومي كامل: الصلاة والطقس والأخبار والمهام والعادات.
 
-            **AlcodeAi-Setup-*.exe** — المُثبِّت (الأسهل: شغّله وتابع الخطوات)
-            **AlcodeAi-win-portable.zip** — نسخة محمولة بلا تثبيت
+            **Awn-Setup-*.exe** — المُثبِّت (الأسهل: شغّله وتابع الخطوات)
+            **Awn-win-portable.zip** — نسخة محمولة بلا تثبيت
 
             سيعرض ويندوز تحذير SmartScreen لأن الملف غير موقّع رقميًا:
             اضغط **More info ← Run anyway**.
@@ -87,5 +87,5 @@ jobs:
             اختصار الشريط السريع: **Ctrl + Space**
           files: |
             alcode-desktop/release/*.exe
-            alcode-desktop/release/AlcodeAi-win-portable.zip
+            alcode-desktop/release/Awn-win-portable.zip
           fail_on_unmatched_files: false

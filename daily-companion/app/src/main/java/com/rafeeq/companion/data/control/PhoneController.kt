@@ -684,7 +684,7 @@ class PhoneController(private val context: Context) {
     }
 
     private fun writeClipboard(text: String): ActionResult = runCatching {
-        clipboard()?.setPrimaryClip(ClipData.newPlainText("Alcode Ai", text))
+        clipboard()?.setPrimaryClip(ClipData.newPlainText("عون", text))
         ActionResult.ok("نسخت النص إلى الحافظة")
     }.getOrElse { ActionResult.fail("تعذّر النسخ.") }
 
@@ -710,12 +710,12 @@ class PhoneController(private val context: Context) {
     }
 
     private fun saveToPictures(bitmap: android.graphics.Bitmap): Boolean = runCatching {
-        val name = "AlcodeAi_${System.currentTimeMillis()}.png"
+        val name = "Awn_${System.currentTimeMillis()}.png"
         val values = android.content.ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, name)
             put(MediaStore.Images.Media.MIME_TYPE, "image/png")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/AlcodeAi")
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Awn")
             }
         }
         val uri = context.contentResolver.insert(

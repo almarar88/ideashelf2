@@ -172,7 +172,7 @@ async function fetchFeed(source: NewsSource): Promise<Article[]> {
   try {
     const response = await fetch(source.url, {
       signal: controller.signal,
-      headers: { 'user-agent': 'AlcodeAi/1.0 (+desktop reader)' },
+      headers: { 'user-agent': 'Awn/1.0 (+desktop reader)' },
     })
     if (!response.ok) return []
     return parseFeed(await response.text(), source)
@@ -207,7 +207,7 @@ export async function validateFeed(url: string): Promise<{ name: string; count: 
   const source: NewsSource = {
     id: 'probe', name: 'مصدر جديد', url, category: 'الأهم', enabled: true,
   }
-  const response = await fetch(url, { headers: { 'user-agent': 'AlcodeAi/1.0' } })
+  const response = await fetch(url, { headers: { 'user-agent': 'Awn/1.0' } })
   if (!response.ok) throw new Error(`الخادم ردّ بـ ${response.status}`)
   const body = await response.text()
   const items = parseFeed(body, source)

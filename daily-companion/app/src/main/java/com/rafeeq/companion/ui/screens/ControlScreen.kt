@@ -91,7 +91,7 @@ fun ControlScreen(viewModel: AppViewModel) {
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    "امنح Alcode Ai ما تريده فقط — وكل صلاحية يمكن سحبها في أي وقت.",
+                    "امنح عون ما تريده فقط — وكل صلاحية يمكن سحبها في أي وقت.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -109,10 +109,10 @@ fun ControlScreen(viewModel: AppViewModel) {
                 Spacer(Modifier.height(6.dp))
                 Text(
                     if (Capability.ACCESSIBILITY in capabilities) {
-                        "التحكّم الكامل مفعّل. يستطيع Alcode Ai فتح التطبيقات والضغط والكتابة نيابةً عنك."
+                        "التحكّم الكامل مفعّل. يستطيع عون فتح التطبيقات والضغط والكتابة نيابةً عنك."
                     } else {
                         "لتحكّم كامل داخل التطبيقات الأخرى، فعّل «خدمة الوصول» أدناه. " +
-                            "بدونها يبقى Alcode Ai قادرًا على فتح التطبيقات وضبط المنبّهات والاتصال والرسائل."
+                            "بدونها يبقى عون قادرًا على فتح التطبيقات وضبط المنبّهات والاتصال والرسائل."
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.92f),
@@ -149,11 +149,11 @@ fun ControlScreen(viewModel: AppViewModel) {
         }
 
         // ------------------------------------------------ زر التشغيل
-        item { SectionTitle("استدعاء Alcode Ai بزر التشغيل") }
+        item { SectionTitle("استدعاء عون بزر التشغيل") }
         item {
             GlassCard {
                 Text(
-                    "اجعل Alcode Ai مساعدك الافتراضي ليظهر عند الضغط المطوّل على زر التشغيل — " +
+                    "اجعل عون مساعدك الافتراضي ليظهر عند الضغط المطوّل على زر التشغيل — " +
                         "تمامًا كما يظهر مساعد جوجل.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -161,7 +161,7 @@ fun ControlScreen(viewModel: AppViewModel) {
                 Text(
                     "الخطوات:\n" +
                         "١. اضغط الزر أدناه لفتح إعدادات المساعد.\n" +
-                        "٢. اختر «تطبيق المساعد الرقمي» ثم اختر «Alcode Ai».\n" +
+                        "٢. اختر «تطبيق المساعد الرقمي» ثم اختر «عون».\n" +
                         "٣. من الإعدادات ← النظام ← الإيماءات ← «الضغط المطوّل على زر التشغيل»، " +
                         "فعّل «المساعد الرقمي».",
                     style = MaterialTheme.typography.bodySmall,
@@ -211,7 +211,7 @@ fun ControlScreen(viewModel: AppViewModel) {
         }
 
         // ------------------------------------------------ ما يستطيع فعله
-        item { SectionTitle("ما يستطيع Alcode Ai تنفيذه") }
+        item { SectionTitle("ما يستطيع عون تنفيذه") }
         item {
             GlassCard {
                 val available = ToolCatalog.all.count {
@@ -251,7 +251,7 @@ fun ControlScreen(viewModel: AppViewModel) {
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "أندرويد يمنع التطبيقات من تبديل وضع الطيران أو الواي فاي أو بيانات الجوّال " +
-                        "برمجيًا، مهما كانت الأذونات. في هذه الحالات يفتح لك Alcode Ai الشاشة الصحيحة، " +
+                        "برمجيًا، مهما كانت الأذونات. في هذه الحالات يفتح لك عون الشاشة الصحيحة، " +
                         "ومع خدمة الوصول يستطيع الضغط على المفتاح نيابةً عنك.\n\n" +
                         "كذلك لا يستطيع قراءة بيانات التطبيقات الأخرى مباشرة — يقرأ ما هو معروض " +
                         "على الشاشة فقط.",
@@ -270,7 +270,7 @@ fun ControlScreen(viewModel: AppViewModel) {
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "لا يقرأ Alcode Ai شاشتك ولا إشعاراتك إلا في اللحظة التي تطلب فيها أمرًا يحتاج ذلك، " +
+                    "لا يقرأ عون شاشتك ولا إشعاراتك إلا في اللحظة التي تطلب فيها أمرًا يحتاج ذلك، " +
                         "وما يُقرأ يُرسل إلى Anthropic ضمن سؤالك فقط ولا يُخزَّن عندنا.\n\n" +
                         "ولأن ما يظهر على الشاشة يكتبه آخرون، فقد بُرمج المساعد ليعامله كمعلومات " +
                         "لا كأوامر — فلا تستطيع رسالة واردة أن توجّهه لفعل شيء.",
@@ -356,9 +356,9 @@ private fun CapabilityRow(
                     .padding(12.dp),
             ) {
                 Text(
-                    "بعد الضغط على «تفعيل»: اختر «Alcode Ai» من القائمة ثم شغّل المفتاح.\n" +
+                    "بعد الضغط على «تفعيل»: اختر «عون» من القائمة ثم شغّل المفتاح.\n" +
                         "إن ظهرت رسالة «إعداد مقيّد» على أندرويد ١٣ فأحدث، اذهب إلى " +
-                        "الإعدادات ← التطبيقات ← Alcode Ai ← القائمة (⋮) ← «السماح بالإعدادات المقيّدة».",
+                        "الإعدادات ← التطبيقات ← عون ← القائمة (⋮) ← «السماح بالإعدادات المقيّدة».",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -65,7 +65,7 @@ import com.rafeeq.companion.ui.theme.RafeeqTheme
  * يستقبل أي نص أو رابط تشاركه من أي تطبيق.
  *
  * هذا يجعل المساعد متاحًا داخل بقية تطبيقاتك دون فتحه: حدّد نصًا في المتصفّح
- * أو شارك رابط مقال، واختر Alcode Ai، فيعطيك خلاصته فورًا.
+ * أو شارك رابط مقال، واختر عون، فيعطيك خلاصته فورًا.
  */
 class ShareActivity : ComponentActivity() {
 
@@ -208,7 +208,7 @@ private fun ShareSheet(
 
                 if (settingsLoaded && !settings.hasApiKey) {
                     Text(
-                        "أضِف مفتاح Anthropic من إعدادات Alcode Ai لتفعيل هذه الميزة.",
+                        "أضِف مفتاح Anthropic من إعدادات عون لتفعيل هذه الميزة.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(18.dp),

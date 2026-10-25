@@ -83,7 +83,7 @@ export async function checkForUpdate(force = false): Promise<UpdateInfo> {
       headers: {
         Accept: 'application/vnd.github+json',
         // GitHub توثّق User-Agent كترويسة مطلوبة وترفض بدونها في بعض المسارات.
-        'User-Agent': `AlcodeAi/${current}`,
+        'User-Agent': `Awn/${current}`,
       },
     })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -96,7 +96,7 @@ export async function checkForUpdate(force = false): Promise<UpdateInfo> {
       assets?: { name?: string; browser_download_url?: string }[]
     }
 
-    // اسم الحزمة يحمل النسخة (AlcodeAi-Setup-1.3.0.exe)، وهو أصدق من الوسم
+    // اسم الحزمة يحمل النسخة (Awn-Setup-2.1.0.exe)، وهو أصدق من الوسم
     // لأن الوسم مرتبط برقم البناء لا بنسخة التطبيق.
     const installer = (data.assets ?? []).find(
       (asset) => /Setup-.*\.exe$/i.test(asset.name ?? ''),

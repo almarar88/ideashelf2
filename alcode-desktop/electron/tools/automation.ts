@@ -92,7 +92,7 @@ else { Disable-NetAdapter -Name $a.Name -Confirm:$false }`
     danger: 'confirm',
     description:
       'يجدول تشغيل برنامج أو ملف في وقت محدّد عبر جدولة مهام ويندوز — ' +
-      'يعمل حتى لو كان Alcode مغلقًا. للتذكيرات داخل التطبيق استعمل add_reminder.',
+      'يعمل حتى لو كان عون مغلقًا. للتذكيرات داخل التطبيق استعمل add_reminder.',
     input: props({
       name: { type: 'string', description: 'اسم المهمة' },
       command: { type: 'string', description: 'البرنامج أو الملف المراد تشغيله' },

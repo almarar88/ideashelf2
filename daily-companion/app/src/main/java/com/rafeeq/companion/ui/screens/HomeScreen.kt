@@ -679,7 +679,7 @@ private fun VoiceBar(
         ) {
             Icon(
                 Icons.Filled.Mic,
-                contentDescription = "التحدّث إلى Alcode Ai",
+                contentDescription = "التحدّث إلى عون",
                 tint = Color.White,
                 modifier = Modifier.size(24.dp),
             )
@@ -687,7 +687,7 @@ private fun VoiceBar(
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                if (enabled) "تحدّث إلى Alcode Ai" else "فعّل المساعد الذكي",
+                if (enabled) "تحدّث إلى عون" else "فعّل المساعد الذكي",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,

@@ -27,8 +27,8 @@ import {
   TTS_MODELS, voiceCacheSize,
 } from './voice'
 import {
-  installCrashGuards, log, markBootStarted, markBootSucceeded, previousBootFailed,
-  readLogTail, reportFatal, startupLogPath,
+  installCrashGuards, log, markBootStarted, markBootSucceeded, migrateLegacyProfile,
+  previousBootFailed, readLogTail, reportFatal, startupLogPath,
 } from './startup'
 
 /**
@@ -102,7 +102,7 @@ function createMainWindow() {
     show: false,
     backgroundColor: '#EDE7E1',
     autoHideMenuBar: true,
-    title: 'Alcode Ai',
+    title: 'عون',
     icon: appIcon(),
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
@@ -252,10 +252,10 @@ function createTray() {
     log('تعذّر إنشاء أيقونة شريط المهام', error)
     return
   }
-  tray.setToolTip('Alcode Ai')
+  tray.setToolTip('عون')
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'فتح Alcode Ai', click: showMain },
+      { label: 'فتح عون', click: showMain },
       { label: 'الشريط السريع', click: toggleQuick },
       { type: 'separator' },
       {
@@ -1160,7 +1160,9 @@ function registerIpc() {
 // --------------------------------------------------------------- إقلاع
 
 installCrashGuards()
-log(`إقلاع Alcode Ai ${app.getVersion()} — ${process.platform} ${process.arch}`)
+// قبل أي قراءة من المخزن: الاسم تغيّر، ومعه مسار بيانات المستخدم.
+migrateLegacyProfile()
+log(`إقلاع عون ${app.getVersion()} — ${process.platform} ${process.arch}`)
 
 // يجب أن يسبق whenReady: تعطيل التسريع لا يُقبل بعد جهوزية التطبيق.
 if (previousBootFailed()) {

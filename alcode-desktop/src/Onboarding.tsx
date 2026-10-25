@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AppSettings, Place } from './types'
+import { Mark } from './icons'
 
 /**
  * تهيئة أول تشغيل.
@@ -51,8 +52,8 @@ export default function Onboarding({ settings, onPatch, onDone }: {
 
         {step === 0 && (
           <Step
-            emoji="✦"
-            title="أهلًا بك في Alcode Ai"
+            emoji={<span style={{ color: 'var(--accent)' }}><Mark size={44} /></span>}
+            title="أهلًا بك في عون"
             body={
               <>
                 <p style={{ marginTop: 0 }}>
@@ -138,11 +139,11 @@ export default function Onboarding({ settings, onPatch, onDone }: {
 }
 
 function Step({ emoji, title, body }: {
-  emoji: string; title: string; body: React.ReactNode
+  emoji: string | React.ReactNode; title: string; body: React.ReactNode
 }) {
   return (
     <div>
-      <div style={{ fontSize: 40, marginBottom: 10 }}>{emoji}</div>
+      <div style={{ fontSize: 40, marginBottom: 10, lineHeight: 1 }}>{emoji}</div>
       <h1 className="h1" style={{ fontSize: 26, marginBottom: 12 }}>{title}</h1>
       <div style={{ lineHeight: 1.8 }}>{body}</div>
     </div>

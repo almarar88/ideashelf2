@@ -168,7 +168,7 @@ class FeaturesTest {
             zone = ZoneOffset.UTC,
         )
         assertFalse(body, body.contains("مظلّتك"))
-        assertEquals("افتح Alcode Ai لترى موجز يومك.", body)
+        assertEquals("افتح عون لترى موجز يومك.", body)
     }
 
     @Test

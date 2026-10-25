@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- الوضع الليلي أسود حقيقي، فأيّ خلفية فاتحة هنا وميض أبيض في العتمة. -->
+    <color name="window_bg">#FF000000</color>
+</resources>

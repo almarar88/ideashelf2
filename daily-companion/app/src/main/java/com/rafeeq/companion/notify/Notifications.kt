@@ -287,7 +287,7 @@ class AlarmReceiver : BroadcastReceiver() {
                             tasks = app.repos.tasks.load(),
                         )
                     }
-                }.getOrElse { "افتح Alcode Ai لترى موجز يومك." }
+                }.getOrElse { "افتح عون لترى موجز يومك." }
 
                 Notifier.show(
                     context, id = 300, channel = Channels.BRIEF,

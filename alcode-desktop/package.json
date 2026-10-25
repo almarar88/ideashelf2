@@ -1,10 +1,10 @@
 {
-  "name": "alcode-ai-desktop",
-  "productName": "Alcode Ai",
+  "name": "awn-desktop",
+  "productName": "Awn",
   "version": "2.1.0",
   "description": "رفيقك اليومي على ويندوز — مساعد يفهم أمرك وينفّذه على جهازك فعلًا",
   "main": "dist-electron/main.js",
-  "author": "Alcode",
+  "author": "Awn",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -32,7 +32,7 @@
   },
   "build": {
     "appId": "com.alcode.ai.desktop",
-    "productName": "Alcode Ai",
+    "productName": "Awn",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -51,7 +51,7 @@
         "dir"
       ],
       "icon": "build/icon.png",
-      "artifactName": "AlcodeAi-${version}-win.${ext}"
+      "artifactName": "Awn-${version}-win.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -59,8 +59,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Alcode Ai",
-      "artifactName": "AlcodeAi-Setup-${version}.${ext}",
+      "shortcutName": "Awn",
+      "artifactName": "Awn-Setup-${version}.${ext}",
       "installerLanguages": [
         "en_US"
       ],

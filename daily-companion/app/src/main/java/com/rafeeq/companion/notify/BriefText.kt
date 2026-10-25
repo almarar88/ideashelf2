@@ -61,7 +61,7 @@ object BriefText {
         }
         if (overdue > 0) parts += "⏳ $overdue متأخرة"
 
-        return if (parts.isEmpty()) "افتح Alcode Ai لترى موجز يومك."
+        return if (parts.isEmpty()) "افتح عون لترى موجز يومك."
         else parts.joinToString("  ·  ")
     }
 }

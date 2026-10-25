@@ -1,4 +1,4 @@
-name: Build Alcode Ai APK
+name: Build Awn APK
 
 on:
   push:
@@ -16,6 +16,12 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # أسماء دوالّ الاختبار عربية بين علامتَي `، فتصير أسماء ملفّات .class
+    # عربية. مترجم Kotlin يفشل بـ InvalidPathException إن لم تكن محارف
+    # نظام الملفّات UTF-8 — عُثر على هذا محلّيًا حيث اللغة POSIX.
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
     defaults:
       run:
         working-directory: daily-companion
@@ -51,7 +57,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: alcode-ai-release-apk
+          name: awn-release-apk
           path: daily-companion/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
@@ -62,9 +68,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-v${{ github.run_number }}
-          name: Alcode Ai للأندرويد — بناء ${{ github.run_number }}
+          name: عون للأندرويد — بناء ${{ github.run_number }}
           body: |
-            نسخة الأندرويد من Alcode Ai.
+            نسخة الأندرويد من عون.
 
             نزّل ملف APK وثبّته. قد يطلب هاتفك السماح بالتثبيت من مصدر غير
             معروف — هذا متوقّع لأي تطبيق خارج المتجر.

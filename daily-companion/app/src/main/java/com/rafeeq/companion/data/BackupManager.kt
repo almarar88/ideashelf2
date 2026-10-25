@@ -122,7 +122,7 @@ class BackupManager(private val context: Context, private val repos: Repos) {
     companion object {
         fun suggestedFileName(): String {
             val date = java.time.LocalDate.now()
-            return "alcode-ai-backup-$date.json"
+            return "awn-backup-$date.json"
         }
     }
 }

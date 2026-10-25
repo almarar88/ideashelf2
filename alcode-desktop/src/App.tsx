@@ -4,7 +4,7 @@ import { useAgent } from './useAgent'
 import { AppSettings, Place } from './types'
 import type { LicenseState } from '../electron/preload-api'
 import Onboarding from './Onboarding'
-import { Icon, IconName } from './icons'
+import { Icon, IconName, Mark } from './icons'
 import MicButton from './MicButton'
 import { isSpeaking, onSpeakingChange, stopSpeaking } from './voice'
 import {
@@ -217,10 +217,10 @@ export default function App() {
               display: 'grid', placeItems: 'center', color: '#fff', flexShrink: 0,
             }}
           >
-            <Icon.sparkle size={17} stroke={2} />
+            <Mark size={16} />
           </div>
           <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: '-0.01em' }}>
-            Alcode Ai
+            عون
           </span>
         </div>
 
@@ -740,7 +740,7 @@ function SettingsTab({ settings, onPatch, onRefresh, version, license, onLicense
     <div style={{ height: '100%', overflowY: 'auto', paddingLeft: 6 }}>
       <h1 className="h1" style={{ marginBottom: 4 }}>الإعدادات</h1>
       <p className="muted small" style={{ marginTop: 0, marginBottom: 20 }}>
-        Alcode Ai {version} · كل بياناتك على هذا الجهاز
+        عون {version} · كل بياناتك على هذا الجهاز
       </p>
 
       {license && <LicenseSection license={license} onChange={onLicenseChange} />}

@@ -72,7 +72,7 @@ import com.rafeeq.companion.ui.components.VoicePulse
 import com.rafeeq.companion.ui.theme.RafeeqTheme
 
 /**
- * المساعد الصوتي — يظهر عند استدعاء Alcode Ai كمساعد النظام
+ * المساعد الصوتي — يظهر عند استدعاء عون كمساعد النظام
  * (الضغط المطوّل على زر التشغيل)، أو من التطبيق واللوحة السريعة.
  *
  * التصميم مقصود أن يكون صغيرًا وهادئًا: بطاقة عائمة قرب أسفل الشاشة تبقى
@@ -166,7 +166,7 @@ private fun VoiceAssistantScreen(
             // فارغًا فيظهر خطأ «أضِف المفتاح» رغم أن المفتاح محفوظ.
             val saved = viewModel.awaitSettings()
             if (!saved.hasApiKey) {
-                errorText = "أضِف مفتاح Anthropic من إعدادات Alcode Ai أولًا."
+                errorText = "أضِف مفتاح Anthropic من إعدادات عون أولًا."
             } else {
                 micPermission.launch(Manifest.permission.RECORD_AUDIO)
             }

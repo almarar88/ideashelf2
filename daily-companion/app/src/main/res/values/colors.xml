@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="splash_bg">#FF0A1024</color>
-    <color name="ic_launcher_background">#FF0A1024</color>
+    <!--
+      خلفية شاشة البدء هي لون الأيقونة نفسه، فينمو الحرف من الأيقونة إلى
+      الشاشة بلا قفزة لون بينهما.
+    -->
+    <color name="splash_bg">#FF0A6CFF</color>
+    <color name="ic_launcher_background">#FF0A6CFF</color>
+
+    <!--
+      خلفية النافذة بعد شاشة البدء وقبل أن يرسم Compose أول إطار. تساوي
+      خلفية التطبيق لا لون العلامة: وميض أزرق في كل فتح أسوأ من لا شيء.
+    -->
+    <color name="window_bg">#FFF2F2F5</color>
 </resources>
