@@ -16,6 +16,7 @@ import com.rafeeq.companion.data.JsonListStore
 import com.rafeeq.companion.data.JsonValueStore
 import com.rafeeq.companion.data.WeatherBundle
 import com.rafeeq.companion.data.ai.AgentRunner
+import com.rafeeq.companion.data.ai.OpenAiRunner
 import com.rafeeq.companion.data.ai.ClaudeClient
 import com.rafeeq.companion.data.BackupManager
 import com.rafeeq.companion.data.DefaultShortcuts
@@ -42,8 +43,17 @@ class Repos(app: Application) {
         runCatching { runBlocking { settings.settings.first().apiKey } }.getOrDefault("")
     }
 
+    /** مفتاح المزوّد الفعّال وعنوانه — يتبعان الإعدادات حيًّا. */
+    private val activeKey: () -> String = {
+        runCatching { runBlocking { settings.settings.first().activeKey } }.getOrDefault("")
+    }
+    private val activeUrl: () -> String = {
+        runCatching { runBlocking { settings.settings.first().activeUrl } }.getOrDefault("")
+    }
+
     val claude = ClaudeClient(apiKey)
     val agent = AgentRunner(apiKey)
+    val openAi = OpenAiRunner(activeKey, activeUrl)
     val phone = PhoneController(app)
     val voice = VoiceEngine(app)
 

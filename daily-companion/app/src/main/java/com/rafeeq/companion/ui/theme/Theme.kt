@@ -22,7 +22,7 @@ import androidx.core.view.WindowCompat
 private val Color0F = Color(0xFF141210)
 
 private val DarkScheme = darkColorScheme(
-    primary = Cyan,
+    primary = Accent,
     onPrimary = Color0F,
     primaryContainer = Color(0xFF23413A),
     onPrimaryContainer = PastelMint,
@@ -50,7 +50,7 @@ private val DarkScheme = darkColorScheme(
 )
 
 private val LightScheme = lightColorScheme(
-    primary = CyanDeep,
+    primary = Accent,
     onPrimary = Color.White,
     primaryContainer = PastelMint,
     onPrimaryContainer = PastelMintInk,

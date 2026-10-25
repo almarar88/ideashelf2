@@ -13,6 +13,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.rafeeq.companion.core.Net
 import com.rafeeq.companion.data.ai.ClaudeClient
 import com.rafeeq.companion.data.ai.Dialect
+import com.rafeeq.companion.data.ai.Provider
+import com.rafeeq.companion.data.ai.Providers
 import com.rafeeq.companion.data.prayer.AsrMethod
 import com.rafeeq.companion.data.prayer.CalculationMethod
 import com.rafeeq.companion.data.prayer.HighLatitudeRule
@@ -47,6 +49,14 @@ data class AppSettings(
     val adhanSound: Boolean = true,
 
     val apiKey: String = "",
+    /** المزوّد الفعّال. */
+    val provider: String = "anthropic",
+    /** مفتاح لكل مزوّد — التبديل بينها لا يفقد المفاتيح. */
+    val providerKeys: Map<String, String> = emptyMap(),
+    /** نموذج لكل مزوّد: المعرّفات لا تنتقل بين المزوّدين. */
+    val providerModels: Map<String, String> = emptyMap(),
+    /** عنوان مخصّص لمزوّد يسمح بتحريره. */
+    val providerUrls: Map<String, String> = emptyMap(),
     val aiModel: String = "claude-opus-5",
     val aiEffort: String = "medium",
     val aiPersona: String = "",
@@ -95,7 +105,22 @@ data class AppSettings(
             offsets = prayerOffsets,
         )
 
-    val hasApiKey: Boolean get() = apiKey.isNotBlank()
+    val hasApiKey: Boolean get() = activeKey.isNotBlank()
+
+    /** المزوّد الفعّال ومفاتيحه — نقطة واحدة تمنع اختلاف الحساب بين الشاشات. */
+    val activeProvider: Provider get() = Providers.byId(provider)
+
+    val activeKey: String
+        get() = if (activeProvider.kind == Provider.Kind.ANTHROPIC) apiKey
+        else providerKeys[activeProvider.id].orEmpty()
+
+    val activeModel: String
+        get() = if (activeProvider.kind == Provider.Kind.ANTHROPIC) effectiveModel
+        else providerModels[activeProvider.id].orEmpty()
+            .ifBlank { activeProvider.models.firstOrNull()?.id.orEmpty() }
+
+    val activeUrl: String
+        get() = providerUrls[activeProvider.id].orEmpty().ifBlank { activeProvider.baseUrl }
 
     /** هل الصوت الواقعي جاهز للاستعمال؟ */
     val hasRealisticVoice: Boolean
@@ -105,6 +130,14 @@ data class AppSettings(
     val effectiveModel: String get() = responseSpeed.model
     val effectiveEffort: String get() = responseSpeed.effort
 }
+
+
+/** خريطة نصّية مخزَّنة JSON — تُقرأ بأمان ولا تُسقط الإعدادات إن تلفت. */
+private fun readStringMap(raw: String?): Map<String, String> = raw?.let {
+    runCatching {
+        Net.json.decodeFromString(MapSerializer(String.serializer(), String.serializer()), it)
+    }.getOrNull()
+} ?: emptyMap()
 
 class SettingsRepository(private val context: Context) {
 
@@ -134,6 +167,10 @@ class SettingsRepository(private val context: Context) {
         val adhanSound = booleanPreferencesKey("adhan_sound")
 
         val apiKey = stringPreferencesKey("api_key")
+        val provider = stringPreferencesKey("provider")
+        val providerKeys = stringPreferencesKey("provider_keys")
+        val providerModels = stringPreferencesKey("provider_models")
+        val providerUrls = stringPreferencesKey("provider_urls")
         val aiModel = stringPreferencesKey("ai_model")
         val aiEffort = stringPreferencesKey("ai_effort")
         val aiPersona = stringPreferencesKey("ai_persona")
@@ -188,6 +225,10 @@ class SettingsRepository(private val context: Context) {
             asrMethod = p[Keys.asrMethod]?.let { runCatching { AsrMethod.valueOf(it) }.getOrNull() } ?: AsrMethod.STANDARD,
             highLatitudeRule = p[Keys.highLat]?.let { runCatching { HighLatitudeRule.valueOf(it) }.getOrNull() }
                 ?: HighLatitudeRule.ANGLE_BASED,
+            provider = p[Keys.provider] ?: "anthropic",
+            providerKeys = readStringMap(p[Keys.providerKeys]),
+            providerModels = readStringMap(p[Keys.providerModels]),
+            providerUrls = readStringMap(p[Keys.providerUrls]),
             hijriOffset = p[Keys.hijriOffset] ?: 0,
             prayerOffsets = p[Keys.prayerOffsets]?.let {
                 runCatching {
@@ -273,6 +314,24 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAdhanSound(value: Boolean) = edit { it[Keys.adhanSound] = value }
 
     suspend fun setApiKey(value: String) = edit { it[Keys.apiKey] = value.trim() }
+
+    suspend fun setProvider(value: String) = edit { it[Keys.provider] = value }
+
+    private suspend fun putInMap(
+        key: androidx.datastore.preferences.core.Preferences.Key<String>,
+        id: String,
+        value: String,
+    ) = edit { prefs ->
+        val current = readStringMap(prefs[key]).toMutableMap()
+        current[id] = value.trim()
+        prefs[key] = Net.json.encodeToString(
+            MapSerializer(String.serializer(), String.serializer()), current,
+        )
+    }
+
+    suspend fun setProviderKey(id: String, value: String) = putInMap(Keys.providerKeys, id, value)
+    suspend fun setProviderModel(id: String, value: String) = putInMap(Keys.providerModels, id, value)
+    suspend fun setProviderUrl(id: String, value: String) = putInMap(Keys.providerUrls, id, value)
     suspend fun setAiModel(value: String) = edit { it[Keys.aiModel] = value }
     suspend fun setAiEffort(value: String) = edit { it[Keys.aiEffort] = value }
     suspend fun setAiPersona(value: String) = edit { it[Keys.aiPersona] = value }

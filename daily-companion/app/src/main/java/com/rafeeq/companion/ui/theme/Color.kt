@@ -3,28 +3,32 @@ package com.rafeeq.companion.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * لوحة "الرمل الدافئ" — Warm Sand.
+ * اللوحة.
  *
- * خلفية رملية دافئة، بطاقات بيضاء كبيرة الاستدارة، عناوين سوداء عريضة،
- * وألوان باستيل هادئة للفئات والبطاقات. اللون لا يصرخ — الحروف هي البطل.
+ * رمادي محايد هو الأرضية، واللون محجوز للتمييز وحده — حين يكون كل شيء
+ * ملوّنًا لا يبرز شيء. نفس القيم المستعملة في نسخة ويندوز، فيبدو التطبيقان
+ * تطبيقًا واحدًا على جهازين.
+ *
+ * الوضع الداكن على أسود حقيقي: شاشات الهاتف OLED، والأسود فيها بكسل مطفأ
+ * لا رمادي مضاء. والألوان تُفتَح فيه لأن نسخة النهار تبدو موحلة على أسود.
  */
 
-// --- Light (Warm Sand) ---
-val SandBackground = Color(0xFFEDE7E1)
+// --- فاتح ---
+val SandBackground = Color(0xFFF2F2F5)
 val SandSurface = Color(0xFFFFFFFF)
-val SandSurfaceSoft = Color(0xFFFBF8F5)
-val SandSurfaceHigh = Color(0xFFF2ECE6)
-val SandOutline = Color(0xFFE2DAD2)
-val SandOnSurface = Color(0xFF111111)
-val SandOnSurfaceMuted = Color(0xFF8C8680)
+val SandSurfaceSoft = Color(0xFFFAFAFC)
+val SandSurfaceHigh = Color(0xFFEFEFF2)
+val SandOutline = Color(0x12000000)
+val SandOnSurface = Color(0xFF1A1A1C)
+val SandOnSurfaceMuted = Color(0xFF5E5E66)
 
-// --- Dark (Warm Night) ---
-val NightBackground = Color(0xFF141210)
-val NightSurface = Color(0xFF1E1B18)
-val NightSurfaceHigh = Color(0xFF272320)
-val NightOutline = Color(0xFF3A3430)
-val NightOnSurface = Color(0xFFF5F0EA)
-val NightOnSurfaceMuted = Color(0xFFA39C94)
+// --- داكن ---
+val NightBackground = Color(0xFF000000)
+val NightSurface = Color(0xFF161618)
+val NightSurfaceHigh = Color(0xFF262629)
+val NightOutline = Color(0x29FFFFFF)
+val NightOnSurface = Color(0xFFF5F5F7)
+val NightOnSurfaceMuted = Color(0xFFA1A1A8)
 
 // أسماء قديمة يستعملها بقيّة الكود — نُبقيها مربوطة باللوحة الجديدة.
 val DayBackground = SandBackground
@@ -34,20 +38,26 @@ val DayOutline = SandOutline
 val DayOnSurface = SandOnSurface
 val DayOnSurfaceMuted = SandOnSurfaceMuted
 
-// --- الباستيل: ألوان البطاقات والفئات ---
-val PastelLavender = Color(0xFFD9DCF7)
-val PastelLavenderInk = Color(0xFF4B4FA6)
-val PastelOlive = Color(0xFFDCCF8E)
-val PastelOliveInk = Color(0xFF6B5E1F)
-val PastelMint = Color(0xFFC9E7DC)
-val PastelMintInk = Color(0xFF2F6B57)
-val PastelPeach = Color(0xFFF6E7D8)
-val PastelPeachInk = Color(0xFF8A5E33)
-val PastelButter = Color(0xFFF2E08D)
-val PastelButterInk = Color(0xFF6E5A12)
-val PastelBlue = Color(0xFFB9C3F5)
-val PastelRose = Color(0xFFF7D9DC)
-val PastelRoseInk = Color(0xFF9B4B57)
+/*
+ * الألوان الدلالية.
+ *
+ * كانت باستيلات مشبَعة تملأ خلفيات البطاقات. صارت خلفيات باهتة جدًا مع حبر
+ * مشبَع: الخلفية تُلمّح، والحبر هو ما يُقرأ. هذا ما يُبقي التباين كافيًا
+ * ويمنع الشاشة من أن تصير لوحة ألوان.
+ */
+val PastelLavender = Color(0x1A6B4BE8)
+val PastelLavenderInk = Color(0xFF6B4BE8)
+val PastelOlive = Color(0x1FC77C12)
+val PastelOliveInk = Color(0xFFC77C12)
+val PastelMint = Color(0x1A20A56A)
+val PastelMintInk = Color(0xFF20A56A)
+val PastelPeach = Color(0x1A0A6CFF)
+val PastelPeachInk = Color(0xFF0A6CFF)
+val PastelButter = Color(0x1FC77C12)
+val PastelButterInk = Color(0xFFC77C12)
+val PastelBlue = Color(0x1A0E8E9E)
+val PastelRose = Color(0x1ADC3B38)
+val PastelRoseInk = Color(0xFFDC3B38)
 
 /** ترتيب ثابت تدور عليه البطاقات، فيبقى شكل الشاشة متوازنًا. */
 val PastelDeck = listOf(
@@ -59,19 +69,24 @@ val PastelInkDeck = listOf(
 )
 
 // --- ألوان الحالة والتمييز ---
-val Ink = Color(0xFF111111)
-val Amber = Color(0xFFE9A93B)
-val AmberDeep = Color(0xFF9A6B14)
-val Emerald = Color(0xFF3CC28A)
-val EmeraldDeep = Color(0xFF1E7A55)
-val Rose = Color(0xFFE0757F)
-val RoseDeep = Color(0xFFB33A46)
-val Violet = Color(0xFF7F84D6)
-val VioletDeep = Color(0xFF4B4FA6)
-val Cyan = Color(0xFF57BFAE)
-val CyanDeep = Color(0xFF2F6B57)
-val Sky = Color(0xFF8FB4E8)
-val Indigo = Color(0xFF7F84D6)
+/*
+ * ألوان التمييز. نفس قيم نسخة ويندوز حرفًا بحرف — أي اختلاف هنا يجعل
+ * التطبيقين يبدوان تطبيقين.
+ */
+val Ink = Color(0xFF1A1A1C)
+val Accent = Color(0xFF0A6CFF)
+val Amber = Color(0xFFC77C12)
+val AmberDeep = Color(0xFF8A5406)
+val Emerald = Color(0xFF20A56A)
+val EmeraldDeep = Color(0xFF14704A)
+val Rose = Color(0xFFDC3B38)
+val RoseDeep = Color(0xFF9E2522)
+val Violet = Color(0xFF6B4BE8)
+val VioletDeep = Color(0xFF4A32A8)
+val Cyan = Color(0xFF0E8E9E)
+val CyanDeep = Color(0xFF096470)
+val Sky = Color(0xFF0A6CFF)
+val Indigo = Color(0xFF6B4BE8)
 
 /**
  * تدرّجات هادئة. اللوحة الجديدة تعتمد المسطّح أكثر من التدرّج،

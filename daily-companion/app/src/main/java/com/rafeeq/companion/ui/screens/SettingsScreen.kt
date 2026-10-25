@@ -94,6 +94,7 @@ fun SettingsScreen(
     onOpenStats: () -> Unit = {},
     onOpenShortcuts: () -> Unit = {},
     onOpenVoice: () -> Unit = {},
+    onOpenProvider: () -> Unit = {},
     onOpenMemory: () -> Unit = {},
     onOpenSaved: () -> Unit = {},
 ) {
@@ -107,7 +108,6 @@ fun SettingsScreen(
     var showSpeedPicker by remember { mutableStateOf(false) }
     var showDialectPicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
-    var showApiKeyDialog by remember { mutableStateOf(false) }
     var showOffsets by remember { mutableStateOf(false) }
     var showPersona by remember { mutableStateOf(false) }
     var showNameDialog by remember { mutableStateOf(false) }
@@ -259,12 +259,12 @@ fun SettingsScreen(
         item {
             GlassCard(padding = PaddingValues(6.dp)) {
                 SettingRow(
-                    title = "مفتاح Anthropic",
+                    title = "النموذج والمزوّد",
                     value = if (settings.hasApiKey) "مضبوط ✓" else "غير مضبوط",
-                    subtitle = "يُحفظ على جهازك فقط ولا يُشارك مع أي طرف آخر",
+                    subtitle = "${settings.activeProvider.label} · ${settings.activeModel}",
                     icon = Icons.Filled.AutoAwesome,
                     tint = Violet,
-                ) { showApiKeyDialog = true }
+                ) { onOpenProvider() }
 
                 SettingRow(
                     title = "سرعة الاستجابة",
@@ -613,9 +613,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showApiKeyDialog) {
-        ApiKeyDialog(viewModel = viewModel, onDismiss = { showApiKeyDialog = false })
-    }
 
     if (showOffsets) {
         OffsetsDialog(viewModel = viewModel, onDismiss = { showOffsets = false })
@@ -784,99 +781,6 @@ fun PlacePickerDialog(
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } },
-    )
-}
-
-@Composable
-private fun ApiKeyDialog(viewModel: AppViewModel, onDismiss: () -> Unit) {
-    val settings by viewModel.settings.collectAsState()
-    var key by remember { mutableStateOf(settings.apiKey) }
-    var checking by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf<String?>(null) }
-    var valid by remember { mutableStateOf<Boolean?>(null) }
-    val scope = rememberCoroutineScope()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("مفتاح Anthropic", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "أنشئ مفتاحًا من console.anthropic.com ثم الصقه هنا. " +
-                        "المفتاح يُخزَّن في ذاكرة التطبيق على جهازك، ويُرسل إلى خوادم Anthropic فقط " +
-                        "عند استخدام المساعد.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                RafeeqTextField(
-                    key, { key = it; valid = null; status = null },
-                    "المفتاح",
-                    placeholder = "sk-ant-…",
-                    isPassword = true,
-                    keyboardType = KeyboardType.Password,
-                )
-                status?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (valid == true) Emerald else MaterialTheme.colorScheme.error,
-                    )
-                }
-                if (settings.hasApiKey) {
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                viewModel.setApiKey("")
-                                key = ""
-                                status = "حُذف المفتاح."
-                                valid = null
-                            }
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Filled.Delete, contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            "حذف المفتاح من الجهاز",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = !checking,
-                onClick = {
-                    viewModel.setApiKey(key)
-                    if (key.isBlank()) { onDismiss(); return@TextButton }
-                    checking = true
-                    status = "جارٍ التحقّق…"
-                    scope.launch {
-                        // ننتظر لحظة حتى يُحفظ المفتاح قبل التحقّق منه.
-                        kotlinx.coroutines.delay(250)
-                        val result = viewModel.validateApiKey()
-                        checking = false
-                        result.onSuccess {
-                            valid = true
-                            status = "المفتاح يعمل ✓"
-                        }.onFailure {
-                            valid = false
-                            status = it.message ?: "فشل التحقّق."
-                        }
-                    }
-                },
-            ) {
-                if (checking) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                else Text("حفظ وتحقّق")
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } },
     )
 }
 

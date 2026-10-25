@@ -38,6 +38,12 @@ import com.rafeeq.companion.data.control.AppActions
 import com.rafeeq.companion.data.control.PhoneController
 import com.rafeeq.companion.data.control.ToolCatalog
 import com.rafeeq.companion.data.control.ToolSpec
+import com.rafeeq.companion.core.Net
+import com.rafeeq.companion.data.ai.OpenAiRunner
+import com.rafeeq.companion.data.ai.Provider
+import com.rafeeq.companion.data.ai.Providers
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import com.rafeeq.companion.data.voice.VoiceEngine
 import com.rafeeq.companion.data.news.NewsCategories
 import com.rafeeq.companion.data.prayer.AsrMethod
@@ -632,20 +638,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val streamSpeech = spoken && s.voiceReplies && s.speakWhileTyping
             if (streamSpeech) repos.voice.beginStreamSpeech(s.voiceLanguage)
 
+            val provider = s.activeProvider
+            val specOf: (String) -> ToolSpec? = { name -> ToolCatalog.byName(name) }
+            val confirmCall: suspend (AgentRunner.ToolCall, ToolSpec) -> Boolean =
+                { call, spec -> requestConfirmation(call, spec, s.confirmSensitive) }
+            val executeCall: suspend (AgentRunner.ToolCall) -> ActionResult = { call ->
+                if (appActions.handles(call.name)) appActions.execute(call.name, call.input)
+                else repos.phone.execute(call.name, call.input)
+            }
+
+            /*
+             * سجلّ المحادثة يحمل شكل المزوّد الذي أنشأه: Anthropic تضع نتائج
+             * الأدوات في كتل داخل رسالة مستخدم، والمتوافقون في رسائل `tool`
+             * مستقلّة. إرسال أحدهما إلى الآخر يُرفض بخطأ غامض، فإن تبدّل
+             * الشكل نبدأ من آخر سؤال بدل أن يفشل الطلب.
+             */
+            val wantsOpenAi = provider.kind == Provider.Kind.OPENAI
+            val looksOpenAi = history.any {
+                it["role"]?.jsonPrimitive?.contentOrNull == "tool" || it.containsKey("tool_calls")
+            }
+            val looksAnthropic = history.any { message ->
+                (message["content"] as? JsonArray)?.any { block ->
+                    val type = (block as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull
+                    type == "tool_use" || type == "tool_result"
+                } == true
+            }
+            if ((wantsOpenAi && looksAnthropic) || (!wantsOpenAi && looksOpenAi)) {
+                val lastAsk = history.lastOrNull {
+                    it["role"]?.jsonPrimitive?.contentOrNull == "user" &&
+                        it["content"] is JsonPrimitive
+                }
+                history.clear()
+                lastAsk?.let { history += it }
+            }
+
             runCatching {
-                repos.agent.run(
-                    model = s.effectiveModel,
-                    system = system,
-                    history = history,
-                    tools = buildTools(useTools, s),
-                    effort = s.effectiveEffort,
-                    specOf = { name -> ToolCatalog.byName(name) },
-                    confirm = { call, spec -> requestConfirmation(call, spec, s.confirmSensitive) },
-                    execute = { call ->
-                        if (appActions.handles(call.name)) appActions.execute(call.name, call.input)
-                        else repos.phone.execute(call.name, call.input)
-                    },
-                ) { event ->
+                val onEvent: suspend (AgentRunner.Event) -> Unit = { event ->
                     when (event) {
                         is AgentRunner.Event.Text -> {
                             builder.append(event.delta)
@@ -693,6 +721,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         is AgentRunner.Event.Failed -> failure = event.message
                         AgentRunner.Event.Completed -> Unit
                     }
+                }
+
+                // المسلكان يتقاسمان نفس الأحداث والموافقة، فلا يختلف شعور
+                // المستخدم باختلاف المزوّد.
+                if (wantsOpenAi) {
+                    repos.openAi.run(
+                        provider = provider,
+                        model = s.activeModel,
+                        system = system,
+                        history = history,
+                        tools = buildTools(useTools, s),
+                        specOf = specOf,
+                        confirm = confirmCall,
+                        execute = executeCall,
+                        emit = onEvent,
+                    )
+                } else {
+                    repos.agent.run(
+                        model = s.effectiveModel,
+                        system = system,
+                        history = history,
+                        tools = buildTools(useTools, s),
+                        effort = s.effectiveEffort,
+                        specOf = specOf,
+                        confirm = confirmCall,
+                        execute = executeCall,
+                        emit = onEvent,
+                    )
                 }
             }.onFailure { failure = it.friendlyMessage() }
 
@@ -1112,6 +1168,80 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setApiKey(value: String) = viewModelScope.launch { repos.settings.setApiKey(value) }
+
+    // ------------------------------------------------------- المزوّدون
+
+    fun setProvider(value: String) = viewModelScope.launch { repos.settings.setProvider(value) }
+    fun setProviderModel(id: String, value: String) =
+        viewModelScope.launch { repos.settings.setProviderModel(id, value) }
+    fun setProviderUrl(id: String, value: String) =
+        viewModelScope.launch { repos.settings.setProviderUrl(id, value) }
+
+    /** الحفظ المنتظَر: الشاشة تحتاج أن يكتمل قبل أن تجرّب الاتصال. */
+    suspend fun setApiKeyNow(value: String) = repos.settings.setApiKey(value)
+    suspend fun setProviderKeyNow(id: String, value: String) =
+        repos.settings.setProviderKey(id, value)
+
+    fun openUrl(url: String) = runCatching {
+        val intent = android.content.Intent(
+            android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url),
+        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        getApplication<android.app.Application>().startActivity(intent)
+    }
+
+    /**
+     * نداء قصير حقيقي للتحقّق. يعيد null عند النجاح أو رسالة عربية عند الفشل —
+     * أصدق من فحص شكل المفتاح، الذي يقبل مفتاحًا مُبطَلًا.
+     */
+    suspend fun testProvider(id: String): String? {
+        val s = settings.value
+        val provider = Providers.byId(id)
+        val key = if (provider.kind == Provider.Kind.ANTHROPIC) s.apiKey
+        else s.providerKeys[id].orEmpty()
+        val model = if (provider.kind == Provider.Kind.ANTHROPIC) s.effectiveModel
+        else s.providerModels[id].orEmpty().ifBlank { provider.models.firstOrNull()?.id.orEmpty() }
+
+        if (key.isBlank()) return "ما في مفتاح محفوظ."
+        if (model.isBlank()) return "ما في معرّف نموذج."
+
+        return runCatching {
+            if (provider.kind == Provider.Kind.ANTHROPIC) {
+                repos.claude.complete(
+                    model = model,
+                    system = "رد بكلمة واحدة.",
+                    messages = listOf(ClaudeClient.Msg("user", "قل: جاهز")),
+                    maxTokens = 16,
+                )
+            } else {
+                val url = s.providerUrls[id].orEmpty().ifBlank { provider.baseUrl }
+                    .trimEnd('/')
+                val body = kotlinx.serialization.json.buildJsonObject {
+                    put("model", model)
+                    putJsonArray("messages") {
+                        add(kotlinx.serialization.json.buildJsonObject {
+                            put("role", "user"); put("content", "قل: جاهز")
+                        })
+                    }
+                    put("max_tokens", 16)
+                }
+                val request = okhttp3.Request.Builder()
+                    .url("$url/chat/completions")
+                    .header("Authorization", "Bearer $key")
+                    .post(
+                        body.toString().toRequestBody("application/json".toMediaType()),
+                    )
+                    .build()
+                Net.execute(request).use { response ->
+                    if (!response.isSuccessful) {
+                        error("${response.code}: ${response.body?.string()?.take(200).orEmpty()}")
+                    }
+                }
+            }
+        }.fold(
+            onSuccess = { null },
+            onFailure = { OpenAiRunner.friendly(it, provider) },
+        )
+    }
     fun setAiModel(value: String) = viewModelScope.launch { repos.settings.setAiModel(value) }
     fun setAiEffort(value: String) = viewModelScope.launch { repos.settings.setAiEffort(value) }
     fun setAiPersona(value: String) = viewModelScope.launch { repos.settings.setAiPersona(value) }

@@ -10,6 +10,9 @@ on:
       - 'daily-companion/**'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -44,6 +47,22 @@ jobs:
           name: alcode-ai-release-apk
           path: daily-companion/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      # الإصدار يعطي رابط تنزيل مباشرًا بلا تسجيل دخول، بخلاف ملفات Actions
+      # التي تتطلّب حسابًا وتنتهي صلاحيتها.
+      - name: نشر إصدار للتنزيل المباشر
+        if: github.ref == 'refs/heads/claude/daily-companion-app-8fnen3'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v${{ github.run_number }}
+          name: Alcode Ai للأندرويد — بناء ${{ github.run_number }}
+          body: |
+            نسخة الأندرويد من Alcode Ai.
+
+            نزّل ملف APK وثبّته. قد يطلب هاتفك السماح بالتثبيت من مصدر غير
+            معروف — هذا متوقّع لأي تطبيق خارج المتجر.
+          files: daily-companion/app/build/outputs/apk/release/*.apk
+          fail_on_unmatched_files: false
 
       - name: Upload test report on failure
         if: failure()
