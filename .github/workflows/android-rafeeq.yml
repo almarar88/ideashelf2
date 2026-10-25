@@ -23,14 +23,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
+      # الحزمة `tools` سُحبت من مستودع جوجل، وهي ضمن الافتراضي لهذا الإجراء،
+      # فكان `sdkmanager tools` يفشل ويسقط البناء قبل أن يُترجم سطر واحد —
+      # سبب فشل كل بناء أندرويد هنا، لا خطأ في الكود. والتراخيص كانت تُطبع
+      # كاملةً فتدفن الخطأ تحت ألف سطر، فأُسكتت.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
