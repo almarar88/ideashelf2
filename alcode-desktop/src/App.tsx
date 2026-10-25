@@ -665,12 +665,6 @@ function MemoryTab() {
 
 // ----------------------------------------------------------- الإعدادات
 
-const MODELS = [
-  { id: 'claude-opus-5', label: 'Opus 5 — الأذكى', hint: 'للمهام المعقّدة والتخطيط' },
-  { id: 'claude-sonnet-5', label: 'Sonnet 5 — متوازن', hint: 'الأفضل للاستخدام اليومي' },
-  { id: 'claude-haiku-4-5', label: 'Haiku 4.5 — الأسرع', hint: 'للأوامر المباشرة القصيرة' },
-]
-
 const DIALECTS = [
   { id: 'emirati', label: 'إماراتي' },
   { id: 'gulf', label: 'خليجي' },
@@ -751,46 +745,10 @@ function SettingsTab({ settings, onPatch, onRefresh, version, license, onLicense
 
       {license && <LicenseSection license={license} onChange={onLicenseChange} />}
 
-      <Section title="مفتاح Anthropic">
-        <div className="card">
-          <p className="muted small" style={{ marginTop: 0 }}>
-            المفتاح يُحفظ على جهازك ولا يغادر عملية التطبيق الرئيسية —
-            حتى واجهة العرض لا تراه. يُرسل حصريًا إلى api.anthropic.com.
-          </p>
-          <div className="row" style={{ gap: 8 }}>
-            <input
-              className="field grow"
-              type="password"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              placeholder={settings.hasApiKey ? 'مضبوط ✓ — الصق مفتاحًا جديدًا لتغييره' : 'sk-ant-...'}
-              style={{ direction: 'ltr' }}
-            />
-            <button className="btn" onClick={saveKey} disabled={testing || !key.trim()}>
-              {testing ? 'أتحقّق…' : 'حفظ وتحقّق'}
-            </button>
-          </div>
-          {keyState && <div className="small" style={{ marginTop: 8 }}>{keyState}</div>}
-        </div>
-      </Section>
+      <ProviderSection settings={settings} onPatch={onPatch} onRefresh={onRefresh} />
 
       <Section title="المساعد">
         <div className="card col" style={{ gap: 16 }}>
-          <Field label="النموذج">
-            <div className="row wrap" style={{ gap: 8 }}>
-              {MODELS.map((model) => (
-                <button
-                  key={model.id}
-                  className={settings.model === model.id ? 'pill active' : 'pill'}
-                  onClick={() => void onPatch({ model: model.id })}
-                  title={model.hint}
-                >
-                  {model.label}
-                </button>
-              ))}
-            </div>
-          </Field>
-
           <Field label="عمق التفكير">
             <div className="row wrap" style={{ gap: 8 }}>
               {EFFORTS.map((level) => (
@@ -2173,5 +2131,171 @@ function Slider({ label, hint, value, onChange, min = 0, max = 1 }: {
       />
       {hint && <div className="muted small">{hint}</div>}
     </div>
+  )
+}
+
+// ------------------------------------------------------------ المزوّدون
+
+/**
+ * اختيار مزوّد النموذج.
+ *
+ * المفاتيح تُحفظ لكل مزوّد على حدة، فالتبديل بينها لا يفقد شيئًا ولا يُعاد
+ * لصق مفتاح في كل مرّة. والمفتاح نفسه لا يصل الواجهة أبدًا — وجوده فقط.
+ */
+function ProviderSection({ settings, onPatch, onRefresh }: {
+  settings: AppSettings
+  onPatch: (patch: Partial<AppSettings>) => Promise<void>
+  onRefresh: () => Promise<void>
+}) {
+  const [providers, setProviders] = useState<any[]>([])
+  const [key, setKey] = useState('')
+  const [state, setState] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => { void window.alcode.providers.list().then(setProviders) }, [])
+
+  const active = providers.find((one) => one.id === settings.provider) ?? providers[0]
+  if (!active) return null
+
+  const hasKey = settings.hasProviderKey?.[active.id] === true
+  const model = active.id === 'anthropic'
+    ? settings.model
+    : (settings.providerModels?.[active.id] || active.models[0]?.id || '')
+  const url = settings.providerBaseUrl?.[active.id] || active.baseUrl
+
+  const saveKey = async () => {
+    if (!key.trim()) return
+    setBusy(true)
+    setState('')
+    if (active.id === 'anthropic') await window.alcode.settings.setKey(key.trim())
+    else await window.alcode.providers.setKey(active.id, key.trim())
+    const result = await window.alcode.providers.test(active.id)
+    setBusy(false)
+    setState(result.ok ? '✅ يعمل' : `⚠️ ${result.error}`)
+    if (result.ok) setKey('')
+    await onRefresh()
+  }
+
+  return (
+    <Section title="النموذج والمزوّد">
+      <div className="card col" style={{ gap: 18 }}>
+        <Field label="المزوّد">
+          <div className="row wrap" style={{ gap: 8 }}>
+            {providers.map((one) => (
+              <button
+                key={one.id}
+                className={settings.provider === one.id ? 'pill active' : 'pill'}
+                onClick={async () => {
+                  await onPatch({ provider: one.id })
+                  setState('')
+                  setKey('')
+                }}
+              >
+                {one.label}
+                {settings.hasProviderKey?.[one.id] && settings.provider !== one.id && ' ✓'}
+              </button>
+            ))}
+          </div>
+          <p className="footnote" style={{ margin: '8px 0 0' }}>{active.note}</p>
+        </Field>
+
+        <Field label="النموذج">
+          <div className="row wrap" style={{ gap: 8, marginBottom: 8 }}>
+            {active.models.filter((one: any) => one.id).map((one: any) => (
+              <button
+                key={one.id}
+                className={model === one.id ? 'pill active' : 'pill'}
+                onClick={async () => {
+                  if (active.id === 'anthropic') await onPatch({ model: one.id })
+                  else await window.alcode.providers.setModel(active.id, one.id)
+                  await onRefresh()
+                }}
+              >
+                {one.label}
+              </button>
+            ))}
+          </div>
+          {/* معرّفات النماذج تتبدّل أسرع من أي قائمة نكتبها، فنترك الحقل حرًّا. */}
+          <input
+            className="field"
+            defaultValue={model}
+            key={`${active.id}-${model}`}
+            onBlur={async (event) => {
+              const value = event.target.value.trim()
+              if (!value || value === model) return
+              if (active.id === 'anthropic') await onPatch({ model: value })
+              else await window.alcode.providers.setModel(active.id, value)
+              await onRefresh()
+            }}
+            placeholder="أو اكتب معرّف نموذج آخر"
+            style={{ direction: 'ltr', fontSize: 13 }}
+          />
+        </Field>
+
+        {active.editableUrl && (
+          <Field label="عنوان الخدمة">
+            <input
+              className="field"
+              defaultValue={url}
+              key={`url-${active.id}`}
+              onBlur={async (event) => {
+                await window.alcode.providers.setUrl(active.id, event.target.value.trim())
+                await onRefresh()
+              }}
+              placeholder="http://localhost:11434/v1"
+              style={{ direction: 'ltr', fontSize: 13 }}
+            />
+          </Field>
+        )}
+
+        {active.id !== 'local' && (
+          <Field label="المفتاح">
+            <div className="row" style={{ gap: 8 }}>
+              <input
+                className="field grow"
+                type="password"
+                value={key}
+                onChange={(event) => setKey(event.target.value)}
+                placeholder={hasKey ? 'مضبوط ✓ — الصق مفتاحًا جديدًا لتغييره' : 'الصق مفتاحك'}
+                style={{ direction: 'ltr' }}
+              />
+              <button className="btn" onClick={saveKey} disabled={busy || !key.trim()}>
+                {busy ? 'أتحقّق…' : 'حفظ وتحقّق'}
+              </button>
+            </div>
+            {state && <div className="footnote" style={{ marginTop: 8 }}>{state}</div>}
+            {active.keyUrl && (
+              <button
+                className="chip"
+                style={{ marginTop: 8 }}
+                onClick={() => window.alcode.daily.openExternal(active.keyUrl)}
+              >
+                من وين أجيب مفتاحًا؟ ↗
+              </button>
+            )}
+          </Field>
+        )}
+
+        {hasKey && (
+          <button
+            className="chip"
+            style={{ alignSelf: 'flex-start' }}
+            onClick={async () => {
+              setBusy(true)
+              const result = await window.alcode.providers.test(active.id)
+              setBusy(false)
+              setState(result.ok ? '✅ يعمل' : `⚠️ ${result.error}`)
+            }}
+          >
+            {busy ? 'أتحقّق…' : 'جرّب الاتصال'}
+          </button>
+        )}
+
+        <p className="footnote" style={{ margin: 0 }}>
+          المفتاح يُحفظ على جهازك ولا يغادر عملية التطبيق الرئيسية — حتى واجهة
+          العرض لا تراه. لكل مزوّد مفتاحه، فالتبديل لا يفقد شيئًا.
+        </p>
+      </div>
+    </Section>
   )
 }

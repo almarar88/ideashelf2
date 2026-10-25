@@ -51,6 +51,10 @@ export interface AppSettings {
   userName: string
   persona: string
   hasApiKey: boolean
+  provider: string
+  providerModels: Record<string, string>
+  providerBaseUrl: Record<string, string>
+  hasProviderKey: Record<string, boolean>
 
   // ---- الرفيق اليومي
   place: Place | null

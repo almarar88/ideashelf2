@@ -70,6 +70,13 @@ const api = {
     deleteHabit: (id: string) => ipcRenderer.invoke('daily:deleteHabit', id),
     openExternal: (url: string) => ipcRenderer.invoke('daily:openExternal', url),
   },
+  providers: {
+    list: () => ipcRenderer.invoke('providers:list'),
+    setKey: (id: string, key: string) => ipcRenderer.invoke('providers:setKey', id, key),
+    setModel: (id: string, model: string) => ipcRenderer.invoke('providers:setModel', id, model),
+    setUrl: (id: string, url: string) => ipcRenderer.invoke('providers:setUrl', id, url),
+    test: (id: string) => ipcRenderer.invoke('providers:test', id),
+  },
   voice: {
     models: () => ipcRenderer.invoke('voice:models'),
     voices: () => ipcRenderer.invoke('voice:voices'),

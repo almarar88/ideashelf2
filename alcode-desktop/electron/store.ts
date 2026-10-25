@@ -131,6 +131,14 @@ export interface Habit {
 
 export interface Settings {
   apiKey: string
+  /** المزوّد الفعّال: anthropic | xai | google | openai | groq | openrouter | local | custom */
+  provider: string
+  /** مفتاح لكل مزوّد — التبديل بينها لا يفقد المفاتيح. */
+  providerKeys: Record<string, string>
+  /** نموذج لكل مزوّد: معرّفات النماذج لا تنتقل بين المزوّدين. */
+  providerModels: Record<string, string>
+  /** عنوان مخصّص للنموذج المحلّي أو خدمة أخرى. */
+  providerBaseUrl: Record<string, string>
   model: string
   effort: string
   dialect: string
@@ -180,6 +188,10 @@ export interface Settings {
 
 export const defaultSettings: Settings = {
   apiKey: '',
+  provider: 'anthropic',
+  providerKeys: {},
+  providerModels: {},
+  providerBaseUrl: {},
   model: 'claude-sonnet-5',
   effort: 'low',
   dialect: 'emirati',

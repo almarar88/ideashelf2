@@ -1,3 +1,14 @@
+export interface ProviderInfo {
+  id: string
+  label: string
+  kind: 'anthropic' | 'openai'
+  baseUrl: string
+  keyUrl: string
+  models: { id: string; label: string }[]
+  note: string
+  editableUrl?: boolean
+}
+
 export interface VoiceOption {
   id: string
   name: string
@@ -74,6 +85,13 @@ export interface AlcodeBridge {
     saveHabit(habit: unknown): Promise<boolean>
     deleteHabit(id: string): Promise<boolean>
     openExternal(url: string): Promise<boolean>
+  }
+  providers: {
+    list(): Promise<ProviderInfo[]>
+    setKey(id: string, key: string): Promise<boolean>
+    setModel(id: string, model: string): Promise<boolean>
+    setUrl(id: string, url: string): Promise<boolean>
+    test(id: string): Promise<{ ok: boolean; error: string }>
   }
   voice: {
     models(): Promise<{ id: string; arabic: string; hint: string }[]>

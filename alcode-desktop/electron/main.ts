@@ -4,7 +4,9 @@ import {
 } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { AgentEvent, ToolCall, complete, friendly, runAgent, webSearchTool } from './claude'
+import {
+  AgentEvent, RunOptions, ToolCall, complete, friendly, runAgent, webSearchTool,
+} from './claude'
 import { contextBlock, systemPrompt } from './prompt'
 import { defaultSettings, Habit, Settings, stores, Task } from './store'
 import { allTools, toolByName, toolGroups, toolsForApi } from './tools'
@@ -16,6 +18,9 @@ import { locateViaIp, locateViaWindows, placeFromCoordinates } from './daily/loc
 import { validateFeed, topicSource } from './daily/news'
 import { longGregorianAr, longHijriAr } from './daily/dates'
 import { currentState, ensureFirstRun, licensingEnabled, verifyKey } from './license'
+import {
+  friendlyProvider, PROVIDERS, providerById, runOpenAiAgent,
+} from './providers'
 import { checkForUpdate } from './update'
 import {
   clearVoiceCache, listVoices, speak, testKey as testVoiceKey, transcribe,
@@ -499,6 +504,15 @@ function registerIpc() {
       hasApiKey: Boolean(settings.apiKey),
       elevenKey: '',
       hasElevenKey: Boolean(settings.elevenKey),
+      providerKeys: {},
+      hasProviderKey: Object.fromEntries(
+        PROVIDERS.map((one) => [
+          one.id,
+          one.id === 'anthropic'
+            ? Boolean(settings.apiKey)
+            : Boolean(settings.providerKeys[one.id]),
+        ]),
+      ),
     }
   })
 
@@ -509,6 +523,7 @@ function registerIpc() {
     const safe = { ...patch }
     delete (safe as Record<string, unknown>).apiKey
     delete (safe as Record<string, unknown>).elevenKey
+    delete (safe as Record<string, unknown>).providerKeys
 
     const next = await stores.settings.update((current) => ({ ...current, ...safe }))
     if (safe.hotkey !== undefined) registerHotkey(next.hotkey)
@@ -521,6 +536,85 @@ function registerIpc() {
       hasApiKey: Boolean(next.apiKey),
       elevenKey: '',
       hasElevenKey: Boolean(next.elevenKey),
+      providerKeys: {},
+      hasProviderKey: Object.fromEntries(
+        PROVIDERS.map((one) => [
+          one.id,
+          one.id === 'anthropic'
+            ? Boolean(next.apiKey)
+            : Boolean(next.providerKeys[one.id]),
+        ]),
+      ),
+    }
+  })
+
+  ipcMain.handle('providers:list', async () => PROVIDERS)
+
+  /** مفتاح المزوّد غير الافتراضي — لا يغادر العملية الرئيسية كغيره. */
+  ipcMain.handle('providers:setKey', async (_event, id: string, key: string) => {
+    await stores.settings.update((current) => ({
+      ...current,
+      providerKeys: { ...current.providerKeys, [String(id)]: String(key ?? '').trim() },
+    }))
+    return true
+  })
+
+  ipcMain.handle('providers:setModel', async (_event, id: string, model: string) => {
+    await stores.settings.update((current) => ({
+      ...current,
+      providerModels: { ...current.providerModels, [String(id)]: String(model ?? '').trim() },
+    }))
+    return true
+  })
+
+  ipcMain.handle('providers:setUrl', async (_event, id: string, url: string) => {
+    await stores.settings.update((current) => ({
+      ...current,
+      providerBaseUrl: { ...current.providerBaseUrl, [String(id)]: String(url ?? '').trim() },
+    }))
+    return true
+  })
+
+  /** يتحقّق من المزوّد بنداء قصير حقيقي — أصدق من فحص شكل المفتاح. */
+  ipcMain.handle('providers:test', async (_event, id: string) => {
+    const settings = await stores.settings.load()
+    const provider = providerById(String(id))
+    const key = provider.id === 'anthropic'
+      ? settings.apiKey
+      : (settings.providerKeys[provider.id] ?? '')
+    const model = provider.id === 'anthropic'
+      ? settings.model
+      : (settings.providerModels[provider.id] || provider.models[0]?.id || '')
+    const url = settings.providerBaseUrl[provider.id] || provider.baseUrl
+
+    if (!key && provider.id !== 'local') return { ok: false, error: 'ما في مفتاح محفوظ.' }
+    if (!model) return { ok: false, error: 'ما في معرّف نموذج.' }
+
+    if (provider.kind === 'anthropic') {
+      try {
+        await complete(key, model, 'رد بكلمة واحدة.', 'قل: جاهز', 16)
+        return { ok: true, error: '' }
+      } catch (error) {
+        return { ok: false, error: friendly(error) }
+      }
+    }
+
+    try {
+      const response = await fetch(`${url.replace(/\/+$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: 'قل: جاهز' }],
+          max_tokens: 16,
+        }),
+      })
+      if (!response.ok) {
+        throw new Error(`${response.status}: ${(await response.text()).slice(0, 200)}`)
+      }
+      return { ok: true, error: '' }
+    } catch (error) {
+      return { ok: false, error: friendlyProvider(error, provider) }
     }
   })
 
@@ -941,8 +1035,24 @@ function registerIpc() {
       }
     }
 
-    if (!settings.apiKey) {
-      return { ok: false, error: 'أضِف مفتاح Anthropic من الإعدادات أولًا.' }
+    const provider = providerById(settings.provider)
+    const activeKey = provider.id === 'anthropic'
+      ? settings.apiKey
+      : (settings.providerKeys[provider.id] ?? '')
+    const activeModel = provider.id === 'anthropic'
+      ? settings.model
+      : (settings.providerModels[provider.id] || provider.models[0]?.id || '')
+    const activeUrl = settings.providerBaseUrl[provider.id] || provider.baseUrl
+
+    // النموذج المحلّي لا يطلب مفتاحًا؛ البقية تطلبه.
+    if (!activeKey && provider.id !== 'local') {
+      return { ok: false, error: `أضِف مفتاح ${provider.label} من الإعدادات أولًا.` }
+    }
+    if (!activeModel) {
+      return { ok: false, error: 'اكتب معرّف النموذج في الإعدادات أولًا.' }
+    }
+    if (!activeUrl) {
+      return { ok: false, error: 'اكتب عنوان الخدمة في الإعدادات أولًا.' }
     }
 
     const sender = event.sender
@@ -952,7 +1062,30 @@ function registerIpc() {
     }
 
     const context = await buildContext(settings)
-    const history = payload.history.map((message) => ({ ...message }))
+    let history = payload.history.map((message) => ({ ...message }))
+
+    /*
+     * سجلّ المحادثة بشكل المزوّد الذي أنشأه: Anthropic تضع نتائج الأدوات في
+     * كتل داخل رسالة مستخدم، والمتوافقون يضعونها في رسائل `tool` مستقلّة.
+     * إرسال أحدهما إلى الآخر يُرفض بخطأ غامض من الخادم. فإن تبدّل الشكل
+     * نبدأ من آخر سؤال للمستخدم بدل أن نُسقط الطلب.
+     */
+    const looksOpenAi = history.some(
+      (message) => message.role === 'tool' || Array.isArray((message as any).tool_calls),
+    )
+    const looksAnthropic = history.some((message) =>
+      Array.isArray(message.content) &&
+      (message.content as any[]).some(
+        (block) => block?.type === 'tool_use' || block?.type === 'tool_result',
+      ))
+    const wantsOpenAi = provider.kind === 'openai'
+    if ((wantsOpenAi && looksAnthropic) || (!wantsOpenAi && looksOpenAi)) {
+      const lastAsk = [...history].reverse().find(
+        (message) => message.role === 'user' && typeof message.content === 'string',
+      )
+      history = lastAsk ? [lastAsk] : []
+      log(`تبدّل المزوّد إلى ${provider.id} — بدأت المحادثة من جديد`)
+    }
 
     // حالة اللحظة تُرفق بآخر رسالة للمستخدم فقط، لتبقى البادئة قابلة للتخزين.
     for (let i = history.length - 1; i >= 0; i--) {
@@ -964,13 +1097,16 @@ function registerIpc() {
     }
 
     const tools = [...toolsForApi()]
-    if (settings.webSearch) tools.push(webSearchTool(settings.model))
+    // البحث أداة تعمل على خوادم Anthropic ولا مقابل لها عند غيرها.
+    if (settings.webSearch && provider.kind === 'anthropic') {
+      tools.push(webSearchTool(activeModel))
+    }
 
     currentAbort = new AbortController()
 
-    await runAgent({
-      apiKey: settings.apiKey,
-      model: settings.model,
+    const run: RunOptions = {
+      apiKey: activeKey,
+      model: activeModel,
       effort: settings.effort,
       system: systemPrompt(settings),
       history,
@@ -996,7 +1132,7 @@ function registerIpc() {
           return { ok: false, display: `فشل ${call.name}`, detail: `تعذّر التنفيذ: ${message}` }
         }
       },
-      emit: (agentEvent) => {
+      emit: (agentEvent: AgentEvent) => {
         if (agentEvent.type === 'usage') {
           void stores.usage.update((current) => ({
             input: current.input + agentEvent.input,
@@ -1007,7 +1143,14 @@ function registerIpc() {
         }
         emit(agentEvent)
       },
-    })
+    }
+
+    // المسلكان يتقاسمان نفس الخيارات والأحداث، فلا يختلف شعور المستخدم.
+    if (provider.kind === 'anthropic') {
+      await runAgent(run)
+    } else {
+      await runOpenAiAgent(run, provider, activeUrl)
+    }
 
     currentAbort = null
     return { ok: true, error: '', history }
