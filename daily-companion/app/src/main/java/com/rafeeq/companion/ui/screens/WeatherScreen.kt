@@ -1,5 +1,6 @@
 package com.rafeeq.companion.ui.screens
 
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -128,18 +129,18 @@ fun WeatherScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                             "${bundle.now.temperature.toInt()}°",
                             style = MaterialTheme.typography.displayLarge,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = LocalContentColor.current,
                         )
                         Text(
                             info.text,
                             style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
+                            color = LocalContentColor.current,
                         )
                         bundle.daily.firstOrNull()?.let {
                             Text(
                                 "العظمى ${it.max.toInt()}° · الصغرى ${it.min.toInt()}°",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.9f),
+                                color = LocalContentColor.current.copy(alpha = 0.75f),
                             )
                         }
                     }

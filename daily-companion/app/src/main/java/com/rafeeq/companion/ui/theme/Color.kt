@@ -64,9 +64,6 @@ val PastelDeck = listOf(
     PastelPeach, PastelMint, PastelButter, PastelLavender, PastelRose, PastelOlive,
 )
 
-val PastelInkDeck = listOf(
-    PastelPeachInk, PastelMintInk, PastelButterInk, PastelLavenderInk, PastelRoseInk, PastelOliveInk,
-)
 
 // --- ألوان الحالة والتمييز ---
 /*
@@ -75,6 +72,8 @@ val PastelInkDeck = listOf(
  */
 val Ink = Color(0xFF1A1A1C)
 val Accent = Color(0xFF0A6CFF)
+/** الأزرق مكتوبًا نصًّا: #0A6CFF يعطي ٣٫٩٧ على خلفيته الباهتة، وهو دون الحدّ. */
+val AccentDeep = Color(0xFF0A5CE0)
 val Amber = Color(0xFFC77C12)
 val AmberDeep = Color(0xFF8A5406)
 val Emerald = Color(0xFF20A56A)
@@ -87,6 +86,36 @@ val Cyan = Color(0xFF0E8E9E)
 val CyanDeep = Color(0xFF096470)
 val Sky = Color(0xFF0A6CFF)
 val Indigo = Color(0xFF6B4BE8)
+
+/*
+ * النسخ المفتوحة للوضع الداكن: نفس الأسرة، مرفوعة السطوع حتى تتجاوز ٤٫٥
+ * فوق الخلفية الباهتة وقد صارت غامقة. مطابقة لقيم نسخة ويندوز.
+ */
+val AccentLight = Color(0xFF6BA5FF)
+val EmeraldLight = Color(0xFF4FD9A0)
+val AmberLight = Color(0xFFF0B65C)
+val RoseLight = Color(0xFFFF8582)
+val VioletLight = Color(0xFFB9A3FF)
+val CyanLight = Color(0xFF5FD3E3)
+
+/*
+ * حبر البطاقات الملوّنة — نسختان، وكلّ قيمة مقيسة لا مختارة بالعين.
+ *
+ * النسخة الواحدة السابقة كانت ترسب في الوضعين معًا: الألوان المشبَعة
+ * (#20A56A، #C77C12، #0A6CFF) تعطي على خلفيتها الباهتة تباينًا بين ٢٫٨
+ * و٣٫٩، ودون ٤٫٥ التي يحتاجها النصّ العادي. وفي الوضع الداكن كانت تنزل
+ * إلى ٢٫٥ — نصٌّ غامق على خلفية غامقة.
+ *
+ * القيم أدناه كلّها فوق ٥ في وضعها، ويفرضها ContrastTest.
+ */
+val PastelInkDeck = listOf(
+    AccentDeep, EmeraldDeep, AmberDeep, VioletDeep, RoseDeep, AmberDeep,
+)
+
+/** نفس الترتيب، مفتوحًا للوضع الداكن حيث الخلفية الباهتة تصير غامقة. */
+val PastelInkDeckDark = listOf(
+    AccentLight, EmeraldLight, AmberLight, VioletLight, RoseLight, AmberLight,
+)
 
 /**
  * تدرّجات هادئة. اللوحة الجديدة تعتمد المسطّح أكثر من التدرّج،

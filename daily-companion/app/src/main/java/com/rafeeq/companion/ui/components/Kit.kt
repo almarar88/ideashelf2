@@ -1,5 +1,7 @@
 package com.rafeeq.companion.ui.components
 
+import com.rafeeq.companion.ui.theme.PastelInkDeckDark
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -545,7 +547,20 @@ fun ListRowCard(
 
 /** لون باستيل ثابت لكل عنصر بحسب موضعه — لتبقى الشاشة متوازنة لا عشوائية. */
 fun pastelAt(index: Int): Color = PastelDeck[index.mod(PastelDeck.size)]
-fun pastelInkAt(index: Int): Color = PastelInkDeck[index.mod(PastelInkDeck.size)]
+
+/**
+ * حبر البطاقة الملوّنة، تابعًا للوضع.
+ *
+ * الحبر العميق مقروء على الخلفية الباهتة في النهار (٥ وما فوق) وغير
+ * مقروء في الليل (٢٫٥)، لأن الخلفية نفسها تنقلب فوق سطح أسود. نسختان،
+ * ويُختار بينهما بسطوع السطح لا بعَلَمٍ مُمرَّر — فلا تنسى شاشةٌ تمريره.
+ */
+@Composable
+fun pastelInkAt(index: Int): Color {
+    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val deck = if (dark) PastelInkDeckDark else PastelInkDeck
+    return deck[index.mod(deck.size)]
+}
 
 /**
  * زخارف البطاقات.

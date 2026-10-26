@@ -928,7 +928,7 @@ export function NewsTab() {
                 {article.summary.slice(0, 180)}
               </div>
             )}
-            <div className="small" style={{ color: 'var(--amber)', fontWeight: 600 }}>
+            <div className="small" style={{ color: 'var(--amber-ink)', fontWeight: 600 }}>
               {article.sourceName} · {article.category}
             </div>
           </button>

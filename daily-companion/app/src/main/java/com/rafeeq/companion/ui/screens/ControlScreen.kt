@@ -1,5 +1,6 @@
 package com.rafeeq.companion.ui.screens
 
+import androidx.compose.material3.LocalContentColor
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -104,7 +105,7 @@ fun ControlScreen(viewModel: AppViewModel) {
                     "$enabledCount من $totalCount قدرات مفعّلة",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = LocalContentColor.current,
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
@@ -115,7 +116,7 @@ fun ControlScreen(viewModel: AppViewModel) {
                             "بدونها يبقى عون قادرًا على فتح التطبيقات وضبط المنبّهات والاتصال والرسائل."
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.92f),
+                    color = LocalContentColor.current.copy(alpha = 0.85f),
                 )
             }
         }

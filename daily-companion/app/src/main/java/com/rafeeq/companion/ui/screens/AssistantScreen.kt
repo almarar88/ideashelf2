@@ -1,5 +1,6 @@
 package com.rafeeq.companion.ui.screens
 
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -199,14 +200,14 @@ fun AssistantScreen(viewModel: AppViewModel, onOpenSettings: () -> Unit) {
                         "فعّل المساعد الذكي",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = LocalContentColor.current,
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
                         "المساعد يعمل عبر مفتاح Anthropic خاص بك. المفتاح يُحفظ على جهازك فقط، " +
                             "ولا يُرسل إلى أي جهة غير Anthropic مباشرة.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.92f),
+                        color = LocalContentColor.current.copy(alpha = 0.85f),
                     )
                     Spacer(Modifier.height(14.dp))
                     PrimaryButton("أضِف المفتاح الآن") { onOpenSettings() }

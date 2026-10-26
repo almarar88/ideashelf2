@@ -62,7 +62,19 @@
 
   --accent: #0A6CFF;
   --accent-soft: rgba(10, 108, 255, 0.1);
-  --accent-ink: #0A6CFF;
+  /*
+    ألوان النصّ أغمق من ألوان الملء عمدًا.
+
+    #0A6CFF يعطي ٣٫٩٧ فوق --accent-soft و٤٫٥٦ على الأبيض — الأول دون حدّ
+    AA للنصّ العادي. القيم هنا مقيسة لا مختارة، وتطابق نسخة الأندرويد،
+    ويفرضها tests/contrast.test.mjs.
+  */
+  --accent-ink: #0A5CE0;
+  --green-ink: #14704A;
+  --amber-ink: #8A5406;
+  --red-ink: #9E2522;
+  --violet-ink: #4A32A8;
+  --teal-ink: #096470;
 
   --green: #20A56A;
   --green-soft: rgba(32, 165, 106, 0.1);
@@ -119,7 +131,13 @@
   /* الألوان تُفتَح في الداكن: النسخة الفاتحة تبدو موحلة على أسود. */
   --accent: #3D8BFF;
   --accent-soft: rgba(61, 139, 255, 0.16);
+  /* في الليل تنقلب الحاجة: الخلفية الباهتة تصير غامقة فيُفتح الحبر. */
   --accent-ink: #6BA5FF;
+  --green-ink: #4FD9A0;
+  --amber-ink: #F0B65C;
+  --red-ink: #FF8582;
+  --violet-ink: #B9A3FF;
+  --teal-ink: #5FD3E3;
   --green: #30C98A;
   --green-soft: rgba(48, 201, 138, 0.16);
   --amber: #E8A33D;

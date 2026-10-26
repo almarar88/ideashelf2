@@ -1,5 +1,7 @@
 package com.rafeeq.companion.ui.screens
 
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material3.LocalContentColor
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -139,37 +141,47 @@ fun PrayerScreen(
                 val total = Duration.between(previous, time).seconds.coerceAtLeast(1)
                 val remaining = Duration.between(now, time)
 
+                // الألوان من البطاقة نفسها عبر LocalContentColor: كتابة
+                // Color.White هنا هي ما جعل البطاقة بيضاء على بيضاء.
                 GradientCard(colors = Gradients.Meadow, padding = PaddingValues(20.dp)) {
+                    val ink = LocalContentColor.current
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(
                                 "الصلاة القادمة",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = Color.White.copy(alpha = 0.9f),
+                                color = ink.copy(alpha = 0.75f),
                             )
                             Text(
                                 prayer.arabic,
-                                style = MaterialTheme.typography.displaySmall,
+                                style = MaterialTheme.typography.headlineLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White,
+                                color = ink,
+                                // اسم الصلاة لا ينكسر: كان «الظهر» يُقطع
+                                // إلى «الظه» و«ر» على سطرين — والعربية
+                                // لا تُقطع كلماتها.
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Visible,
                             )
                             Text(
                                 "${Dates.formatTime(time, settings.use24hClock)} · بعد ${Dates.humanDuration(remaining)}",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.92f),
+                                color = ink.copy(alpha = 0.85f),
                             )
                         }
                         ProgressRing(
                             progress = 1f - remaining.seconds.toFloat() / total.toFloat(),
-                            colors = listOf(Color.White, Color.White.copy(alpha = 0.5f)),
+                            colors = listOf(ink, ink.copy(alpha = 0.25f)),
                             strokeWidth = 7.dp,
-                            modifier = Modifier.size(104.dp),
+                            modifier = Modifier.size(92.dp),
                         ) {
                             Text(
                                 Dates.clockDuration(remaining),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White,
+                                color = ink,
+                                maxLines = 1,
                             )
                         }
                     }

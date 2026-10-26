@@ -1,5 +1,10 @@
 package com.rafeeq.companion.ui.components
 
+import com.rafeeq.companion.ui.theme.Ink
+import com.rafeeq.companion.ui.theme.Contrast
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -71,7 +76,17 @@ fun GlassCard(
     )
 }
 
-/** بطاقة بتدرّج لوني — تُستخدم للعناصر البارزة مثل بطاقة الترحيب. */
+/**
+ * بطاقة بخلفية متدرّجة، تقرّر لون نصّها بنفسها.
+ *
+ * كانت الشاشات تكتب `Color.White` يدويًا داخلها. ثم تغيّرت اللوحة إلى
+ * تدرّجات باهتة جدًا (شفافية ١٠٪ فوق سطح أبيض)، فصار النصّ أبيضَ على
+ * أبيض — ظهر ذلك في بطاقة «الصلاة القادمة»، التي لم يكن يُقرأ منها شيء.
+ *
+ * الآن تُحسب خلفية البطاقة فعليًا بدمج التدرّج فوق السطح، ويُختار اللون
+ * الأعلى تباينًا ويُمرَّر عبر `LocalContentColor`. فلا تستطيع شاشةٌ أن
+ * تُعيد الخطأ، ولا تحتاج أن تعرف لون خلفيتها.
+ */
 @Composable
 fun GradientCard(
     colors: List<Color>,
@@ -81,15 +96,32 @@ fun GradientCard(
     onClick: (() -> Unit)? = null,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(Brush.linearGradient(colors, start = Offset.Zero, end = Offset(900f, 900f)))
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(padding),
-        content = content,
-    )
+    val surface = MaterialTheme.colorScheme.surface
+    // أغمق محطّات التدرّج هي الحالة الأسوأ للنصّ الفاتح، والعكس — فنقيس
+    // على المحطّة الأقرب إلى منتصف السطوع بدمجها فوق السطح الحقيقي.
+    val effective = remember(colors, surface) {
+        val solid = colors.map { Contrast.over(it, surface) }
+        solid.minByOrNull { candidate ->
+            Contrast.ratio(Contrast.readableOn(candidate), candidate)
+        } ?: surface
+    }
+    val ink = remember(effective) {
+        Contrast.readableOn(effective, dark = Ink)
+    }
+
+    CompositionLocalProvider(LocalContentColor provides ink) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(
+                    Brush.linearGradient(colors, start = Offset.Zero, end = Offset(900f, 900f)),
+                )
+                .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+                .padding(padding),
+            content = content,
+        )
+    }
 }
 
 @Composable
