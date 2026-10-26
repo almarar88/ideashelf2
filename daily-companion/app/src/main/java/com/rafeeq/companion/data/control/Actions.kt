@@ -139,6 +139,21 @@ object ToolCatalog {
         schema = schema(Triple("query", "string", "عبارة البحث")),
     )
 
+    /**
+     * قراءة صفحة ويب.
+     *
+     * `search_web` تفتح المتصفّح للمستخدم ولا تُعيد للنموذج شيئًا، فكان من
+     * يشارك رابطًا ويطلب تلخيصه يُقال له إن المساعد لا يفتح الروابط. هذه
+     * تُعيد نصّ الصفحة فعلًا، وتعمل مع كل مزوّد لأنها تجري على الجهاز.
+     */
+    val READ_URL = ToolSpec(
+        name = "read_url",
+        description = "يفتح رابطًا ويعيد نصّ الصفحة قابلًا للقراءة (عنوانها ومتنها). " +
+            "استعمله حين يعطيك المستخدم رابطًا ويطلب تلخيصه أو السؤال عمّا فيه، " +
+            "أو لقراءة مقال من نتائج search_news كاملًا.",
+        schema = schema(Triple("url", "string", "الرابط الكامل، يبدأ بـ http أو https")),
+    )
+
     val navigate = ToolSpec(
         name = "navigate_to",
         description = "يفتح تطبيق الخرائط ويبدأ التوجيه الملاحي إلى وجهة. " +
@@ -732,7 +747,7 @@ object ToolCatalog {
         readNotifications, clearNotifications,
         readScreen, tapText, tapCoordinates, typeText, swipe, pressKey, waitTool,
         addTask, readTasks, completeTask, deleteTask,
-        addNote, readNotes, addHabit, logHabit, searchNews,
+        addNote, readNotes, addHabit, logHabit, searchNews, READ_URL,
         mediaControl, readClipboard, writeClipboard, shareText, screenshot,
         lookAtScreen, setDoNotDisturb, setAutoRotate, setScreenTimeout, nowPlaying,
         openPanel, appInfo, uninstallApp, readCallLog, createContact, openCamera,
@@ -748,6 +763,7 @@ object ToolCatalog {
         "add_note", "read_notes", "add_habit", "log_habit", "search_news",
         "remember_fact", "recall_facts", "forget_fact",
         "add_routine", "read_routines", "delete_routine",
+        "read_url",
     )
 
     fun byName(name: String): ToolSpec? = all.firstOrNull { it.name == name }

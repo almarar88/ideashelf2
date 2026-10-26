@@ -28,6 +28,7 @@ import com.rafeeq.companion.data.ToolRun
 import com.rafeeq.companion.data.ai.AgentRunner
 import com.rafeeq.companion.data.ai.Assistant
 import com.rafeeq.companion.data.ai.ImageInput
+import com.rafeeq.companion.data.ai.Retrieval
 import com.rafeeq.companion.data.ai.ServerTools
 import com.rafeeq.companion.data.ai.ClaudeClient
 import com.rafeeq.companion.data.ai.ControlPrompt
@@ -577,7 +578,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** يبني السياق الكامل الذي يعرفه المساعد عن يومك. */
-    private fun assistantContext(): Assistant.Context {
+    /**
+     * لقطة السياق المحقونة في تعليمات النظام.
+     *
+     * [query] هو سؤال المستخدم الحالي: به تُنتقى الذكريات والملاحظات
+     * بالصلة لا بترتيب الإضافة. يُترك فارغًا للطلبات التي لا سؤال فيها
+     * (الموجز الصباحي مثلًا)، فيُؤخذ الأحدث.
+     */
+    private fun assistantContext(query: String = ""): Assistant.Context {
         val s = settings.value
         val now = LocalDateTime.now(zoneId())
         return Assistant.Context(
@@ -593,7 +601,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             headlines = _news.value.articles.take(10),
             persona = s.aiPersona,
             use24h = s.use24hClock,
-            memories = memories.value.takeLast(12).map { it.text },
+            memories = Retrieval.rank(
+                query = query,
+                items = memories.value,
+                limit = 12,
+                textOf = { it.text },
+                recencyOf = { it.createdAt },
+            ).map { it.text },
+            // الملاحظات أطول من الذكريات، فأقلّ عددًا وأقصر اقتطاعًا.
+            notes = Retrieval.rank(
+                query = query,
+                items = notes.value,
+                limit = 4,
+                textOf = { it.title + " " + it.body },
+                recencyOf = { it.updatedAt },
+            ).map { note ->
+                val head = note.title.ifBlank { "ملاحظة" }
+                "$head: ${note.body.take(280)}"
+            },
         )
     }
 
@@ -638,7 +663,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 dialect = s.dialect,
                 webSearch = s.webSearch,
             )
-            val history = buildApiHistory(conversation.id, Assistant.contextBlock(assistantContext()))
+            val history = buildApiHistory(conversation.id, Assistant.contextBlock(assistantContext(text)))
 
             val builder = StringBuilder()
             val runs = mutableListOf<ToolRun>()

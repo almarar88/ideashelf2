@@ -126,8 +126,11 @@ export function systemPrompt(settings: Settings): string {
  */
 export function contextBlock(input: {
   userName: string
+  /** مُرتّبة بالصلة بسؤال المستخدم، لا بترتيب إضافتها. */
   memories: string[]
   reminders: string[]
+  /** مقتطفات ملاحظاته ذات الصلة — كانت غائبة عن السياق تمامًا. */
+  notes?: string[]
 }): string {
   const now = new Date()
   const lines = [
@@ -137,7 +140,10 @@ export function contextBlock(input: {
   ]
   if (input.userName.trim()) lines.push(`المستخدم: ${input.userName.trim()}`)
   if (input.reminders.length) lines.push(`تذكيرات قادمة: ${input.reminders.join(' · ')}`)
-  if (input.memories.length) lines.push(`تعرف عنه: ${input.memories.slice(0, 12).join(' · ')}`)
+  if (input.memories.length) lines.push(`تعرف عنه: ${input.memories.join(' · ')}`)
+  if (input.notes?.length) {
+    lines.push(`من ملاحظاته (ذات صلة بسؤاله): ${input.notes.join(' | ')}`)
+  }
   lines.push('</حالة_الآن>')
   return lines.join('\n')
 }

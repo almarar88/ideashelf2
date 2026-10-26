@@ -32,8 +32,19 @@ object Assistant {
         val headlines: List<Article>,
         val persona: String,
         val use24h: Boolean,
-        /** ما يتذكّره عنك — يُحقن في كل محادثة ليبني عليه بدل أن يبدأ من الصفر. */
+        /**
+         * ما يتذكّره عنك. مُرتّبة بالصلة بسؤالك لا بترتيب إضافتها: من حفظ
+         * خمسين معلومة كان يرى المساعد اثنتي عشرة منها فقط، أقدمَها أو
+         * أحدثَها بحسب الحظّ، لا أقربَها إلى ما يسأل عنه.
+         */
         val memories: List<String> = emptyList(),
+        /**
+         * مقتطفات من ملاحظاتك ذات الصلة.
+         *
+         * كانت الملاحظات غائبة عن السياق تمامًا: يكتب المستخدم ملاحظةً ثم
+         * يسأل عنها فلا يعرف المساعد بوجودها، ويبدو كأنه نسي ما كُتب أمامه.
+         */
+        val notes: List<String> = emptyList(),
     )
 
     private const val BASE_PERSONA = """أنت "عون" — مساعد شخصي يومي ذكي، تتحدث العربية الفصحى المبسّطة بطبيعية.
@@ -144,9 +155,12 @@ object Assistant {
             appendLine("عناوين: " + context.headlines.take(5).joinToString(" | ") { it.title })
         }
 
-        // الذاكرة تأتي أخيرًا وبحدّ أعلى: أهمّ ما فيها أن تُقرأ، لا أن تطول.
+        // الذاكرة والملاحظات أخيرًا وبحدّ أعلى: أهمّ ما فيها أن تُقرأ، لا أن تطول.
         if (context.memories.isNotEmpty()) {
-            appendLine("تعرف عنه: " + context.memories.take(12).joinToString(" · "))
+            appendLine("تعرف عنه: " + context.memories.joinToString(" · "))
+        }
+        if (context.notes.isNotEmpty()) {
+            appendLine("من ملاحظاته (ذات صلة بسؤاله): " + context.notes.joinToString(" | "))
         }
         append("</حالة_اليوم>")
     }

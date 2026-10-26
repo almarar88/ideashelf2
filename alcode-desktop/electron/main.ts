@@ -8,6 +8,7 @@ import {
   AgentEvent, RunOptions, ToolCall, complete, friendly, runAgent, webSearchTool,
 } from './claude'
 import { contextBlock, systemPrompt } from './prompt'
+import { rank } from './retrieval'
 import { defaultSettings, Habit, Settings, stores, Task } from './store'
 import { allTools, toolByName, toolGroups, toolsForApi } from './tools'
 import { isWindows } from './ps'
@@ -475,8 +476,44 @@ function askConfirm(call: ToolCall, fromQuick: boolean): Promise<boolean> {
   })
 }
 
-async function buildContext(settings: Settings): Promise<string> {
-  const memories = (await stores.memories.load()).slice(-12).map((m) => m.text)
+/**
+ * نصّ آخر سؤال للمستخدم، لاختيار الذكريات والملاحظات بالصلة به.
+ *
+ * الشكل يختلف بحسب المزوّد: Anthropic تضع المحتوى مصفوفةَ كتل، والمتوافقون
+ * مع OpenAI يضعونه نصًّا. وقد يكون آخره نتيجةَ أداة لا سؤالًا، فنرجع إلى
+ * آخر رسالة مستخدم فيها نصّ فعلي.
+ */
+function lastUserText(history: Record<string, unknown>[]): string {
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const message = history[i]
+    if (message.role !== 'user') continue
+    const content = message.content
+    if (typeof content === 'string' && content.trim()) return content
+    if (Array.isArray(content)) {
+      const text = content
+        .filter((block): block is { type: string; text: string } =>
+          typeof block === 'object' && block !== null &&
+          (block as { type?: string }).type === 'text')
+        .map((block) => block.text)
+        .join(' ')
+        .trim()
+      if (text) return text
+    }
+  }
+  return ''
+}
+
+async function buildContext(settings: Settings, question = ''): Promise<string> {
+  // بالصلة لا بالترتيب: آخر اثنتي عشرة ذكرى مهما كان السؤال تعني أن من
+  // يحفظ الكثير يرى المساعد أقلّ ممّا يعنيه. والملاحظات لم تكن تُرسل أصلًا.
+  const memories = rank(
+    question, await stores.memories.load(), 12,
+    (m) => m.text, (m) => m.createdAt ?? 0,
+  ).map((m) => m.text)
+  const notes = rank(
+    question, await stores.notes.load(), 4,
+    (n) => `${n.title ?? ""} ${n.body ?? ""}`, (n) => n.createdAt ?? 0,
+  ).map((n) => `${(n.title || 'ملاحظة')}: ${String(n.body ?? '').slice(0, 280)}`)
   const reminders = (await stores.reminders.load())
     .filter((r) => !r.done)
     .slice(0, 5)
@@ -486,7 +523,7 @@ async function buildContext(settings: Settings): Promise<string> {
   // بدونها يسأل المساعد عن أشياء يعرفها التطبيق أصلًا.
   const daily = await contextSummary().catch(() => '')
 
-  return contextBlock({ userName: settings.userName, memories, reminders }) +
+  return contextBlock({ userName: settings.userName, memories, reminders, notes }) +
     (daily ? `\n<يومك>\n${daily}\n</يومك>` : '')
 }
 
@@ -1078,7 +1115,7 @@ function registerIpc() {
       if (!sender.isDestroyed()) sender.send('agent:event', agentEvent)
     }
 
-    const context = await buildContext(settings)
+    const context = await buildContext(settings, lastUserText(payload.history))
     let history = payload.history.map((message) => ({ ...message }))
 
     /*

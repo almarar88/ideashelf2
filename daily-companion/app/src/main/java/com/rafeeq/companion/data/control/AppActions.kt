@@ -1,5 +1,8 @@
 package com.rafeeq.companion.data.control
 
+import com.rafeeq.companion.core.friendlyMessage
+import com.rafeeq.companion.core.Readable
+import com.rafeeq.companion.core.Net
 import com.rafeeq.companion.data.Habit
 import com.rafeeq.companion.data.JsonListStore
 import com.rafeeq.companion.data.Memory
@@ -44,6 +47,7 @@ class AppActions(
             "add_habit" -> addHabit(input.str("title"), input.intOrNull("times_per_day") ?: 1)
             "log_habit" -> logHabit(input.str("title"))
             "search_news" -> searchNews(input.str("query"))
+            "read_url" -> readUrl(input.str("url"))
             "remember_fact" -> rememberFact(input.str("text"), input.strOrNull("category"))
             "recall_facts" -> recallFacts(input.strOrNull("query"))
             "forget_fact" -> forgetFact(input.str("query"))
@@ -193,6 +197,40 @@ class AppActions(
     }
 
     // ------------------------------------------------------------ الأخبار
+
+    /**
+     * يقرأ صفحة ويب ويعيد نصّها للنموذج.
+     *
+     * يرفض ما ليس http/https: الأداة بيد نموذج قد يُمرَّر إليه رابط من نصّ
+     * لا يثق به المستخدم، و`file://` أو `content://` هنا تعني قراءة ملفّ
+     * من الجهاز وإرساله إلى المزوّد.
+     */
+    private suspend fun readUrl(url: String): ActionResult {
+        val trimmed = url.trim()
+        val parsed = runCatching { java.net.URI(trimmed) }.getOrNull()
+        val scheme = parsed?.scheme?.lowercase()
+        if (scheme != "http" && scheme != "https") {
+            return ActionResult.fail("أقرأ روابط الويب فقط (http أو https).")
+        }
+
+        return runCatching {
+            val html = Net.text(trimmed, mapOf("Accept" to "text/html,*/*"))
+            val page = Readable.extract(html)
+            if (page.text.isBlank()) {
+                ActionResult.fail("الصفحة بلا نصّ يُقرأ — قد تكون صورة أو تحتاج تسجيل دخول.")
+            } else {
+                ActionResult.ok(
+                    display = page.title.ifBlank { "قرأت الصفحة" },
+                    detail = buildString {
+                        if (page.title.isNotBlank()) appendLine("العنوان: ${page.title}")
+                        appendLine("الرابط: $trimmed")
+                        appendLine()
+                        append(page.text)
+                    },
+                )
+            }
+        }.getOrElse { ActionResult.fail("تعذّر فتح الرابط: ${it.friendlyMessage()}") }
+    }
 
     private fun searchNews(query: String): ActionResult {
         val wanted = normalize(query)

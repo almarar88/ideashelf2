@@ -1,3 +1,4 @@
+import { extractReadable } from '../readable'
 import { shell } from 'electron'
 import { runPs, runPsJson } from '../ps'
 import { ToolSpec, fail, ok, props } from './types'
@@ -238,6 +239,52 @@ $procs.Count`
       if (!/^https?:\/\//i.test(url)) return fail('أفتح روابط الويب فقط.')
       await shell.openExternal(url)
       return ok(`🌐 فتحت ${url}`)
+    },
+  },
+
+  {
+    /*
+     * قراءة صفحة ويب.
+     *
+     * `open_url` تفتح المتصفّح للمستخدم و`web_search` تجري على خوادم
+     * Anthropic وحدها، فمن يشغّل Grok أو Gemini أو GPT كان مساعده أعمى عن
+     * الإنترنت تمامًا. هذه تجري على الجهاز، فتعمل مع كل مزوّد.
+     */
+    name: 'read_url',
+    group: 'التطبيقات',
+    danger: 'safe',
+    description:
+      'يفتح رابطًا ويعيد نصّ الصفحة قابلًا للقراءة (عنوانها ومتنها). ' +
+      'استعمله حين يعطيك المستخدم رابطًا ويطلب تلخيصه أو السؤال عمّا فيه، ' +
+      'أو لقراءة خبر كاملًا. للعرض على المستخدم استعمل open_url.',
+    input: props({ url: { type: 'string', description: 'الرابط الكامل' } }),
+    required: ['url'],
+    run: async (input) => {
+      const raw = String(input.url).trim()
+      const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+      // النموذج قد يُمرَّر إليه رابط من نصّ لا يثق به المستخدم؛ file: هنا
+      // تعني قراءة ملفّ من الجهاز وإرساله إلى المزوّد.
+      if (!/^https?:\/\//i.test(url)) return fail('أقرأ روابط الويب فقط.')
+      try {
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 20_000)
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: { Accept: 'text/html,*/*', 'User-Agent': 'Awn/1.0 (+desktop reader)' },
+        }).finally(() => clearTimeout(timer))
+        if (!response.ok) return fail(`الصفحة ردّت ${response.status}.`)
+        const page = extractReadable(await response.text())
+        if (!page.text) {
+          return fail('الصفحة بلا نصّ يُقرأ — قد تكون صورة أو تحتاج تسجيل دخول.')
+        }
+        return ok(
+          page.title || 'قرأت الصفحة',
+          `${page.title ? `العنوان: ${page.title}\n` : ''}الرابط: ${url}\n\n${page.text}`,
+        )
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return fail(`تعذّر فتح الرابط: ${/abort/i.test(message) ? 'انتهت المهلة' : message}`)
+      }
     },
   },
 ]
