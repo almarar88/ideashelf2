@@ -1,6 +1,7 @@
 package com.rafeeq.companion
 
 import android.app.Application
+import com.rafeeq.companion.data.AppSettings
 import com.rafeeq.companion.data.Conversation
 import com.rafeeq.companion.data.DailyBrief
 import com.rafeeq.companion.data.Habit
@@ -18,6 +19,7 @@ import com.rafeeq.companion.data.WeatherBundle
 import com.rafeeq.companion.data.ai.AgentRunner
 import com.rafeeq.companion.data.ai.OpenAiRunner
 import com.rafeeq.companion.data.ai.ClaudeClient
+import com.rafeeq.companion.data.ai.Completion
 import com.rafeeq.companion.data.AzkarProgress
 import com.rafeeq.companion.data.BackupManager
 import com.rafeeq.companion.data.DefaultShortcuts
@@ -53,6 +55,16 @@ class Repos(app: Application) {
     }
 
     val claude = ClaudeClient(apiKey)
+
+    /**
+     * الطلبات المفردة (الموجز، الخطّة، أدوات النصّ) تتبع المزوّد الفعّال.
+     * قبلها كانت تنادي Anthropic دائمًا، فتموت لمن بدّل مزوّده.
+     */
+    val completion = Completion(
+        settingsOf = { runCatching { runBlocking { settings.settings.first() } }
+            .getOrDefault(AppSettings()) },
+        claude = claude,
+    )
     val agent = AgentRunner(apiKey)
     val openAi = OpenAiRunner(activeKey, activeUrl)
     val phone = PhoneController(app)

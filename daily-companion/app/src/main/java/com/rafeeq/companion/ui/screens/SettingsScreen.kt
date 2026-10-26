@@ -96,6 +96,7 @@ fun SettingsScreen(
     onOpenVoice: () -> Unit = {},
     onOpenProvider: () -> Unit = {},
     onOpenMemory: () -> Unit = {},
+    onOpenSmart: () -> Unit = {},
     onOpenSaved: () -> Unit = {},
 ) {
     val settings by viewModel.settings.collectAsState()
@@ -381,6 +382,13 @@ fun SettingsScreen(
                     icon = Icons.Filled.Bolt,
                     tint = Violet,
                 ) { onOpenShortcuts() }
+
+                SettingRow(
+                    title = "أدوات ذكية",
+                    subtitle = "لخّص، ترجم، صحّح، أعد الصياغة — على أي نصّ",
+                    icon = Icons.Filled.AutoAwesome,
+                    tint = Violet,
+                ) { onOpenSmart() }
 
                 SettingRow(
                     title = "ذاكرة المساعد والروتينات",

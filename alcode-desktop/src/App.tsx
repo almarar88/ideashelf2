@@ -13,7 +13,7 @@ import {
 
 type Tab =
   | 'home' | 'chat' | 'day' | 'prayer' | 'weather' | 'news'
-  | 'skills' | 'memory' | 'settings'
+  | 'skills' | 'memory' | 'smart' | 'settings'
 
 /**
  * التبويبات مجمَّعة لا مسرودة.
@@ -28,6 +28,7 @@ const TAB_GROUPS: { label: string; items: { id: Tab; label: string; icon: IconNa
       { id: 'home', label: 'الرئيسية', icon: 'home' },
       { id: 'chat', label: 'المساعد', icon: 'sparkle' },
       { id: 'day', label: 'مهامي', icon: 'list' },
+      { id: 'smart', label: 'أدوات ذكية', icon: 'bolt' },
     ],
   },
   {
@@ -484,6 +485,7 @@ export default function App() {
         {tab === 'news' && <NewsTab />}
         {tab === 'skills' && <SkillsTab />}
         {tab === 'memory' && <MemoryTab />}
+        {tab === 'smart' && <SmartToolsTab />}
         {tab === 'settings' && settings && (
           <SettingsTab
             settings={settings}
@@ -577,6 +579,108 @@ function SkillsTab() {
 }
 
 // ------------------------------------------------------------- الذاكرة
+
+/**
+ * أدوات النصّ الذكية.
+ *
+ * ألصق نصًّا واضغط زرًّا. كانت هذه القدرات تتطلّب فتح المحادثة وكتابة
+ * التعليمات يدويًا في كل مرّة، فتختلف النتيجة باختلاف ما يُكتب. التعليمات
+ * الآن مكتوبة مرّةً بعناية، ومطابقة لما في تطبيق الهاتف حرفًا بحرف.
+ */
+function SmartToolsTab() {
+  const [tools, setTools] = useState<{ id: string; label: string; emoji: string; hint: string }[]>([])
+  const [input, setInput] = useState('')
+  const [output, setOutput] = useState('')
+  const [error, setError] = useState('')
+  const [clipped, setClipped] = useState(false)
+  const [busy, setBusy] = useState('')
+
+  useEffect(() => { void window.alcode.smart.list().then(setTools) }, [])
+
+  const run = async (id: string) => {
+    if (!input.trim() || busy) return
+    setBusy(id); setOutput(''); setError(''); setClipped(false)
+    const result = await window.alcode.smart.run(id, input)
+    setBusy('')
+    if (result.ok) { setOutput(result.text); setClipped(Boolean(result.clipped)) }
+    else setError(result.error)
+  }
+
+  return (
+    <div className="page">
+      <h1 className="h1">أدوات ذكية</h1>
+      <p className="footnote" style={{ marginTop: 4 }}>
+        ألصق أي نصّ — رسالة، مقالًا، بريدًا — واختر ما تريد فعله به.
+      </p>
+
+      <Field label="النصّ">
+        <textarea
+          className="field"
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          rows={7}
+          placeholder="الصق النصّ هنا…"
+          style={{ resize: 'vertical', lineHeight: 1.7 }}
+        />
+        {input.trim() !== '' && (
+          <div className="row" style={{ gap: 10, marginTop: 6, alignItems: 'center' }}>
+            <button className="chip" onClick={() => { setInput(''); setOutput(''); setError('') }}>
+              امسح
+            </button>
+            <span className="footnote">{input.length} حرفًا</span>
+          </div>
+        )}
+      </Field>
+
+      <Field label="ماذا أفعل به؟">
+        <div className="row wrap" style={{ gap: 8 }}>
+          {tools.map((tool) => (
+            <button
+              key={tool.id}
+              className="pill"
+              disabled={!input.trim() || busy !== ''}
+              title={tool.hint}
+              onClick={() => void run(tool.id)}
+            >
+              {/*
+                بلا الإيموجي: نظام التصميم أسقطها من الواجهة لأنها تأتي
+                بألوانها وأسلوبها فتُقاتل أي لوحة. تبقى في البيانات لنسخة
+                الهاتف، ولا تُرسم هنا.
+              */}
+              {busy === tool.id ? `${tool.label}…` : tool.label}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      {(output || error) && (
+        <Field label="النتيجة">
+          {error
+            ? <p style={{ color: 'var(--danger, #D7263D)', margin: 0 }}>⚠️ {error}</p>
+            : (
+              <>
+                {clipped && (
+                  <p className="footnote" style={{ marginTop: 0 }}>
+                    النصّ كان أطول من الحدّ، فعُولج أوّله فقط.
+                  </p>
+                )}
+                <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.9, margin: 0 }}>{output}</p>
+                <div className="row" style={{ gap: 8, marginTop: 10 }}>
+                  <button className="chip" onClick={() => void navigator.clipboard.writeText(output)}>
+                    نسخ
+                  </button>
+                  {/* التسلسل: لخّص ثمّ ترجم الملخّص، بلا نسخ ولصق. */}
+                  <button className="chip" onClick={() => { setInput(output); setOutput('') }}>
+                    اجعله المدخل
+                  </button>
+                </div>
+              </>
+            )}
+        </Field>
+      )}
+    </div>
+  )
+}
 
 function MemoryTab() {
   const [memories, setMemories] = useState<any[]>([])

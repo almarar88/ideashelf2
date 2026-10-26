@@ -29,6 +29,7 @@ import com.rafeeq.companion.data.ai.AgentRunner
 import com.rafeeq.companion.data.ai.Assistant
 import com.rafeeq.companion.data.ai.ImageInput
 import com.rafeeq.companion.data.ai.Retrieval
+import com.rafeeq.companion.data.ai.SmartTools
 import com.rafeeq.companion.data.ai.ServerTools
 import com.rafeeq.companion.data.ai.ClaudeClient
 import com.rafeeq.companion.data.ai.ControlPrompt
@@ -1077,10 +1078,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _ai.value = _ai.value.copy(briefLoading = true)
             runCatching {
-                repos.claude.complete(
-                    model = s.effectiveModel,
+                repos.completion.text(
                     system = Assistant.systemPrompt(assistantContext()),
-                    messages = listOf(ClaudeClient.Msg("user", Assistant.dailyBriefPrompt())),
+                    user = Assistant.dailyBriefPrompt(),
                     maxTokens = 1200,
                     effort = "low",
                 )
@@ -1097,15 +1097,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun summarizeArticle(article: Article, onResult: (Result<String>) -> Unit) {
         val s = settings.value
         if (!s.hasApiKey) {
-            onResult(Result.failure(IllegalStateException("أضِف مفتاح Anthropic من الإعدادات أولًا.")))
+            onResult(Result.failure(IllegalStateException("أضِف مفتاح ${s.activeProvider.label} من الإعدادات أولًا.")))
             return
         }
         viewModelScope.launch {
             val result = runCatching {
-                repos.claude.complete(
-                    model = s.effectiveModel,
+                repos.completion.text(
                     system = Assistant.systemPrompt(assistantContext()),
-                    messages = listOf(ClaudeClient.Msg("user", Assistant.summarizeArticlePrompt(article))),
+                    user = Assistant.summarizeArticlePrompt(article),
                     maxTokens = 900,
                     effort = "low",
                 )
@@ -1125,20 +1124,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun extractTasks(text: String, onResult: (Result<Int>) -> Unit) {
         val s = settings.value
         if (!s.hasApiKey) {
-            onResult(Result.failure(IllegalStateException("أضِف مفتاح Anthropic من الإعدادات أولًا.")))
+            onResult(Result.failure(IllegalStateException("أضِف مفتاح ${s.activeProvider.label} من الإعدادات أولًا.")))
             return
         }
         viewModelScope.launch {
             val result = runCatching {
-                val output = repos.claude.complete(
-                    model = s.effectiveModel,
+                val output = repos.completion.text(
                     system = "أنت محلّل نصوص دقيق. اتبع صيغة الإخراج المطلوبة حرفيًا دون أي إضافات.",
-                    messages = listOf(
-                        ClaudeClient.Msg(
-                            "user",
-                            Assistant.extractTasksPrompt(text, LocalDate.now(zoneId())),
-                        ),
-                    ),
+                    user = Assistant.extractTasksPrompt(text, LocalDate.now(zoneId())),
                     maxTokens = 700,
                     effort = "low",
                 )
@@ -1343,6 +1336,70 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setTasbih(count: Int, rounds: Int) {
         val base = AzkarProgress.forToday(_azkar.value, today())
         saveAzkar(base.copy(tasbih = count, rounds = rounds))
+    }
+
+    // ------------------------------------------------ أدوات النصّ الذكية
+
+    data class SmartToolState(
+        val running: Boolean = false,
+        val toolId: String = "",
+        val output: String = "",
+        val error: String = "",
+        val clipped: Boolean = false,
+    )
+
+    private val _smartTool = MutableStateFlow(SmartToolState())
+    val smartTool: StateFlow<SmartToolState> = _smartTool.asStateFlow()
+
+    /** يشغّل أداة نصّ على ما كتبه المستخدم. يتبع المزوّد الفعّال. */
+    fun runSmartTool(toolId: String, input: String) {
+        val tool = SmartTools.byId(toolId) ?: return
+        if (input.isBlank() || _smartTool.value.running) return
+        if (!settings.value.hasApiKey) {
+            _smartTool.value = SmartToolState(
+                error = "أضِف مفتاح ${settings.value.activeProvider.label} من الإعدادات أولًا.",
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _smartTool.value = SmartToolState(
+                running = true, toolId = toolId, clipped = SmartTools.wasClipped(input),
+            )
+            runCatching {
+                repos.completion.text(
+                    system = SmartTools.SYSTEM,
+                    user = SmartTools.prompt(tool, input),
+                    maxTokens = 1400,
+                    effort = "low",
+                )
+            }.fold(
+                onSuccess = { text ->
+                    _smartTool.value = _smartTool.value.copy(
+                        running = false,
+                        output = text.trim(),
+                        error = if (text.isBlank()) "ردّ فارغ من المزوّد." else "",
+                    )
+                },
+                onFailure = { error ->
+                    _smartTool.value = _smartTool.value.copy(
+                        running = false,
+                        error = OpenAiRunner.friendly(error, settings.value.activeProvider),
+                    )
+                },
+            )
+        }
+    }
+
+    fun clearSmartTool() { _smartTool.value = SmartToolState() }
+
+    /** يحفظ ناتج الأداة ملاحظةً، فلا يضيع بإغلاق الشاشة. */
+    fun saveSmartOutputAsNote(title: String, body: String) {
+        if (body.isBlank()) return
+        viewModelScope.launch {
+            repos.notes.update { it + Note(title = title.take(60), body = body) }
+            _snackbar.value = "حُفظت ملاحظة"
+        }
     }
 
     fun setAiModel(value: String) = viewModelScope.launch { repos.settings.setAiModel(value) }

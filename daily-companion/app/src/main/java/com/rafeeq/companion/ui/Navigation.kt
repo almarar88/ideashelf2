@@ -65,6 +65,7 @@ import com.rafeeq.companion.ui.components.keyboardVisible
 import com.rafeeq.companion.ui.screens.AssistantScreen
 import com.rafeeq.companion.ui.screens.AzkarScreen
 import com.rafeeq.companion.ui.screens.SavedScreen
+import com.rafeeq.companion.ui.screens.SmartToolsScreen
 import com.rafeeq.companion.ui.screens.SearchScreen
 import com.rafeeq.companion.ui.screens.ShortcutsScreen
 import com.rafeeq.companion.ui.screens.ProviderScreen
@@ -103,6 +104,7 @@ object Routes {
     const val VOICE = "voice"
     const val PROVIDER = "provider"
     const val MEMORY = "memory"
+    const val SMART = "smart"
 }
 
 private data class Tab(
@@ -193,7 +195,8 @@ fun RafeeqNavigation(
         currentRoute == Routes.SHORTCUTS ||
         currentRoute == Routes.VOICE ||
         currentRoute == Routes.PROVIDER ||
-        currentRoute == Routes.MEMORY
+        currentRoute == Routes.MEMORY ||
+        currentRoute == Routes.SMART
 
     Scaffold(
         // الرسالة كانت تظهر خلف الشريط العائم وأزرار النظام، فنرفعها فوقهما.
@@ -294,6 +297,7 @@ fun RafeeqNavigation(
                         onOpenVoice = { navController.navigate(Routes.VOICE) },
                         onOpenProvider = { navController.navigate(Routes.PROVIDER) },
                         onOpenMemory = { navController.navigate(Routes.MEMORY) },
+                        onOpenSmart = { navController.navigate(Routes.SMART) },
                         onOpenSaved = { navController.navigate(Routes.SAVED) },
                     )
                 }
@@ -324,6 +328,7 @@ fun RafeeqNavigation(
                 composable(Routes.PROVIDER) { ProviderScreen(viewModel) }
 
                 composable(Routes.MEMORY) { MemoryScreen(viewModel) }
+                composable(Routes.SMART) { SmartToolsScreen(viewModel) }
             }
         }
 

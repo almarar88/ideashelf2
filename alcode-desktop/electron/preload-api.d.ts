@@ -94,6 +94,12 @@ export interface AlcodeBridge {
     test(id: string): Promise<{ ok: boolean; error: string }>
     models(id: string): Promise<{ ok: boolean; models: string[]; error: string }>
   }
+  smart: {
+    list(): Promise<{ id: string; label: string; emoji: string; hint: string }[]>
+    run(toolId: string, input: string): Promise<{
+      ok: boolean; text: string; clipped?: boolean; error: string
+    }>
+  }
   voice: {
     models(): Promise<{ id: string; arabic: string; hint: string }[]>
     voices(): Promise<{ ok: boolean; voices: VoiceOption[]; error: string }>

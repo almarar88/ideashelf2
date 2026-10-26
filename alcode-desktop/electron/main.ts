@@ -9,6 +9,7 @@ import {
 } from './claude'
 import { contextBlock, systemPrompt } from './prompt'
 import { rank } from './retrieval'
+import { SMART_SYSTEM, SMART_TOOLS, smartPrompt, toolById, wasClipped } from './smartTools'
 import { defaultSettings, Habit, Settings, stores, Task } from './store'
 import { allTools, toolByName, toolGroups, toolsForApi } from './tools'
 import { isWindows } from './ps'
@@ -613,6 +614,63 @@ function registerIpc() {
   })
 
   /** يتحقّق من المزوّد بنداء قصير حقيقي — أصدق من فحص شكل المفتاح. */
+  /**
+   * أدوات النصّ الذكية: طلب واحد بلا أدوات، يتبع المزوّد الفعّال.
+   *
+   * لا يمرّ عبر حلقة الأدوات عمدًا: الأداة تعالج نصًّا في يد المستخدم ولا
+   * شأن لها بالجهاز، وإعطاؤها صلاحية التنفيذ خطرٌ بلا فائدة.
+   */
+  ipcMain.handle('smart:list', async () =>
+    SMART_TOOLS.map(({ id, label, emoji, hint }) => ({ id, label, emoji, hint })))
+
+  ipcMain.handle('smart:run', async (_event, toolId: string, input: string) => {
+    const tool = toolById(String(toolId))
+    if (!tool) return { ok: false, text: '', error: 'أداة غير معروفة.' }
+    if (!String(input).trim()) return { ok: false, text: '', error: 'ما في نصّ.' }
+
+    const settings = await stores.settings.load()
+    const provider = providerById(settings.provider)
+    const key = provider.id === 'anthropic'
+      ? settings.apiKey
+      : (settings.providerKeys[provider.id] ?? '')
+    const model = provider.id === 'anthropic'
+      ? settings.model
+      : (settings.providerModels[provider.id] || provider.models[0]?.id || '')
+
+    if (!key && provider.id !== 'local') {
+      return { ok: false, text: '', error: `أضِف مفتاح ${provider.label} من الإعدادات.` }
+    }
+
+    const prompt = smartPrompt(tool, String(input))
+    try {
+      if (provider.kind === 'anthropic') {
+        const text = await complete(key, model, SMART_SYSTEM, prompt, 1400)
+        return { ok: true, text: text.trim(), clipped: wasClipped(String(input)), error: '' }
+      }
+      const url = (settings.providerBaseUrl[provider.id] || provider.baseUrl).replace(/\/+$/, '')
+      const response = await fetch(`${url}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: SMART_SYSTEM },
+            { role: 'user', content: prompt },
+          ],
+        }),
+      })
+      const body = await response.text()
+      if (!response.ok) throw new Error(`${response.status}: ${body.slice(0, 200)}`)
+      const parsed = JSON.parse(body) as {
+        choices?: { message?: { content?: string } }[]
+      }
+      const text = (parsed.choices?.[0]?.message?.content ?? '').trim()
+      return { ok: true, text, clipped: wasClipped(String(input)), error: '' }
+    } catch (error) {
+      return { ok: false, text: '', error: friendlyProvider(error, provider) }
+    }
+  })
+
   ipcMain.handle('providers:models', async (_event, id: string) => {
     const settings = await stores.settings.load()
     const provider = providerById(String(id))

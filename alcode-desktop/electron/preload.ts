@@ -78,6 +78,10 @@ const api = {
     test: (id: string) => ipcRenderer.invoke('providers:test', id),
     models: (id: string) => ipcRenderer.invoke('providers:models', id),
   },
+  smart: {
+    list: () => ipcRenderer.invoke('smart:list'),
+    run: (toolId: string, input: string) => ipcRenderer.invoke('smart:run', toolId, input),
+  },
   voice: {
     models: () => ipcRenderer.invoke('voice:models'),
     voices: () => ipcRenderer.invoke('voice:voices'),
