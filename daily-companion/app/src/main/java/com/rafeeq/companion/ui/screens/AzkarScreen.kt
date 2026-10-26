@@ -1,5 +1,8 @@
 package com.rafeeq.companion.ui.screens
 
+import androidx.compose.runtime.collectAsState
+import com.rafeeq.companion.ui.AppViewModel
+import com.rafeeq.companion.data.AzkarProgress
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -61,11 +64,12 @@ private const val TAB_TASBIH = "المسبحة"
  * التبويب الافتراضي يتبع وقت اليوم، فلا يحتاج المستخدم لاختياره كل مرة.
  */
 @Composable
-fun AzkarScreen() {
+fun AzkarScreen(viewModel: AppViewModel) {
     val defaultTab = remember {
         if (LocalTime.now().hour in 4..14) TAB_MORNING else TAB_EVENING
     }
     var tab by remember { mutableStateOf(defaultTab) }
+    val progress by viewModel.azkarProgress.collectAsState()
 
     Column(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
@@ -93,18 +97,22 @@ fun AzkarScreen() {
         Spacer(Modifier.height(12.dp))
 
         when (tab) {
-            TAB_MORNING -> DhikrList(AzkarData.morning)
-            TAB_EVENING -> DhikrList(AzkarData.evening)
-            else -> TasbihPanel()
+            TAB_MORNING -> DhikrList(AzkarData.morning, TAB_MORNING, progress, viewModel)
+            TAB_EVENING -> DhikrList(AzkarData.evening, TAB_EVENING, progress, viewModel)
+            else -> TasbihPanel(progress, viewModel)
         }
     }
 }
 
 @Composable
-private fun DhikrList(items: List<Dhikr>) {
-    // العدّ محلّي للجلسة: الأذكار تُقرأ في جلسة واحدة، وحفظها بين الجلسات
-    // يجعل المستخدم يجدها نصف مكتملة بلا سبب.
-    val counts = remember(items) { mutableStateListOf(*Array(items.size) { 0 }) }
+private fun DhikrList(
+    items: List<Dhikr>,
+    tab: String,
+    progress: AzkarProgress,
+    viewModel: AppViewModel,
+) {
+    // العدّ محفوظ ليوم واحد: يصمد أمام مكالمة أو تدوير الشاشة أو تنقّل بين
+    // التبويبات، ويُمحى وحده غدًا فلا تُفتح الأذكار نصف مقروءة.
     val context = LocalContext.current
 
     LazyColumn(
@@ -113,17 +121,15 @@ private fun DhikrList(items: List<Dhikr>) {
     ) {
         items(items.size) { index ->
             val dhikr = items[index]
-            val done = counts[index]
+            val key = AzkarProgress.keyOf(tab, dhikr.text)
+            val done = progress.counts[key] ?: 0
             val complete = done >= dhikr.repeat
 
             GlassCard(
                 onClick = {
-                    if (!complete) {
-                        counts[index] = done + 1
-                        tick(context, counts[index] >= dhikr.repeat)
-                    } else {
-                        counts[index] = 0
-                    }
+                    val next = if (complete) 0 else done + 1
+                    viewModel.setDhikrCount(key, next)
+                    if (!complete) tick(context, next >= dhikr.repeat)
                 },
             ) {
                 Row(verticalAlignment = Alignment.Top) {
@@ -165,10 +171,10 @@ private fun DhikrList(items: List<Dhikr>) {
 }
 
 @Composable
-private fun TasbihPanel() {
+private fun TasbihPanel(progress: AzkarProgress, viewModel: AppViewModel) {
     var selected by remember { mutableStateOf(AzkarData.tasbih.first()) }
-    var count by remember { mutableIntStateOf(0) }
-    var rounds by remember { mutableIntStateOf(0) }
+    val count = progress.tasbih
+    val rounds = progress.rounds
     val context = LocalContext.current
 
     Column(Modifier.fillMaxWidth()) {
@@ -182,8 +188,7 @@ private fun TasbihPanel() {
                     selected = dhikr.text == selected.text,
                     onClick = {
                         selected = dhikr
-                        count = 0
-                        rounds = 0
+                        viewModel.setTasbih(0, 0)
                     },
                 )
             }
@@ -199,12 +204,13 @@ private fun TasbihPanel() {
                 .clip(CircleShape)
                 .background(Brush.linearGradient(Gradients.Meadow))
                 .clickable {
-                    count += 1
-                    if (count >= selected.repeat) {
-                        rounds += 1
-                        count = 0
+                    val next = count + 1
+                    if (next >= selected.repeat) {
+                        // اكتملت دورة: يعود العدّ إلى الصفر وتُسجَّل الدورة.
+                        viewModel.setTasbih(0, rounds + 1)
                         tick(context, strong = true)
                     } else {
+                        viewModel.setTasbih(next, rounds)
                         tick(context, strong = false)
                     }
                 },
@@ -246,7 +252,7 @@ private fun TasbihPanel() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            IconButton(onClick = { count = 0; rounds = 0 }) {
+            IconButton(onClick = { viewModel.setTasbih(0, 0) }) {
                 Icon(Icons.Filled.Refresh, contentDescription = "تصفير")
             }
         }

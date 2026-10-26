@@ -12,4 +12,5 @@
     <string name="shortcut_day_long">المهام والعادات</string>
     <string name="shortcut_prayer_short">الصلاة</string>
     <string name="shortcut_prayer_long">أوقات الصلاة</string>
+    <string name="widget_description">الصلاة القادمة ومهام يومك على الشاشة الرئيسية</string>
 </resources>

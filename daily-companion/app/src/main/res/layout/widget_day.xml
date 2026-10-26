@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  تخطيط الودجة.
+
+  RemoteViews لا Glance: الودجة تُرسَم في عملية المشغّل، وكل اعتماد إضافي
+  هنا يكبّر الحزمة ويزيد ما قد ينكسر في بيئة لا نملكها. والتخطيط بسيط بما
+  يكفي ألّا يحتاج أكثر من ذلك.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:padding="14dp"
+    android:layoutDirection="rtl">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+
+        <TextView
+            android:id="@+id/widget_prayer_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="@color/widget_ink"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="@string/app_name" />
+
+        <TextView
+            android:id="@+id/widget_prayer_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="@color/widget_accent" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_countdown"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textSize="13sp"
+        android:textColor="@color/widget_muted"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!--
+      ImageView لا View: RemoteViews تقبل قائمة محدودة من الأصناف، و View
+      المجرّدة ليست منها — كانت الودجة ستفشل في التمدّد على الشاشة الرئيسية.
+    -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="8dp"
+        android:contentDescription="@null"
+        android:background="@color/widget_separator" />
+
+    <TextView
+        android:id="@+id/widget_summary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="@color/widget_ink"
+        android:maxLines="2"
+        android:ellipsize="end" />
+</LinearLayout>

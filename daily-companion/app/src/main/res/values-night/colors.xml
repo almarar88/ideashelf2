@@ -2,4 +2,10 @@
 <resources>
     <!-- الوضع الليلي أسود حقيقي، فأيّ خلفية فاتحة هنا وميض أبيض في العتمة. -->
     <color name="window_bg">#FF000000</color>
+
+    <color name="widget_surface">#FF161618</color>
+    <color name="widget_ink">#FFF5F5F7</color>
+    <color name="widget_muted">#FFA1A1A8</color>
+    <color name="widget_separator">#29FFFFFF</color>
+    <color name="widget_accent">#FF4D94FF</color>
 </resources>

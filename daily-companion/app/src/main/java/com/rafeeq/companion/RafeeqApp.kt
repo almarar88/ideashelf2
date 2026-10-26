@@ -18,6 +18,7 @@ import com.rafeeq.companion.data.WeatherBundle
 import com.rafeeq.companion.data.ai.AgentRunner
 import com.rafeeq.companion.data.ai.OpenAiRunner
 import com.rafeeq.companion.data.ai.ClaudeClient
+import com.rafeeq.companion.data.AzkarProgress
 import com.rafeeq.companion.data.BackupManager
 import com.rafeeq.companion.data.DefaultShortcuts
 import com.rafeeq.companion.data.Shortcut
@@ -69,6 +70,7 @@ class Repos(app: Application) {
     val routines = JsonListStore(app, "routines.json", Routine.serializer())
     val brief = JsonValueStore(app, "daily_brief.json", DailyBrief.serializer())
     val usage = JsonValueStore(app, "usage.json", UsageStats.serializer())
+    val azkar = JsonValueStore(app, "azkar.json", AzkarProgress.serializer())
 
     /** يُنشأ كسولًا لأنه يحتاج الحاوية نفسها بعد اكتمالها. */
     val backup: BackupManager by lazy { BackupManager(app, this) }

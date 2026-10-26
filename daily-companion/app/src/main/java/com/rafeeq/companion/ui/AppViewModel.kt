@@ -8,6 +8,7 @@ import com.rafeeq.companion.Repos
 import com.rafeeq.companion.core.Dates
 import com.rafeeq.companion.core.friendlyMessage
 import com.rafeeq.companion.data.AppSettings
+import com.rafeeq.companion.data.AzkarProgress
 import com.rafeeq.companion.data.Article
 import com.rafeeq.companion.data.ChatMessage
 import com.rafeeq.companion.data.Conversation
@@ -229,6 +230,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             repos.saved.load(); repos.sources.load(); repos.topics.load()
             repos.conversations.load(); repos.brief.load()
             repos.shortcuts.load(); repos.usage.load()
+            // تقدّم الأذكار: يُحمَّل ثم يُنقّى من أيّ يومٍ سابق فورًا.
+            _azkar.value = AzkarProgress.forToday(repos.azkar.load(), today())
             repos.weatherCache.load()?.let { cached ->
                 if (System.currentTimeMillis() - cached.fetchedAt < 3 * 60 * 60_000L) {
                     _weather.value = WeatherState(bundle = cached)
@@ -1292,6 +1295,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     .orEmpty()
             }
         }
+    }
+
+    // ----------------------------------------------------- الأذكار
+
+    private val _azkar = MutableStateFlow(AzkarProgress())
+    /** تقدّم أذكار اليوم؛ يُمحى وحده عند تغيّر التاريخ. */
+    val azkarProgress: StateFlow<AzkarProgress> = _azkar.asStateFlow()
+
+    private fun today() = java.time.LocalDate.now(zoneId())
+
+    private fun saveAzkar(next: AzkarProgress) {
+        _azkar.value = next
+        viewModelScope.launch { repos.azkar.set(next) }
+    }
+
+    fun setDhikrCount(key: String, count: Int) {
+        val base = AzkarProgress.forToday(_azkar.value, today())
+        saveAzkar(base.copy(counts = base.counts + (key to count)))
+    }
+
+    fun setTasbih(count: Int, rounds: Int) {
+        val base = AzkarProgress.forToday(_azkar.value, today())
+        saveAzkar(base.copy(tasbih = count, rounds = rounds))
     }
 
     fun setAiModel(value: String) = viewModelScope.launch { repos.settings.setAiModel(value) }

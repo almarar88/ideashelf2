@@ -302,7 +302,7 @@ fun RafeeqNavigation(
 
                 composable(Routes.CONTROL) { ControlScreen(viewModel) }
 
-                composable(Routes.AZKAR) { AzkarScreen() }
+                composable(Routes.AZKAR) { AzkarScreen(viewModel) }
 
                 composable(Routes.SAVED) { SavedScreen(viewModel, openArticle) }
 
