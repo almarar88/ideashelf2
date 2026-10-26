@@ -1,4 +1,6 @@
 import { appTools } from './apps'
+import { browserTools } from './browser'
+import type { Browser } from '../browser/tabs'
 import { automationTools } from './automation'
 import { dailyTools } from './daily'
 import { fileTools } from './files'
@@ -10,8 +12,19 @@ import { windowTools } from './windows'
 import { ToolSpec } from './types'
 
 /** كل ما يستطيع المساعد فعله على هذا الجهاز. */
+/*
+ * أدوات المتصفّح تحتاج نسخته الحيّة، وهي تُنشأ مع النافذة لا عند تحميل
+ * الوحدة — فتُحقن بدالّة تُسأل عند التنفيذ لا عند التسجيل.
+ */
+let browserRef: () => Browser | null = () => null
+
+export function bindBrowser(getter: () => Browser | null): void {
+  browserRef = getter
+}
+
 export const allTools: ToolSpec[] = [
   ...systemTools,
+  ...browserTools(() => browserRef()),
   ...appTools,
   ...windowTools,
   ...inputTools,

@@ -5,6 +5,7 @@ import { AppSettings, Place } from './types'
 import type { LicenseState } from '../electron/preload-api'
 import Onboarding from './Onboarding'
 import { Icon, IconName, Mark } from './icons'
+import { BrowserPane } from './Browser'
 import MicButton from './MicButton'
 import { isSpeaking, onSpeakingChange, stopSpeaking } from './voice'
 import {
@@ -13,7 +14,7 @@ import {
 
 type Tab =
   | 'home' | 'chat' | 'day' | 'prayer' | 'weather' | 'news'
-  | 'skills' | 'memory' | 'smart' | 'settings'
+  | 'skills' | 'memory' | 'smart' | 'browser' | 'settings'
 
 /**
  * التبويبات مجمَّعة لا مسرودة.
@@ -29,6 +30,7 @@ const TAB_GROUPS: { label: string; items: { id: Tab; label: string; icon: IconNa
       { id: 'chat', label: 'المساعد', icon: 'sparkle' },
       { id: 'day', label: 'مهامي', icon: 'list' },
       { id: 'smart', label: 'أدوات ذكية', icon: 'bolt' },
+      { id: 'browser', label: 'المتصفّح', icon: 'globe' },
     ],
   },
   {
@@ -486,6 +488,11 @@ export default function App() {
         {tab === 'skills' && <SkillsTab />}
         {tab === 'memory' && <MemoryTab />}
         {tab === 'smart' && <SmartToolsTab />}
+        {/* يُركَّب دائمًا: العرض نظاميّ يرسم فوق الواجهة، ولو فُكّ
+            المكوّن عند مغادرة التبويب لبقي ظاهرًا فوق كل شيء. */}
+        <div style={{ display: tab === 'browser' ? 'contents' : 'none' }}>
+          <BrowserPane visible={tab === 'browser'} />
+        </div>
         {tab === 'settings' && settings && (
           <SettingsTab
             settings={settings}

@@ -7,11 +7,14 @@ import { join } from 'node:path'
 import {
   AgentEvent, RunOptions, ToolCall, complete, friendly, runAgent, webSearchTool,
 } from './claude'
+import { Browser } from './browser/tabs'
+import * as extensions from './browser/extensions'
+import { forgetPages, recentPages, searchPages } from './browser/memory'
 import { contextBlock, systemPrompt } from './prompt'
 import { rank } from './retrieval'
 import { SMART_SYSTEM, SMART_TOOLS, smartPrompt, toolById, wasClipped } from './smartTools'
 import { defaultSettings, Habit, Settings, stores, Task } from './store'
-import { allTools, toolByName, toolGroups, toolsForApi } from './tools'
+import { allTools, bindBrowser, toolByName, toolGroups, toolsForApi } from './tools'
 import { isWindows } from './ps'
 import { activeSources, contextSummary, getDay, getNews, getWeather, prayersFor } from './daily'
 import { METHODS, PRAYERS } from './daily/prayer'
@@ -528,6 +531,26 @@ async function buildContext(settings: Settings, question = ''): Promise<string> 
     (daily ? `\n<يومك>\n${daily}\n</يومك>` : '')
 }
 
+/**
+ * المتصفّح.
+ *
+ * جلسة مستقلّة (`persist:browser`) لا جلسة التطبيق: ملفّات تعريف المواقع
+ * وتسجيلات دخولها تبقى منفصلة عن بيانات «عون»، والإضافات تُحمَّل فيها
+ * وحدها فلا تلمس واجهة التطبيق نفسه.
+ */
+const BROWSER_PARTITION = 'persist:browser'
+let browser: Browser | null = null
+
+function ensureBrowser(): Browser | null {
+  if (browser || !mainWindow) return browser
+  browser = new Browser(mainWindow, BROWSER_PARTITION, () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('browser:tabs', browser?.list() ?? [])
+    }
+  })
+  return browser
+}
+
 let quitting = false
 
 // ---------------------------------------------------------------- IPC
@@ -620,6 +643,55 @@ function registerIpc() {
    * لا يمرّ عبر حلقة الأدوات عمدًا: الأداة تعالج نصًّا في يد المستخدم ولا
    * شأن لها بالجهاز، وإعطاؤها صلاحية التنفيذ خطرٌ بلا فائدة.
    */
+  // ------------------------------------------------------------ المتصفّح
+
+  ipcMain.handle('browser:tabs', () => ensureBrowser()?.list() ?? [])
+  ipcMain.handle('browser:open', (_e, url?: string) => ensureBrowser()?.open(url) ?? 0)
+  ipcMain.handle('browser:close', (_e, id: number) => { ensureBrowser()?.close(Number(id)) })
+  ipcMain.handle('browser:activate', (_e, id: number) => { ensureBrowser()?.activate(Number(id)) })
+  ipcMain.handle('browser:navigate', (_e, url: string, id?: number) =>
+    ensureBrowser()?.navigate(String(url), id) ?? false)
+  ipcMain.handle('browser:back', () => { ensureBrowser()?.back() })
+  ipcMain.handle('browser:forward', () => { ensureBrowser()?.forward() })
+  ipcMain.handle('browser:reload', () => { ensureBrowser()?.reload() })
+  ipcMain.handle('browser:stop', () => { ensureBrowser()?.stop() })
+  ipcMain.handle('browser:bounds', (_e, rect: { x: number; y: number; width: number; height: number }) => {
+    ensureBrowser()?.setBounds(rect)
+  })
+  // العرض يُرسم فوق الواجهة، فيُخفى عند مغادرة تبويب المتصفّح.
+  ipcMain.handle('browser:visible', (_e, value: boolean) => {
+    ensureBrowser()?.setVisible(Boolean(value))
+  })
+  ipcMain.handle('browser:read', async (_e, id?: number) =>
+    (await ensureBrowser()?.read(id)) ?? { title: '', url: '', text: '' })
+
+  ipcMain.handle('browser:history', async (_e, query: string) => {
+    const text = String(query ?? '').trim()
+    return text ? searchPages(text, 20) : recentPages(30)
+  })
+  ipcMain.handle('browser:forget', async () => { await forgetPages(); return true })
+
+  ipcMain.handle('browser:extensions', () => extensions.listLoaded(BROWSER_PARTITION))
+  ipcMain.handle('browser:addExtension', async () => {
+    const picked = await dialog.showOpenDialog({
+      title: 'اختر مجلّد الإضافة (غير مضغوط)',
+      properties: ['openDirectory'],
+    })
+    const path = picked.filePaths[0]
+    if (picked.canceled || !path) return { ok: false, error: '' }
+    try {
+      const loaded = await extensions.loadFrom(BROWSER_PARTITION, path)
+      return { ok: true, error: '', extension: loaded }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+  ipcMain.handle('browser:removeExtension', (_e, id: string) => {
+    extensions.unload(BROWSER_PARTITION, String(id))
+    return true
+  })
+  ipcMain.handle('browser:extensionsDir', () => extensions.extensionsDir())
+
   ipcMain.handle('smart:list', async () =>
     SMART_TOOLS.map(({ id, label, emoji, hint }) => ({ id, label, emoji, hint })))
 
@@ -1291,6 +1363,11 @@ if (!single) {
   app.on('second-instance', showMain)
 
   app.whenReady().then(async () => {
+    // الأدوات تعرف المتصفّح، والإضافات تُستعاد: إلكترون لم يعد يتذكّرها
+    // بين التشغيلات، فتُحمَّل من مجلّدها في كل إقلاع.
+    bindBrowser(() => browser)
+    void extensions.restoreAll(BROWSER_PARTITION).catch(() => [])
+
     // كل خطوة داخل حرس: خطأ في أي منها كان يعني قبلًا تطبيقًا حيًّا بلا نافذة.
     // النافذة تُنشأ أولًا حتى يرى المستخدم شيئًا حتى لو تعطّل ما بعدها.
     try {

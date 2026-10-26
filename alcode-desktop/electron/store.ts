@@ -243,6 +243,14 @@ export const stores = {
   license: new JsonStore<{ key: string; firstRunAt: number }>(
     'license.json', { key: '', firstRunAt: 0 },
   ),
+  /**
+   * ذاكرة التصفّح: نصّ كل صفحة قُرئت، للبحث فيها لاحقًا.
+   *
+   * محلّية بالكامل ولا تُرسَل إلى أي مزوّد. تُمحى من إعدادات المتصفّح.
+   */
+  pages: new JsonStore<
+    { url: string; title: string; text: string; at: number }[]
+  >('pages.json', []),
   usage: new JsonStore<{ input: number; output: number; cached: number; requests: number }>(
     'usage.json', { input: 0, output: 0, cached: 0, requests: 0 },
   ),

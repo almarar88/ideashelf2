@@ -30,6 +30,23 @@ export interface LicenseState {
 }
 
 /** واجهة الجسر كما تراها شيفرة العرض. */
+export interface BrowserTab {
+  id: number
+  title: string
+  url: string
+  loading: boolean
+  canGoBack: boolean
+  canGoForward: boolean
+  active: boolean
+}
+
+export interface BrowserExtension {
+  id: string
+  name: string
+  version: string
+  path: string
+}
+
 export interface AlcodeBridge {
   settings: {
     get(): Promise<any>
@@ -93,6 +110,27 @@ export interface AlcodeBridge {
     setUrl(id: string, url: string): Promise<boolean>
     test(id: string): Promise<{ ok: boolean; error: string }>
     models(id: string): Promise<{ ok: boolean; models: string[]; error: string }>
+  }
+  browser: {
+    tabs(): Promise<BrowserTab[]>
+    open(url?: string): Promise<number>
+    close(id: number): Promise<void>
+    activate(id: number): Promise<void>
+    navigate(url: string, id?: number): Promise<boolean>
+    back(): Promise<void>
+    forward(): Promise<void>
+    reload(): Promise<void>
+    stop(): Promise<void>
+    bounds(rect: { x: number; y: number; width: number; height: number }): Promise<void>
+    visible(value: boolean): Promise<void>
+    read(id?: number): Promise<{ title: string; url: string; text: string }>
+    history(query: string): Promise<{ url: string; title: string; text: string; at: number }[]>
+    forget(): Promise<boolean>
+    extensions(): Promise<BrowserExtension[]>
+    addExtension(): Promise<{ ok: boolean; error: string; extension?: BrowserExtension }>
+    removeExtension(id: string): Promise<boolean>
+    extensionsDir(): Promise<string>
+    onTabs(handler: (tabs: BrowserTab[]) => void): () => void
   }
   smart: {
     list(): Promise<{ id: string; label: string; emoji: string; hint: string }[]>

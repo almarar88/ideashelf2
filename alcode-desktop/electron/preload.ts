@@ -78,6 +78,32 @@ const api = {
     test: (id: string) => ipcRenderer.invoke('providers:test', id),
     models: (id: string) => ipcRenderer.invoke('providers:models', id),
   },
+  browser: {
+    tabs: () => ipcRenderer.invoke('browser:tabs'),
+    open: (url?: string) => ipcRenderer.invoke('browser:open', url),
+    close: (id: number) => ipcRenderer.invoke('browser:close', id),
+    activate: (id: number) => ipcRenderer.invoke('browser:activate', id),
+    navigate: (url: string, id?: number) => ipcRenderer.invoke('browser:navigate', url, id),
+    back: () => ipcRenderer.invoke('browser:back'),
+    forward: () => ipcRenderer.invoke('browser:forward'),
+    reload: () => ipcRenderer.invoke('browser:reload'),
+    stop: () => ipcRenderer.invoke('browser:stop'),
+    bounds: (rect: { x: number; y: number; width: number; height: number }) =>
+      ipcRenderer.invoke('browser:bounds', rect),
+    visible: (value: boolean) => ipcRenderer.invoke('browser:visible', value),
+    read: (id?: number) => ipcRenderer.invoke('browser:read', id),
+    history: (query: string) => ipcRenderer.invoke('browser:history', query),
+    forget: () => ipcRenderer.invoke('browser:forget'),
+    extensions: () => ipcRenderer.invoke('browser:extensions'),
+    addExtension: () => ipcRenderer.invoke('browser:addExtension'),
+    removeExtension: (id: string) => ipcRenderer.invoke('browser:removeExtension', id),
+    extensionsDir: () => ipcRenderer.invoke('browser:extensionsDir'),
+    onTabs: (handler: (tabs: unknown[]) => void) => {
+      const listener = (_e: unknown, tabs: unknown[]) => handler(tabs)
+      ipcRenderer.on('browser:tabs', listener)
+      return () => ipcRenderer.removeListener('browser:tabs', listener)
+    },
+  },
   smart: {
     list: () => ipcRenderer.invoke('smart:list'),
     run: (toolId: string, input: string) => ipcRenderer.invoke('smart:run', toolId, input),
