@@ -2151,8 +2151,14 @@ function ProviderSection({ settings, onPatch, onRefresh }: {
   const [key, setKey] = useState('')
   const [state, setState] = useState('')
   const [busy, setBusy] = useState(false)
+  const [fetchedModels, setFetchedModels] = useState<string[]>([])
+  const [modelsNote, setModelsNote] = useState('')
+  const [fetching, setFetching] = useState(false)
 
   useEffect(() => { void window.alcode.providers.list().then(setProviders) }, [])
+
+  // تبديل المزوّد يُبطل قائمةَ نماذج المزوّد السابق.
+  useEffect(() => { setFetchedModels([]); setModelsNote('') }, [settings.provider])
 
   const active = providers.find((one) => one.id === settings.provider) ?? providers[0]
   if (!active) return null
@@ -2230,6 +2236,53 @@ function ProviderSection({ settings, onPatch, onRefresh }: {
             placeholder="أو اكتب معرّف نموذج آخر"
             style={{ direction: 'ltr', fontSize: 13 }}
           />
+
+          {/*
+            المعرّفات أعلاه اقتراحاتٌ تَقدُم. هذا الزرّ يسأل حساب المستخدم
+            نفسه عمّا يملكه فعلًا، فلا يبقى «النموذج غير موجود» لغزًا.
+          */}
+          <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            <button
+              className="chip"
+              disabled={fetching}
+              onClick={async () => {
+                setFetching(true)
+                setModelsNote('')
+                const result = await window.alcode.providers.models(active.id)
+                setFetching(false)
+                setFetchedModels(result.ok ? result.models : [])
+                setModelsNote(
+                  result.ok
+                    ? (result.models.length
+                      ? `${result.models.length} نموذجًا متاحًا لمفتاحك`
+                      : 'ما رجع أي نموذج.')
+                    : `⚠️ ${result.error}`,
+                )
+              }}
+            >
+              {fetching ? 'أجلب…' : 'اجلب النماذج من حسابي'}
+            </button>
+            {modelsNote && <span className="footnote">{modelsNote}</span>}
+          </div>
+
+          {fetchedModels.length > 0 && (
+            <div className="row wrap" style={{ gap: 6, marginTop: 8 }}>
+              {fetchedModels.map((id) => (
+                <button
+                  key={id}
+                  className={model === id ? 'pill active' : 'pill'}
+                  style={{ direction: 'ltr', fontSize: 12 }}
+                  onClick={async () => {
+                    if (active.id === 'anthropic') await onPatch({ model: id })
+                    else await window.alcode.providers.setModel(active.id, id)
+                    await onRefresh()
+                  }}
+                >
+                  {id}
+                </button>
+              ))}
+            </div>
+          )}
         </Field>
 
         {active.editableUrl && (

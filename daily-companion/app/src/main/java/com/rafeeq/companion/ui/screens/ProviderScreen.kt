@@ -49,6 +49,8 @@ fun ProviderScreen(viewModel: AppViewModel) {
     var key by remember { mutableStateOf("") }
     var state by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var fetched by remember { mutableStateOf<List<String>>(emptyList()) }
+    var modelsState by remember { mutableStateOf("") }
 
     val active = settings.activeProvider
     val isAnthropic = active.kind == Provider.Kind.ANTHROPIC
@@ -90,6 +92,8 @@ fun ProviderScreen(viewModel: AppViewModel) {
                             viewModel.setProvider(one.id)
                             key = ""
                             state = ""
+                            fetched = emptyList()
+                            modelsState = ""
                         },
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -142,6 +146,68 @@ fun ProviderScreen(viewModel: AppViewModel) {
                     label = { Text("أو اكتب معرّف نموذج آخر") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                )
+
+                /*
+                 * المعرّفات المكتوبة فوق اقتراحاتٌ تَقدُم. هذا الزرّ يسأل
+                 * حساب المستخدم نفسه عمّا يملكه فعلًا، فلا يبقى «النموذج غير
+                 * موجود» لغزًا يحلّه بالتخمين.
+                 */
+                if (!isAnthropic) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(
+                            enabled = hasKey && !busy,
+                            onClick = {
+                                busy = true
+                                modelsState = ""
+                                scope.launch {
+                                    viewModel.fetchModels(active.id).fold(
+                                        onSuccess = {
+                                            fetched = it
+                                            modelsState = if (it.isEmpty()) {
+                                                "ما رجع أي نموذج."
+                                            } else {
+                                                "${it.size} نموذجًا متاحًا لمفتاحك"
+                                            }
+                                        },
+                                        onFailure = { error ->
+                                            fetched = emptyList()
+                                            modelsState = "⚠️ " +
+                                                com.rafeeq.companion.data.ai.OpenAiRunner
+                                                    .friendly(error, active)
+                                        },
+                                    )
+                                    busy = false
+                                }
+                            },
+                        ) { Text(if (hasKey) "اجلب النماذج من حسابي" else "احفظ مفتاحًا أولًا") }
+
+                        if (modelsState.isNotBlank()) {
+                            Text(
+                                modelsState,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        items(fetched, key = { "model-$it" }) { id ->
+            GlassCard(padding = PaddingValues(10.dp)) {
+                Text(
+                    id,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (settings.activeModel == id) FontWeight.Bold
+                    else FontWeight.Normal,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.setProviderModel(active.id, id) },
                 )
             }
         }

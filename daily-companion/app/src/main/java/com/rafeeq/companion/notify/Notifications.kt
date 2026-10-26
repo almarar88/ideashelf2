@@ -2,6 +2,7 @@ package com.rafeeq.companion.notify
 
 import android.Manifest
 import android.app.AlarmManager
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -100,6 +101,9 @@ object Notifier {
 
         if (big) builder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
 
+        // رفض إذن الإشعارات على أندرويد ١٣+ يرمي SecurityException، وهو
+        // مُلتقَط هنا عمدًا: إشعارٌ لا يظهر أهون من انهيار في خلفية مُنبّه.
+        @SuppressLint("MissingPermission")
         runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }
     }
 }

@@ -430,7 +430,10 @@ private fun MonthTimetableSheet(
     val today = LocalDate.now(viewModel.zoneId())
     val columns = listOf(Prayer.FAJR, Prayer.SUNRISE, Prayer.DHUHR, Prayer.ASR, Prayer.MAGHRIB, Prayer.ISHA)
 
-    val days = remember(month, viewModel.settings.value) {
+    // قراءة .value داخل التركيب لا تُراقَب: كان جدول الشهر يبقى على
+    // طريقة الحساب القديمة بعد تغييرها حتى يُغلق ويُفتح من جديد.
+    val prayerSettings by viewModel.settings.collectAsState()
+    val days = remember(month, prayerSettings) {
         (0 until month.lengthOfMonth()).mapNotNull { i ->
             val date = month.plusDays(i.toLong())
             viewModel.prayersFor(date)?.let { date to it }

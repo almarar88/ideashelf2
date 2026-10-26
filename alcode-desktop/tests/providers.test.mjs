@@ -236,3 +236,84 @@ test('كل مزوّد يحمل عنوانًا ونماذج، والمتوافق�
   assert.equal(providers.providerById('xai').kind, 'openai')
   assert.equal(providers.providerById('لا يوجد').id, 'anthropic', 'المجهول يعود للافتراضي')
 })
+
+/*
+ * ردود المزوّدين على مفتاح باطل — منسوخة حرفيًا من طلبات حقيقية.
+ *
+ * الصياغات تختلف فعلًا: xAI وGoogle يردّان 400 لا 401، وOpenRouter يقول
+ * «Missing Authentication header» بلا ذكر كلمة key أصلًا. تُفحص الصياغة
+ * وحدها، بلا بادئة رمز الحالة: البادئة تُطابق `401` فتُخفي ما إذا كان
+ * النصّ نفسه مفهومًا — وهي تغيب متى وصل الخطأ من مسار آخر.
+ */
+test('صياغة كل مزوّد لمفتاح مرفوض تُقرأ بلا الاعتماد على رمز الحالة', () => {
+  const { friendlyProvider, PROVIDERS } = providers
+  const cases = {
+    xai: 'Incorrect API key provided. You can obtain an API key from https://console.x.ai.',
+    google: 'Please pass a valid API key',
+    openai: 'Incorrect API key provided: sk-inval****robe.',
+    groq: 'Invalid API Key',
+    openrouter: 'Missing Authentication header',
+  }
+  for (const [id, body] of Object.entries(cases)) {
+    const provider = PROVIDERS.find((one) => one.id === id)
+    assert.equal(
+      friendlyProvider(new Error(body), provider),
+      `مفتاح ${provider.label} غير صالح.`,
+      `صياغة ${id} يجب أن تُقرأ كمفتاح غير صالح`,
+    )
+  }
+})
+
+test('الخطأ بلا نصّ لا يُقدَّم كعطل اتصال', () => {
+  const { friendlyProvider, PROVIDERS } = providers
+  const message = friendlyProvider(new Error(''), PROVIDERS[1])
+  assert.ok(!message.includes('اتصال'), 'ما يصح يُلام الاتصال')
+  assert.ok(message.includes('خطأ داخلي'))
+})
+
+/*
+ * `gemini-3.8-flash` و`gpt-5.2` كانا مكتوبَين في السجلّ ولا وجود لهما لدى
+ * المزوّدَين، فكان كلاهما يفشل مهما كان المفتاح صحيحًا.
+ */
+test('لا معرّفات نماذج ملغاة في السجلّ', () => {
+  const { PROVIDERS } = providers
+  const retired = new Set(['gemini-3.8-flash', 'gpt-5.2', 'gemini-2.0-flash'])
+  for (const provider of PROVIDERS) {
+    for (const model of provider.models) {
+      assert.ok(!retired.has(model.id), `معرّف ملغى في ${provider.id}: ${model.id}`)
+    }
+  }
+})
+
+test('جلب النماذج يقرأ data[].id ويفرزها، ويترجم الفشل', async () => {
+  const { listProviderModels, friendlyProvider, PROVIDERS } = providers
+  let seenAuth = ''
+  const server = createServer((req, res) => {
+    seenAuth = req.headers.authorization ?? ''
+    if (req.url === '/models') {
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ data: [{ id: 'z-model' }, { id: 'a-model' }] }))
+    } else {
+      res.writeHead(401, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: { message: 'Invalid API Key' } }))
+    }
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const base = `http://127.0.0.1:${server.address().port}`
+  try {
+    assert.deepEqual(await listProviderModels(base, 'k-123'), ['a-model', 'z-model'])
+    assert.equal(seenAuth, 'Bearer k-123')
+    // الشرطة المائلة الزائدة لا تُنتج //models
+    assert.deepEqual(await listProviderModels(`${base}/`, 'k-123'), ['a-model', 'z-model'])
+
+    await assert.rejects(() => listProviderModels(`${base}/nope`, 'k-123'), (error) => {
+      assert.equal(
+        friendlyProvider(error, PROVIDERS.find((one) => one.id === 'groq')),
+        'مفتاح Groq — سريع جدًا غير صالح.',
+      )
+      return true
+    })
+  } finally {
+    server.close()
+  }
+})

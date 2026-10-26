@@ -1064,15 +1064,31 @@ class PhoneController(private val context: Context) {
         else ActionResult.fail("لم أجد «$text» على الشاشة.")
     }
 
-    /** وصول إحصاءات الاستخدام إذن خاص يُمنح من شاشة النظام لا من حوار عادي. */
+    /**
+     * وصول إحصاءات الاستخدام إذن خاص يُمنح من شاشة النظام لا من حوار عادي.
+     *
+     * `unsafeCheckOpNoThrow` أُضيفت في API 29 وأدنى نسخة ندعمها 26. كان
+     * النداء غير محروس، و`runCatching` يبتلع NoSuchMethodError بصمت، فيقرأ
+     * الإذن «غير ممنوح» دائمًا على أندرويد ٨ و٩ مهما منحه المستخدم —
+     * عطلٌ لا يظهر في سجلّ ولا رسالة. النسخة القديمة من النداء تعمل هناك.
+     */
     fun usageAccessEnabled(): Boolean = runCatching {
         val manager = context.getSystemService(android.app.AppOpsManager::class.java)
             ?: return false
-        val mode = manager.unsafeCheckOpNoThrow(
-            android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
-            android.os.Process.myUid(),
-            context.packageName,
-        )
+        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            manager.unsafeCheckOpNoThrow(
+                android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+                android.os.Process.myUid(),
+                context.packageName,
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            manager.checkOpNoThrow(
+                android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+                android.os.Process.myUid(),
+                context.packageName,
+            )
+        }
         mode == android.app.AppOpsManager.MODE_ALLOWED
     }.getOrDefault(false)
 

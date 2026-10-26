@@ -66,8 +66,9 @@ export const PROVIDERS: Provider[] = [
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     keyUrl: 'https://aistudio.google.com/apikey',
     models: [
-      { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash' },
-      { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+      { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash' },
+      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
     ],
     note: 'عبر طبقة التوافق الرسمية من Google، وهي ما تزال تجريبية لديهم.',
   },
@@ -78,7 +79,7 @@ export const PROVIDERS: Provider[] = [
     baseUrl: 'https://api.openai.com/v1',
     keyUrl: 'https://platform.openai.com/api-keys',
     models: [
-      { id: 'gpt-5.2', label: 'GPT-5.2' },
+      { id: 'gpt-5', label: 'GPT-5' },
       { id: 'gpt-5-mini', label: 'GPT-5 mini' },
     ],
     note: 'الأدوات تعمل. اكتب معرّف أي نموذج متاح في حسابك.',
@@ -181,21 +182,54 @@ function errorText(status: number, body: string): string {
 }
 
 /** يترجم أخطاء المزوّدين إلى عربية مفهومة. */
+/**
+ * الأنماط هنا من ردود حقيقية طُلبت من كل مزوّد بمفتاح باطل، لا من افتراض أن
+ * الجميع يتبع صيغة OpenAI. وهم يختلفون: xAI وGoogle يردّان 400 لا 401 على
+ * مفتاح خاطئ، وOpenRouter يقول «Missing Authentication header» بلا ذكر
+ * كلمة key أصلًا — وكان يصل للمستخدم إنجليزيًا خامًا.
+ */
 export function friendlyProvider(error: unknown, provider: Provider): string {
   const text = error instanceof Error ? error.message : String(error)
-  if (/401|unauthorized|invalid.*key|API key/i.test(text)) {
+  if (/401|unauthorized|invalid.*key|API key|missing authentication/i.test(text)) {
     return `مفتاح ${provider.label} غير صالح.`
   }
   if (/429|rate.?limit/i.test(text)) return 'طلبات كثيرة — انتظر لحظة.'
   if (/quota|insufficient|billing|402/i.test(text)) return 'الرصيد انتهى لدى المزوّد.'
-  if (/404|model.*not.*found|does not exist/i.test(text)) {
-    return 'معرّف النموذج غير موجود لدى هذا المزوّد — راجعه في الإعدادات.'
+  if (/404|model.*not.*(found|exist)|unknown model|does not exist/i.test(text)) {
+    return 'معرّف النموذج غير موجود لدى هذا المزوّد — اضغط «اجلب النماذج».'
+  }
+  if (/unsupported parameter|unrecognized request argument/i.test(text)) {
+    return 'هذا النموذج لا يقبل أحد حقول الطلب — جرّب نموذجًا آخر.'
   }
   if (/ECONNREFUSED/i.test(text)) {
     return 'ما في خدمة على هذا العنوان. تأكّد أن النموذج المحلّي يعمل.'
   }
   if (/fetch failed|ENOTFOUND|ETIMEDOUT|network/i.test(text)) return 'ما في اتصال.'
+  // نصّ فارغ يعني خطأً برمجيًا لا عطلَ شبكة؛ تسميته أصدق من اتّهام الاتصال.
+  if (!text.trim()) return 'خطأ داخلي — أبلغ عنه.'
   return text.slice(0, 200)
+}
+
+/**
+ * النماذج المتاحة فعلًا لهذا المفتاح.
+ *
+ * معرّفات النماذج تتبدّل أسرع من أي قائمة في الكود، ومعرّفٌ قديم يعني فشلًا
+ * لمستخدمٍ لم يخطئ. كل المزوّدين المتوافقين يعرضون GET /models على نفس
+ * العنوان وبنفس الترويسة.
+ */
+export async function listProviderModels(
+  baseUrl: string, key: string,
+): Promise<string[]> {
+  const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/models`, {
+    headers: key ? { Authorization: `Bearer ${key}` } : {},
+  })
+  const text = await response.text()
+  if (!response.ok) throw new Error(`${response.status}: ${text.slice(0, 200)}`)
+  const parsed = JSON.parse(text) as { data?: { id?: string }[] }
+  return (parsed.data ?? [])
+    .map((entry) => String(entry.id ?? ''))
+    .filter(Boolean)
+    .sort()
 }
 
 /**

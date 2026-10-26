@@ -19,7 +19,7 @@ import { validateFeed, topicSource } from './daily/news'
 import { longGregorianAr, longHijriAr } from './daily/dates'
 import { currentState, ensureFirstRun, licensingEnabled, verifyKey } from './license'
 import {
-  friendlyProvider, PROVIDERS, providerById, runOpenAiAgent,
+  friendlyProvider, listProviderModels, PROVIDERS, providerById, runOpenAiAgent,
 } from './providers'
 import { checkForUpdate } from './update'
 import {
@@ -576,6 +576,21 @@ function registerIpc() {
   })
 
   /** يتحقّق من المزوّد بنداء قصير حقيقي — أصدق من فحص شكل المفتاح. */
+  ipcMain.handle('providers:models', async (_event, id: string) => {
+    const settings = await stores.settings.load()
+    const provider = providerById(String(id))
+    if (provider.kind === 'anthropic') {
+      return { ok: true, models: provider.models.map((one) => one.id), error: '' }
+    }
+    const key = settings.providerKeys[provider.id] ?? ''
+    const url = settings.providerBaseUrl[provider.id] || provider.baseUrl
+    try {
+      return { ok: true, models: await listProviderModels(url, key), error: '' }
+    } catch (error) {
+      return { ok: false, models: [], error: friendlyProvider(error, provider) }
+    }
+  })
+
   ipcMain.handle('providers:test', async (_event, id: string) => {
     const settings = await stores.settings.load()
     const provider = providerById(String(id))
@@ -603,10 +618,12 @@ function registerIpc() {
       const response = await fetch(`${url.replace(/\/+$/, '')}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        // بلا max_tokens: الردّ كلمة واحدة أصلًا، وبعض المزوّدين يرفضون
+        // الحقل بينما يقبله غيرهم — فحذفه يُسقط سببَ فشلٍ لا علاقة له
+        // بصحّة المفتاح، وهو ما يفترض أن يقيسه هذا الاختبار.
         body: JSON.stringify({
           model,
           messages: [{ role: 'user', content: 'قل: جاهز' }],
-          max_tokens: 16,
         }),
       })
       if (!response.ok) {

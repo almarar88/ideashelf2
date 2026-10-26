@@ -58,6 +58,7 @@ import com.rafeeq.companion.notify.RoutineScheduler
 import com.rafeeq.companion.notify.TaskScheduler
 import com.rafeeq.companion.ui.theme.ThemeMode
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,6 +68,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -75,6 +77,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -1195,8 +1199,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * نداء قصير حقيقي للتحقّق. يعيد null عند النجاح أو رسالة عربية عند الفشل —
      * أصدق من فحص شكل المفتاح، الذي يقبل مفتاحًا مُبطَلًا.
+     *
+     * كلّ ما يلمس الشبكة داخل Dispatchers.IO. `Net.execute` يستأنف الكوروتين
+     * في سياق المُنادي — وهو الخيط الرئيسي هنا لأن الشاشة تناديه — فكانت
+     * قراءة جسم الردّ `response.body.string()` تقع على الخيط الرئيسي وترمي
+     * NetworkOnMainThreadException. رسالة ذلك الاستثناء **فارغة**، فكان
+     * `friendly` يسقط إلى آخر حالاته ويكتب «تعذّر الوصول إلى المزوّد» مهما
+     * كان السبب الحقيقي: مفتاح خاطئ، نموذج غير موجود، أو حتى مفتاح سليم.
+     * كل مزوّد كان يفشل بنفس الرسالة المضلّلة.
      */
-    suspend fun testProvider(id: String): String? {
+    suspend fun testProvider(id: String): String? = withContext(Dispatchers.IO) {
         val s = settings.value
         val provider = Providers.byId(id)
         val key = if (provider.kind == Provider.Kind.ANTHROPIC) s.apiKey
@@ -1204,10 +1216,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val model = if (provider.kind == Provider.Kind.ANTHROPIC) s.effectiveModel
         else s.providerModels[id].orEmpty().ifBlank { provider.models.firstOrNull()?.id.orEmpty() }
 
-        if (key.isBlank()) return "ما في مفتاح محفوظ."
-        if (model.isBlank()) return "ما في معرّف نموذج."
+        if (key.isBlank()) return@withContext "ما في مفتاح محفوظ."
+        if (model.isBlank()) return@withContext "ما في معرّف نموذج."
 
-        return runCatching {
+        runCatching {
             if (provider.kind == Provider.Kind.ANTHROPIC) {
                 repos.claude.complete(
                     model = model,
@@ -1218,6 +1230,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 val url = s.providerUrls[id].orEmpty().ifBlank { provider.baseUrl }
                     .trimEnd('/')
+                // بلا max_tokens: الردّ كلمة واحدة أصلًا، وبعض المزوّدين
+                // يرفضون هذا الحقل بينما يقبله غيرهم — فحذفه يُسقط سببَ فشلٍ
+                // لا علاقة له بصحّة المفتاح، وهو ما يفترض أن يقيسه الاختبار.
                 val body = kotlinx.serialization.json.buildJsonObject {
                     put("model", model)
                     putJsonArray("messages") {
@@ -1225,7 +1240,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             put("role", "user"); put("content", "قل: جاهز")
                         })
                     }
-                    put("max_tokens", 16)
                 }
                 val request = okhttp3.Request.Builder()
                     .url("$url/chat/completions")
@@ -1245,6 +1259,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             onFailure = { OpenAiRunner.friendly(it, provider) },
         )
     }
+
+    /**
+     * النماذج المتاحة فعلًا لهذا المفتاح، من المزوّد نفسه.
+     *
+     * معرّفات النماذج تتبدّل أسرع من أي قائمة تُكتب في الكود، وقائمةٌ قديمة
+     * تعني رسالة «النموذج غير موجود» لمستخدم لم يخطئ في شيء. المزوّدون
+     * المتوافقون مع OpenAI يعرضون كلّهم GET /models على نفس العنوان وبنفس
+     * الترويسة، فنسأل الحساب بدل أن نخمّن.
+     */
+    suspend fun fetchModels(id: String): Result<List<String>> = withContext(Dispatchers.IO) {
+        val s = settings.value
+        val provider = Providers.byId(id)
+        if (provider.kind == Provider.Kind.ANTHROPIC) {
+            return@withContext Result.success(ClaudeClient.models.map { it.id })
+        }
+        val key = s.providerKeys[id].orEmpty()
+        if (key.isBlank()) return@withContext Result.failure(IllegalStateException("ما في مفتاح محفوظ."))
+        val url = s.providerUrls[id].orEmpty().ifBlank { provider.baseUrl }.trimEnd('/')
+
+        runCatching {
+            val request = okhttp3.Request.Builder()
+                .url("$url/models")
+                .header("Authorization", "Bearer $key")
+                .build()
+            Net.execute(request).use { response ->
+                val text = response.body?.string().orEmpty()
+                if (!response.isSuccessful) error("${response.code}: ${text.take(200)}")
+                Net.json.parseToJsonElement(text).jsonObject["data"]?.jsonArray
+                    ?.mapNotNull { it.jsonObject["id"]?.jsonPrimitive?.contentOrNull }
+                    ?.sorted()
+                    .orEmpty()
+            }
+        }
+    }
+
     fun setAiModel(value: String) = viewModelScope.launch { repos.settings.setAiModel(value) }
     fun setAiEffort(value: String) = viewModelScope.launch { repos.settings.setAiEffort(value) }
     fun setAiPersona(value: String) = viewModelScope.launch { repos.settings.setAiPersona(value) }

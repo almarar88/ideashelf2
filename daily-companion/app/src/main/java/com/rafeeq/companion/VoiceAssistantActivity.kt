@@ -2,6 +2,7 @@ package com.rafeeq.companion
 
 import android.Manifest
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -84,7 +85,18 @@ class VoiceAssistantActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        setShowWhenLocked(true)
+        /*
+         * setShowWhenLocked أُضيفت في API 27 وأدنى نسخة ندعمها 26، ولم تكن
+         * محروسة: على أندرويد ٨٫٠ يرمي النداء NoSuchMethodError فينهار
+         * المساعد الصوتي لحظة فتحه — وهو مدخله الأساسي من زرّ التشغيل.
+         * العَلَم القديم يؤدّي نفس الغرض على تلك النسخة.
+         */
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
+        }
 
         setContent {
             val vm: AppViewModel = viewModel()

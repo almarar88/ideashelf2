@@ -76,6 +76,7 @@ const api = {
     setModel: (id: string, model: string) => ipcRenderer.invoke('providers:setModel', id, model),
     setUrl: (id: string, url: string) => ipcRenderer.invoke('providers:setUrl', id, url),
     test: (id: string) => ipcRenderer.invoke('providers:test', id),
+    models: (id: string) => ipcRenderer.invoke('providers:models', id),
   },
   voice: {
     models: () => ipcRenderer.invoke('voice:models'),

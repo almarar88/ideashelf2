@@ -1,5 +1,6 @@
 package com.rafeeq.companion
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
@@ -36,7 +37,10 @@ class AssistantTileService : TileService() {
             )
             startActivityAndCollapse(pending)
         } else {
+            // النداء القديم هو الوحيد المتاح قبل أندرويد ١٤، والفرع محروس
+            // بالنسخة أعلاه؛ تحذير الإهمال هنا لا موضع له.
             @Suppress("DEPRECATION")
+            @SuppressLint("StartActivityAndCollapseDeprecated")
             startActivityAndCollapse(intent)
         }
     }

@@ -236,4 +236,74 @@ class OpenAiRunnerTest {
         assertEquals(Provider.Kind.OPENAI, Providers.byId("xai").kind)
         assertEquals("anthropic", Providers.byId("لا يوجد").id, )
     }
+
+    /*
+     * الردود أدناه منسوخة حرفيًا من ردود حقيقية طُلبت من كل مزوّد بمفتاح
+     * باطل. كُتبت أوّل مرّة على افتراض أن الجميع يردّ 401 بصيغة OpenAI —
+     * وهو افتراض خاطئ: xAI وGoogle يردّان 400 بصياغتهما الخاصّة، فكان
+     * المستخدم يرى إنجليزيةً خامًا. هذه الحالات تمنع عودة ذلك.
+     */
+    @Test
+    fun `مفتاح مرفوض يُقرأ بصيغة كل مزوّد لا بصيغة واحدة`() {
+        val cases = mapOf(
+            "xai" to "400: Incorrect API key provided. You can obtain an API key from " +
+                "https://console.x.ai.",
+            "google" to "400: Please pass a valid API key",
+            "openai" to "401: Incorrect API key provided: sk-inval****robe.",
+            "groq" to "401: Invalid API Key",
+            "openrouter" to "401: Missing Authentication header",
+        )
+        for ((id, body) in cases) {
+            val provider = Providers.byId(id)
+            val message = OpenAiRunner.friendly(IllegalStateException(body), provider)
+            assertEquals(
+                "ردّ $id يجب أن يُقرأ كمفتاح غير صالح",
+                "مفتاح ${provider.label} غير صالح.",
+                message,
+            )
+        }
+    }
+
+    /**
+     * استثناء بلا رسالة يعني خطأً برمجيًا، لا انقطاع شبكة.
+     *
+     * كان يُترجم إلى «تعذّر الوصول إلى المزوّد»، فظهر عطلُ خيطٍ رئيسي في
+     * شاشة الإعدادات على أنه مشكلة إنترنت لدى كل مزوّد على حدة — وهي رسالة
+     * تدفع المستخدم لتغيير مفتاحه بينما العطل في التطبيق.
+     */
+    @Test
+    fun `الاستثناء بلا رسالة لا يُقدَّم كعطل شبكة`() {
+        val message = OpenAiRunner.friendly(IllegalStateException(), Providers.byId("xai"))
+        assertFalse("ما يصح يُلام الاتصال", message.contains("اتصال"))
+        assertFalse("ولا يُلام الوصول للمزوّد", message.contains("تعذّر الوصول"))
+        assertTrue("يذكر أنه خطأ داخلي", message.contains("خطأ داخلي"))
+    }
+
+    @Test
+    fun `النموذج المجهول يُحيل إلى جلب النماذج لا إلى الإعدادات`() {
+        val message = OpenAiRunner.friendly(
+            IllegalStateException("404: The model `gpt-5.2` does not exist"),
+            Providers.byId("openai"),
+        )
+        assertTrue(message.contains("اجلب النماذج"))
+    }
+
+    /**
+     * لا معرّف نموذج مخترع في السجلّ.
+     *
+     * `gemini-3.8-flash` و`gpt-5.2` كانا مكتوبَين هنا ولا وجود لهما، فكان
+     * المزوّدان يفشلان دائمًا مهما كان المفتاح صحيحًا.
+     */
+    @Test
+    fun `لا معرّفات نماذج ملغاة في السجلّ`() {
+        val retired = setOf("gemini-3.8-flash", "gpt-5.2", "gemini-2.0-flash")
+        for (provider in Providers.all) {
+            for (model in provider.models) {
+                assertFalse(
+                    "معرّف ملغى في ${provider.id}: ${model.id}",
+                    model.id in retired,
+                )
+            }
+        }
+    }
 }

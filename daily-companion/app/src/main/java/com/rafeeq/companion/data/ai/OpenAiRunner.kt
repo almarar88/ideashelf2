@@ -71,23 +71,45 @@ class OpenAiRunner(
             )
         }
 
-        /** يترجم أخطاء المزوّدين إلى عربية مفهومة. */
+        /**
+         * يترجم أخطاء المزوّدين إلى عربية مفهومة.
+         *
+         * الأنماط هنا مأخوذة من ردود حقيقية طُلبت من كل مزوّد بمفتاح باطل، لا
+         * من افتراض أن الجميع يتبع OpenAI. وهما يختلفان فعلًا: xAI وGoogle
+         * يردّان **400** على مفتاح خاطئ لا 401، ونصّاهما «Incorrect API key
+         * provided» و«Please pass a valid API key» — ولا يطابق أيّهما نمط
+         * `invalid api key`، فكان المستخدم يرى إنجليزيةً خامًا بدل سبب مفهوم.
+         */
         fun friendly(error: Throwable, provider: Provider): String {
             val text = error.message.orEmpty()
             return when {
-                Regex("401|unauthorized|invalid.?api.?key", RegexOption.IGNORE_CASE)
-                    .containsMatchIn(text) -> "مفتاح ${provider.label} غير صالح."
+                // «Incorrect API key» و«pass a valid API key» و«Invalid API Key»
+                // و«Missing Authentication» — كلّها صيغ المزوّدين لمفتاح مرفوض.
+                Regex(
+                    "401|unauthorized|invalid.?api.?key|incorrect api key|" +
+                        "valid api key|api.?key.*(invalid|missing|required)|" +
+                        "missing authentication|authentication_error",
+                    RegexOption.IGNORE_CASE,
+                ).containsMatchIn(text) -> "مفتاح ${provider.label} غير صالح."
                 text.contains("429") -> "طلبات كثيرة — انتظر لحظة."
                 Regex("402|quota|insufficient|billing", RegexOption.IGNORE_CASE)
                     .containsMatchIn(text) -> "الرصيد انتهى لدى المزوّد."
-                Regex("404|model.*not.*found", RegexOption.IGNORE_CASE)
+                Regex("404|model.*not.*(found|exist)|unknown model|does not exist",
+                    RegexOption.IGNORE_CASE)
                     .containsMatchIn(text) ->
-                    "معرّف النموذج غير موجود لدى هذا المزوّد — راجعه في الإعدادات."
+                    "معرّف النموذج غير موجود لدى هذا المزوّد — اضغط «اجلب النماذج»."
+                Regex("unsupported parameter|unrecognized request argument",
+                    RegexOption.IGNORE_CASE)
+                    .containsMatchIn(text) ->
+                    "هذا النموذج لا يقبل أحد حقول الطلب — جرّب نموذجًا آخر."
                 Regex("ECONNREFUSED|Failed to connect", RegexOption.IGNORE_CASE)
                     .containsMatchIn(text) -> "ما في خدمة على هذا العنوان."
-                Regex("Unable to resolve host|timeout|timed out", RegexOption.IGNORE_CASE)
+                Regex("Unable to resolve host|UnknownHost|timeout|timed out",
+                    RegexOption.IGNORE_CASE)
                     .containsMatchIn(text) -> "ما في اتصال."
-                text.isBlank() -> "تعذّر الوصول إلى المزوّد."
+                // رسالة فارغة تعني خطأً برمجيًا لا عطلَ شبكة — وإخفاؤه خلف
+                // «تعذّر الوصول» هو ما أضاع سببَ كل فشل سابق. نُسمّي نوعه.
+                text.isBlank() -> "خطأ داخلي (${error::class.java.simpleName}) — أبلغ عنه."
                 else -> text.take(180)
             }
         }

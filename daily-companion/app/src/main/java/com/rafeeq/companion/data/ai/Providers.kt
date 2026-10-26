@@ -14,6 +14,11 @@ import com.rafeeq.companion.data.ai.ClaudeClient.ModelOption
  *
  * نفس السجلّ الموجود في نسخة ويندوز، والعناوين مأخوذة من توثيق كل مزوّد
  * لا من الذاكرة: واجهتا xAI وGoogle تغيّرتا فعلًا عمّا هو شائع.
+ *
+ * المعرّفات هنا **اقتراحات أولى فقط**. معرّفات النماذج تتبدّل كل أسابيع،
+ * ومعرّفٌ قديم مكتوب في الكود يعني رسالة «النموذج غير موجود» لمستخدمٍ لم
+ * يخطئ في شيء — وقد وقع هذا فعلًا. الحقيقة تأتي من زرّ «اجلب النماذج»،
+ * الذي يسأل حساب المستخدم نفسه عبر GET /models.
  */
 data class Provider(
     val id: String,
@@ -64,8 +69,9 @@ object Providers {
             baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai",
             keyUrl = "https://aistudio.google.com/apikey",
             models = listOf(
-                ModelOption("gemini-3.8-flash", "Gemini 3.8 Flash", "سريع"),
-                ModelOption("gemini-2.0-flash", "Gemini 2.0 Flash", ""),
+                ModelOption("gemini-3-flash-preview", "Gemini 3 Flash", "سريع"),
+                ModelOption("gemini-2.5-flash", "Gemini 2.5 Flash", ""),
+                ModelOption("gemini-2.5-pro", "Gemini 2.5 Pro", ""),
             ),
             note = "عبر طبقة التوافق الرسمية من Google، وهي ما تزال تجريبية لديهم.",
         ),
@@ -76,7 +82,7 @@ object Providers {
             baseUrl = "https://api.openai.com/v1",
             keyUrl = "https://platform.openai.com/api-keys",
             models = listOf(
-                ModelOption("gpt-5.2", "GPT-5.2", ""),
+                ModelOption("gpt-5", "GPT-5", ""),
                 ModelOption("gpt-5-mini", "GPT-5 mini", "أرخص"),
             ),
             note = "الأدوات تعمل. اكتب معرّف أي نموذج متاح في حسابك.",

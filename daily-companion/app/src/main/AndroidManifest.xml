@@ -31,6 +31,16 @@
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
+    <!--
+      أذونات الاتصال والكاميرا تجعل النظام يفترض أن التطبيق يحتاج ذلك
+      العتاد، فيختفي عن الأجهزة التي لا تملكه — لوح بلا شريحة، أو جهاز
+      بلا كاميرا. وهو ليس كذلك: كلّ ميزاته الأساسية تعمل بدونها.
+    -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />

@@ -92,6 +92,7 @@ export interface AlcodeBridge {
     setModel(id: string, model: string): Promise<boolean>
     setUrl(id: string, url: string): Promise<boolean>
     test(id: string): Promise<{ ok: boolean; error: string }>
+    models(id: string): Promise<{ ok: boolean; models: string[]; error: string }>
   }
   voice: {
     models(): Promise<{ id: string; arabic: string; hint: string }[]>

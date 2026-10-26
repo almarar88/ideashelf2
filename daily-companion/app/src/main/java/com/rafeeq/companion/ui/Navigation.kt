@@ -1,5 +1,6 @@
 package com.rafeeq.companion.ui
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -119,6 +120,10 @@ private val tabs = listOf(
     Tab(Routes.ASSISTANT, "المساعد", Icons.Filled.AutoAwesome),
 )
 
+// حشو Scaffold متروك عمدًا: شريط التنقّل يطفو فوق المحتوى بدل أن يحجز صفًا
+// أسفل الشاشة، والحوافّ معوَّضة يدويًا بـ statusBarsPadding هنا وبـ
+// floatingNavSpace/safeBottomSpace داخل كل شاشة.
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun RafeeqNavigation(
     viewModel: AppViewModel,
@@ -201,8 +206,10 @@ fun RafeeqNavigation(
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
+        // حشو Scaffold متروك عمدًا: الشريط يطفو فوق المحتوى بدل أن يحجز
+        // صفًا أسفل الشاشة، والحوافّ معوَّضة يدويًا بـ statusBarsPadding
+        // أدناه وبـ floatingNavSpace/safeBottomSpace في كل شاشة.
     ) { _ ->
-        // الشريط يطفو فوق المحتوى بدل أن يحجز صفًا أسفل الشاشة،
         // فتبقى البطاقات ممتدة حتى الحافة كما في التصميم المرجعي.
         Box(Modifier.fillMaxSize()) {
         Column(
