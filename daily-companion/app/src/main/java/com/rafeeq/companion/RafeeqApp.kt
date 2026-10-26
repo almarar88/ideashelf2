@@ -61,8 +61,8 @@ class Repos(app: Application) {
      * قبلها كانت تنادي Anthropic دائمًا، فتموت لمن بدّل مزوّده.
      */
     val completion = Completion(
-        settingsOf = { runCatching { runBlocking { settings.settings.first() } }
-            .getOrDefault(AppSettings()) },
+        // بلا runBlocking: هذه تُنادى من كوروتين، فتُعلَّق لا تحجب.
+        settingsOf = { runCatching { settings.settings.first() }.getOrDefault(AppSettings()) },
         claude = claude,
     )
     val agent = AgentRunner(apiKey)

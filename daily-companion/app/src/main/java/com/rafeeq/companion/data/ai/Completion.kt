@@ -28,7 +28,15 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * تبديل المزوّد يجب أن يبدّل التطبيق كلّه، لا المحادثة وحدها.
  */
 class Completion(
-    private val settingsOf: () -> AppSettings,
+    /**
+     * مُعلَّقة لا عادية — عمدًا.
+     *
+     * كانت دالّة عادية تقرأ الإعدادات بـ `runBlocking`. ولأن `text` تُنادى
+     * من `viewModelScope` أي على الخيط الرئيسي، كان أوّل سطر فيها يحجب
+     * الواجهة على قراءة قرص: يعلّق التطبيق ولا تُفتح الشاشة الرئيسية.
+     * التوقيع المُعلَّق يجعل ذلك مستحيلًا.
+     */
+    private val settingsOf: suspend () -> AppSettings,
     private val claude: ClaudeClient,
 ) {
 
@@ -40,12 +48,13 @@ class Completion(
         user: String,
         maxTokens: Int = 1200,
         effort: String = "medium",
-    ): String {
+    ): String = withContext(Dispatchers.IO) {
+        // كل شيء خارج الخيط الرئيسي، بما في ذلك قراءة الإعدادات.
         val settings = settingsOf()
         val provider = settings.activeProvider
 
         if (provider.kind == Provider.Kind.ANTHROPIC) {
-            return claude.complete(
+            return@withContext claude.complete(
                 model = settings.activeModel,
                 system = system,
                 messages = listOf(ClaudeClient.Msg("user", user)),
@@ -54,7 +63,7 @@ class Completion(
             )
         }
 
-        return withContext(Dispatchers.IO) {
+        run {
             val url = settings.activeUrl.trimEnd('/')
             val payload = buildJsonObject {
                 put("model", settings.activeModel)

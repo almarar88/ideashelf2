@@ -19,7 +19,15 @@ import android.os.SystemClock
  */
 object WidgetRefresher {
 
-    private const val EVERY_MINUTE = 60_000L
+    /*
+     * كل خمس دقائق لا كل دقيقة.
+     *
+     * الدقيقة كانت توقظ عملية التطبيق ستّين مرّة في الساعة، كلٌّ منها يقرأ
+     * الإعدادات وملفَّي المهام والعادات. العدّاد في المربّع يُقرأ بالساعات
+     * والدقائق، ولا أحد يحدّق فيه ينتظر تغيّر الرقم — فخمس دقائق تعطي نفس
+     * الفائدة بخُمس الإيقاظ.
+     */
+    private const val INTERVAL_MS = 5 * 60_000L
 
     private fun intent(context: Context): PendingIntent = PendingIntent.getBroadcast(
         context,
@@ -33,7 +41,7 @@ object WidgetRefresher {
         runCatching {
             manager.set(
                 AlarmManager.ELAPSED_REALTIME,
-                SystemClock.elapsedRealtime() + EVERY_MINUTE,
+                SystemClock.elapsedRealtime() + INTERVAL_MS,
                 intent(context),
             )
         }

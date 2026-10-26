@@ -56,7 +56,14 @@ class DayWidget : AppWidgetProvider() {
         super.onReceive(context, intent)
         if (intent.action == ACTION_REFRESH) {
             val manager = AppWidgetManager.getInstance(context)
-            refresh(context, manager, manager.getAppWidgetIds(componentOf(context)))
+            val ids = manager.getAppWidgetIds(componentOf(context))
+            // بلا مربّع على الشاشة لا تحديث ولا جدولة: السلسلة كانت تستمرّ
+            // إلى الأبد حتى بعد إزالة المربّع، فتوقظ التطبيق بلا مستفيد.
+            if (ids.isEmpty()) {
+                WidgetRefresher.cancel(context)
+                return
+            }
+            refresh(context, manager, ids)
             WidgetRefresher.schedule(context)
         }
     }

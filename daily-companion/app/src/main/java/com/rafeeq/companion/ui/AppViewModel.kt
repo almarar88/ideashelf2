@@ -54,6 +54,7 @@ import com.rafeeq.companion.data.prayer.CalculationMethod
 import com.rafeeq.companion.data.prayer.DayPrayers
 import com.rafeeq.companion.data.prayer.HighLatitudeRule
 import com.rafeeq.companion.data.prayer.Prayer
+import com.rafeeq.companion.data.prayer.PrayerConfig
 import com.rafeeq.companion.data.prayer.PrayerTimes
 import com.rafeeq.companion.notify.PrayerScheduler
 import com.rafeeq.companion.notify.HabitScheduler
@@ -288,9 +289,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             .getOrElse { ZoneId.systemDefault() }
     }
 
-    /** أوقات صلاة اليوم المطلوب. */
+    /*
+     * ذاكرة أوقات الصلاة.
+     *
+     * الشاشة الرئيسية تُعاد تركيبتها كل ثانية (عدّاد `tick`)، وفي كل مرّة
+     * كانت تُنادى `nextPrayer` و`todayPrayers` فتُعاد الحسابات الفلكية
+     * كاملةً مرّتين أو ثلاثًا — كلّها على خيط الواجهة أثناء التركيب. النتيجة
+     * واحدة دائمًا ما لم يتغيّر اليوم أو الموقع أو طريقة الحساب، فلا معنى
+     * لإعادتها ستّين مرّة في الدقيقة.
+     */
+    private data class PrayerKey(
+        val date: LocalDate,
+        val place: Place?,
+        val config: PrayerConfig,
+        val hijriOffset: Int,
+    )
+
+    private val prayerCache = java.util.concurrent.ConcurrentHashMap<PrayerKey, DayPrayers>()
+
+    /** أوقات صلاة اليوم المطلوب — محسوبة مرّة لكل يوم/موقع/إعداد. */
     fun prayersFor(date: LocalDate): DayPrayers? {
-        val place = settings.value.place ?: return null
+        val s = settings.value
+        val place = s.place ?: return null
+        val key = PrayerKey(date, place, s.prayerConfig, s.hijriOffset)
+        prayerCache[key]?.let { return it }
+        // المفتاح يحمل كل ما يؤثّر في النتيجة، فلا يكبر إلا بتبدّل الأيام.
+        if (prayerCache.size > 64) prayerCache.clear()
+        return computePrayers(date, place).also { prayerCache[key] = it }
+    }
+
+    private fun computePrayers(date: LocalDate, place: Place): DayPrayers {
         return PrayerTimes.calculate(
             date = date,
             latitude = place.latitude,
