@@ -1,5 +1,7 @@
 package com.rafeeq.companion.ui.screens
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.LocalContentColor
 import android.content.Context
@@ -152,17 +154,32 @@ fun PrayerScreen(
                                 style = MaterialTheme.typography.labelLarge,
                                 color = ink.copy(alpha = 0.75f),
                             )
+                            /*
+                             * اسم الصلاة لا ينكسر ولا يُقتطع.
+                             *
+                             * كان «الظهر» يظهر «الظه» ثمّ «ر» على سطرين،
+                             * والعربية لا تُقطع كلماتها. السبب ليس ضيق
+                             * البطاقة بل حجم الخطّ: للتطبيق مُكبِّر حتى
+                             * ١٫٤، ويضربه مُكبِّر النظام فوقه، فـ ٣٤sp قد
+                             * تصير ستّين. سطرٌ واحد مع `softWrap = false`
+                             * كان يمنع الكسر ويستبدله بقَطعٍ من الحافّة —
+                             * عطلٌ آخر لا حلّ.
+                             *
+                             * فيُصغَّر الخطّ تلقائيًا حتى يتّسع: يبقى سطرًا
+                             * واحدًا كاملًا مهما بلغ تكبير المستخدم.
+                             */
                             Text(
                                 prayer.arabic,
                                 style = MaterialTheme.typography.headlineLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = ink,
-                                // اسم الصلاة لا ينكسر: كان «الظهر» يُقطع
-                                // إلى «الظه» و«ر» على سطرين — والعربية
-                                // لا تُقطع كلماتها.
                                 maxLines = 1,
                                 softWrap = false,
-                                overflow = TextOverflow.Visible,
+                                autoSize = TextAutoSize.StepBased(
+                                    minFontSize = 18.sp,
+                                    maxFontSize = MaterialTheme.typography.headlineLarge.fontSize,
+                                    stepSize = 1.sp,
+                                ),
                             )
                             Text(
                                 "${Dates.formatTime(time, settings.use24hClock)} · بعد ${Dates.humanDuration(remaining)}",
